@@ -1,4 +1,3 @@
-// package.json at root (mc-explorer)
 {
   "scripts": {
     "build": "cd mc-explorer-client && npm install && npm run build",
