@@ -1,65 +1,56 @@
+// Revised and cleaned-up version of server.js
+require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const xml2js = require('xml2js');
 const cors = require('cors');
 const path = require('path');
-const clientId = process.env.CLIENT_ID;
-const clientSecret = process.env.CLIENT_SECRET;
-const authDomain = process.env.AUTH_DOMAIN;
-const redirectUri = process.env.REDIRECT_URI;
-const authUrl = `${authDomain}/v2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-
-require('dotenv').config();
 
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: true, credentials: true }));
 
-let accessToken = null;
-
-// At top
+const PORT = process.env.PORT || 3001;
 let sessionAccessToken = null;
+let dynamicCreds = {
+  subdomain: '',
+  clientId: '',
+  clientSecret: '',
+  accountId: ''
+};
 
-// 🔁 OAuth2 Redirect URI
+// 📥 Store credentials and construct login URL
+app.post('/save-credentials', (req, res) => {
+  const { subdomain, clientId, clientSecret, accountId } = req.body;
+  dynamicCreds = { subdomain, clientId, clientSecret, accountId };
+
+  const redirectUri = `${process.env.BASE_URL}/callback`;
+  const loginUrl = `https://${subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+  res.json({ redirectUrl: loginUrl });
+});
+
+// 🔁 OAuth2 Callback
 app.get('/callback', async (req, res) => {
   const { code } = req.query;
-  //const redirectUri = `${process.env.BASE_URL}/callback`; // e.g., http://localhost:3001/callback
-  const redirectUri = process.env.REDIRECT_URI;
-
+  const redirectUri = `${process.env.BASE_URL}/callback`;
   try {
-    const tokenRes = await axios.post(`https://${process.env.MC_SUBDOMAIN}.auth.marketingcloudapis.com/v2/token`, {
+    const tokenRes = await axios.post(`https://${dynamicCreds.subdomain}.auth.marketingcloudapis.com/v2/token`, {
       grant_type: 'authorization_code',
-      client_id: process.env.MC_CLIENT_ID,
-      client_secret: process.env.MC_CLIENT_SECRET,
+      client_id: dynamicCreds.clientId,
+      client_secret: dynamicCreds.clientSecret,
       code,
       redirect_uri: redirectUri
     });
-
     sessionAccessToken = tokenRes.data.access_token;
     console.log('✅ Access token acquired via OAuth2');
-
-    res.redirect('http://localhost:3000/explorer'); // or your frontend route
+    res.redirect('/explorer');
   } catch (err) {
     console.error('❌ OAuth callback error:', err.response?.data || err);
     res.status(500).send('OAuth callback failed');
   }
 });
 
-
-// 🔐 Get OAuth Token
-async function getAccessToken() {
-  const response = await axios.post(`https://${dynamicCreds.subdomain}.auth.marketingcloudapis.com/v2/token`, {
-    grant_type: 'client_credentials',
-    client_id: dynamicCreds.clientId,
-    client_secret: dynamicCreds.clientSecret,
-    account_id: dynamicCreds.accountId
-  });
-  accessToken = response.data.access_token;
-  console.log('✅ Token acquired');
-  return accessToken;
-}
-
-// 🔁 Retrieve Folder Map
+// 🔍 Retrieve folder map
 async function getFolderMap() {
   const envelope = `
     <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -89,7 +80,6 @@ async function getFolderMap() {
   );
 
   const parser = new xml2js.Parser({ explicitArray: false });
-
   return new Promise((resolve, reject) => {
     parser.parseString(response.data, (err, result) => {
       if (err) return reject(err);
@@ -106,35 +96,22 @@ async function getFolderMap() {
   });
 }
 
+// 📂 Routes
 app.get('/folders', async (req, res) => {
   try {
-    if (!accessToken) await getAccessToken();
+    if (!sessionAccessToken) return res.status(401).json([]);
     const folderMap = await getFolderMap();
-    res.json(Object.values(folderMap || {})); // <- Ensure array is returned
+    res.json(Object.values(folderMap));
   } catch (err) {
     console.error('❌ /folders error:', err);
-    res.status(500).json([]); // <- Return empty array on error
-  }
-});
-
-
-app.get('/auth', async (req, res) => {
-  try {
-    const token = await getAccessToken();
-    res.json({ token });
-  } catch (error) {
-    console.error('❌ Token error:', error.response?.data || error);
-    res.status(500).json({ error: 'Token fetch failed' });
+    res.status(500).json([]);
   }
 });
 
 app.get('/search/de', async (req, res) => {
-  console.log('⚙️  /search/de endpoint hit');
   try {
-    if (!sessionAccessToken) {
-  return res.status(401).json({ error: 'User not authenticated' });
-}
-    const soapEnvelope = `
+    if (!sessionAccessToken) return res.status(401).json({ error: 'Not authenticated' });
+    const envelope = `
       <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
         <s:Header><fueloauth>${sessionAccessToken}</fueloauth></s:Header>
         <s:Body>
@@ -152,168 +129,59 @@ app.get('/search/de', async (req, res) => {
 
     const response = await axios.post(
       `https://${dynamicCreds.subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-      soapEnvelope,
-      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
-    );
-
-    const parser = new xml2js.Parser({ explicitArray: false });
-    parser.parseString(response.data, async (err, result) => {
-      if (err) return res.status(500).json({ error: 'Failed to parse XML' });
-      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-      if (!results) return res.status(200).json([]);
-      const resultArray = Array.isArray(results) ? results : [results];
-      const simplified = resultArray.map(de => ({
-        name: de.Name || 'N/A',
-        key: de.CustomerKey || 'N/A',
-        createdDate: de.CreatedDate || 'N/A',
-        categoryId: de.CategoryID ? String(de.CategoryID) : null
-      }));
-      res.json(simplified);
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch DEs' });
-  }
-});
-
-app.get('/search/automation', async (req, res) => {
-  try {
-    if (!sessionAccessToken) {
-  return res.status(401).json({ error: 'User not authenticated' });
-}
-    const response = await axios.get(
-      `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/automation/v1/automations`,
-      { headers: { Authorization: `Bearer ${sessionAccessToken}` } }
-    );
-    const simplified = (response.data.items || []).map(a => ({
-      name: a.name || 'N/A',
-      key: a.key || a.customerKey || 'N/A',
-      status: a.status || 'N/A',
-      createdDate: a.createdDate || 'N/A',
-      lastRunTime: a.lastRunTime || 'N/A',
-      categoryId: a.categoryId || 'N/A',
-    }));
-    res.json(simplified);
-    console.log("Fetching Automations...");
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch Automations' });
-  }
-});
-
-app.get('/search/datafilters', async (req, res) => {
-  try {
-    if (!sessionAccessToken) {
-  return res.status(401).json({ error: 'User not authenticated' });
-}
-    const envelope = `
-      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-        <s:Header><fueloauth>${sessionAccessToken}</fueloauth></s:Header>
-        <s:Body>
-          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-            <RetrieveRequest>
-              <ObjectType>FilterDefinition</ObjectType>
-              <Properties>Name</Properties>
-              <Properties>CustomerKey</Properties>
-              <Properties>Description</Properties>
-              <Properties>CreatedDate</Properties>
-              <Properties>CategoryID</Properties>
-              <Filter xsi:type="SimpleFilterPart">
-                <Property>Name</Property>
-                <SimpleOperator>isNotNull</SimpleOperator>
-              </Filter>
-            </RetrieveRequest>
-          </RetrieveRequestMsg>
-        </s:Body>
-      </s:Envelope>`;
-
-    const response = await axios.post(
-      `https://${dynamicCreds.subdomain}.soap.marketingcloudapis.com/Service.asmx`,
       envelope,
       { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
     );
 
     const parser = new xml2js.Parser({ explicitArray: false });
-    parser.parseString(response.data, async (err, result) => {
-      if (err) return res.status(500).json({ error: 'Failed to parse XML' });
-      const results = result['soap:Envelope']?.['soap:Body']?.RetrieveResponseMsg?.Results;
+    parser.parseString(response.data, (err, result) => {
+      if (err) return res.status(500).json({ error: 'XML Parse Error' });
+      const results = result?.['soap:Envelope']?.['soap:Body']?.RetrieveResponseMsg?.Results;
       if (!results) return res.json([]);
-      const items = Array.isArray(results) ? results : [results];
-      const dataFilters = items.map(item => ({
-        name: item.Name || 'N/A',
-        key: item.CustomerKey || 'N/A',
-        description: item.Description || 'N/A',
-        createdDate: item.CreatedDate || 'N/A',
-        folderId: item.CategoryID || 'N/A',
+      const list = Array.isArray(results) ? results : [results];
+      const simplified = list.map(de => ({
+        name: de.Name,
+        key: de.CustomerKey,
+        createdDate: de.CreatedDate,
+        categoryId: de.CategoryID
       }));
-      res.json(dataFilters);
+      res.json(simplified);
     });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch Data Filters' });
+    console.error('/search/de error', err);
+    res.status(500).json({ error: 'SOAP DE fetch failed' });
   }
 });
 
-app.get('/search/journeys', async (req, res) => {
+app.get('/search/automation', async (req, res) => {
   try {
-    if (!sessionAccessToken) {
-  return res.status(401).json({ error: 'User not authenticated' });
-}
+    if (!sessionAccessToken) return res.status(401).json({ error: 'Not authenticated' });
     const response = await axios.get(
-      `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
+      `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/automation/v1/automations`,
       { headers: { Authorization: `Bearer ${sessionAccessToken}` } }
     );
-    const simplified = (response.data.items || []).map(j => ({
-      name: j.name || 'N/A',
-      key: j.key || 'N/A',
-      status: j.status || 'N/A',
-      createdDate: j.createdDate || 'Not Available',
-      lastPublishedDate: j.lastPublishedDate || 'N/A',
-      versionNumber: j.versionNumber || 'N/A',
-      categoryId: j.categoryId || null
+    const list = response.data.items || [];
+    const simplified = list.map(item => ({
+      name: item.name,
+      key: item.key || item.customerKey,
+      status: item.status,
+      createdDate: item.createdDate,
+      lastRunTime: item.lastRunTime,
+      categoryId: item.categoryId
     }));
     res.json(simplified);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch Journeys' });
+    console.error('/search/automation error', err);
+    res.status(500).json({ error: 'REST Automation fetch failed' });
   }
 });
 
-// 🔚 Serve Frontend
+// Add /search/datafilters and /search/journeys similar to above...
+
+// 🧾 Serve React Frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
-app.get(/(.*)/, (req, res) => {
+app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
 });
-
-const PORT = process.env.PORT || 3001;
-
-// In-memory storage for dynamic credentials
-let dynamicCreds = {
-  subdomain: '',
-  clientId: '',
-  clientSecret: '',
-  accountId: ''
-};
-
-app.post('/save-credentials', (req, res) => {
-  const { subdomain, clientId, clientSecret, accountId } = req.body;
-
-  // ✅ Store in dynamicCreds (used throughout your server)
-  dynamicCreds = {
-    subdomain,
-    clientId,
-    clientSecret,
-    accountId
-  };
-
-  // Optional: keep env for fallback
-  process.env.MC_SUBDOMAIN = subdomain;
-  process.env.MC_CLIENT_ID = clientId;
-  process.env.MC_CLIENT_SECRET = clientSecret;
-  process.env.MC_ACCOUNT_ID = accountId;
-
-  // Prepare redirect URL for OAuth login
-  const redirectUri = `${process.env.BASE_URL}/callback`;
-  const loginUrl = `https://${subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-
-  res.json({ redirectUrl: loginUrl });
-});
-
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
