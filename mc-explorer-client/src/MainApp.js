@@ -22,6 +22,7 @@ function MainApp() {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
 
   useEffect(() => {
   if (!isAuthenticated) return;
