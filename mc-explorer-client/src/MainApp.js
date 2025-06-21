@@ -19,15 +19,10 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    window.location.href = '/';
-  };
-
+  // Handle login status via URL param and localStorage
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const hasAuth = urlParams.get('auth') === '1';
-
     if (hasAuth) {
       console.log('✅ Auth param detected. Setting localStorage.');
       localStorage.setItem('isAuthenticated', 'true');
@@ -40,6 +35,7 @@ function MainApp() {
     setLoading(false);
   }, []);
 
+  // Backend session check
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -47,34 +43,42 @@ function MainApp() {
     fetch(`${baseURL}/business-units`, { credentials: 'include' })
       .then(res => {
         if (res.status === 401) {
-          console.warn('🚫 Unauthorized session. Redirecting...');
-          window.location.href = '/auth/login';
+          console.warn('🚫 Unauthorized session. Redirecting to login...');
+          localStorage.removeItem('isAuthenticated');
+          window.location.href = '/';
         } else {
           console.log('✅ Backend session is valid');
         }
       })
       .catch(err => {
-        console.error('⚠️ Error while checking backend session:', err);
-        window.location.href = '/auth/login';
+        console.error('⚠️ Error checking session:', err);
+        localStorage.removeItem('isAuthenticated');
+        window.location.href = '/';
       });
   }, [isAuthenticated]);
 
+  // Load all assets
   useEffect(() => {
     if (!isAuthenticated) return;
 
     console.log('📦 Fetching data from all endpoints...');
-    fetch(`${baseURL}/search/de`, { credentials: 'include' }).then(res => res.json()).then(setDataExtensions);
-    fetch(`${baseURL}/search/automation`, { credentials: 'include' }).then(res => res.json()).then(setAutomations);
-    fetch(`${baseURL}/search/datafilters`, { credentials: 'include' }).then(res => res.json()).then(setDataFilters);
-    fetch(`${baseURL}/search/journeys`, { credentials: 'include' }).then(res => res.json()).then(setJourneys);
-    fetch(`${baseURL}/folders`, { credentials: 'include' })
+    fetch(`${baseURL}/search/de`).then(res => res.json()).then(setDataExtensions).catch(console.error);
+    fetch(`${baseURL}/search/automation`).then(res => res.json()).then(setAutomations).catch(console.error);
+    fetch(`${baseURL}/search/datafilters`).then(res => res.json()).then(setDataFilters).catch(console.error);
+    fetch(`${baseURL}/search/journeys`).then(res => res.json()).then(setJourneys).catch(console.error);
+    fetch(`${baseURL}/folders`)
       .then(res => res.json())
       .then(folders => {
         const map = {};
         (folders || []).forEach(f => map[f.ID] = f);
         setFolderMap(map);
-      });
+      }).catch(console.error);
   }, [isAuthenticated]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated');
+    window.location.href = '/';
+  };
 
   const buildFolderPath = (id) => {
     if (!id || !folderMap[id]) return 'N/A';
@@ -88,6 +92,7 @@ function MainApp() {
   };
 
   const sortData = (data) => {
+    if (!Array.isArray(data)) return [];
     if (!sortConfig.key) return data;
     return [...data].sort((a, b) => {
       const aVal = a[sortConfig.key]?.toString().toLowerCase() || '';
@@ -106,7 +111,7 @@ function MainApp() {
   const getFilteredData = () => {
     const term = searchTerm.toLowerCase();
     const matches = (item) =>
-      Object.values(item || {}).some(val =>
+      Object.values(item).some(val =>
         (val || '').toString().toLowerCase().includes(term)
       );
 
@@ -139,11 +144,15 @@ function MainApp() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto bg-gradient-to-br from-slate-50 to-slate-200 min-h-screen font-sans">
-      <h1 className="text-3xl font-bold text-indigo-700 mb-6">MC Explorer</h1>
-      <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
-        Logout
-      </button>
-      {/* Render your table, tabs, filters, etc. here */}
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold text-indigo-700">MC Explorer</h1>
+        <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
+          Logout
+        </button>
+      </div>
+
+      {/* UI can go here: tabs, search, table, etc. */}
+      {/* This part can be filled in based on what you want to render */}
     </div>
   );
 }
