@@ -1,14 +1,10 @@
 {
-  "scripts": {
-    "build": "cd mc-explorer-client && npm install && npm run build",
-    "start": "cd server && node server.js"
-  }
-}
-{
   "name": "mc-explorer",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
+    "build": "cd mc-explorer-client && npm install && npm run build",
+    "start": "cd server && node server.js",
     "dev": "nodemon server.js"
   },
   "keywords": [],
