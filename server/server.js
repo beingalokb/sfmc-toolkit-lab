@@ -29,6 +29,18 @@ app.post('/save-credentials', (req, res) => {
   res.json({ redirectUrl: loginUrl });
 });
 
+app.get('/auth/login', (req, res) => {
+  if (!dynamicCreds.subdomain || !dynamicCreds.clientId) {
+    return res.status(400).json({ error: 'Missing credentials' });
+  }
+
+  const redirectUri = `${process.env.BASE_URL}/callback`;
+  const loginUrl = `https://${dynamicCreds.subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${dynamicCreds.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+
+  res.redirect(loginUrl);
+});
+
+
 // 🔁 OAuth2 Callback
 app.get('/callback', async (req, res) => {
   const { code } = req.query;
