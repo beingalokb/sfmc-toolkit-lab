@@ -19,6 +19,16 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+
+  useEffect(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('auth') === '1') {
+    localStorage.setItem('isAuthenticated', 'true');
+    window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+  }
+}, []);
+
+  
   // 🔐 Auth check
   useEffect(() => {
     fetch('`${baseURL}/business-units', { credentials: 'include' })
