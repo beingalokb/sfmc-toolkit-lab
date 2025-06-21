@@ -1,49 +1,96 @@
-// LoginPage.js
 import React, { useState } from 'react';
-import logo from './assets/mc-explorer-logo.jpg';
 
-function LoginPage({ onSubmit }) {
-  const [subdomain, setSubdomain] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
-  const [accountId, setAccountId] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+function LoginPage({ onConnect }) {
+  const [formData, setFormData] = useState({
+    subdomain: '',
+    clientId: '',
+    clientSecret: '',
+    accountId: ''
+  });
 
-  const handleConnect = async () => {
-    if (!subdomain || !clientId || !clientSecret || !accountId) {
-      setError('All fields are required');
-      return;
-    }
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
-    setError('');
-    setLoading(true);
-
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     try {
-      const res = await fetch(`${process.env.REACT_APP_BASE_URL}/save-credentials`, {
+      const res = await fetch('/save-credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain, clientId, clientSecret, accountId })
+        body: JSON.stringify(formData)
       });
+
       const data = await res.json();
-      window.location.href = data.redirectUrl;
-    } catch (err) {
-      setError('Connection failed. Please check your inputs.');
-      setLoading(false);
+      if (data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-gradient-to-br from-indigo-100 to-indigo-200 p-4">
-      <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-md">
-        <div className="flex flex-col items-center mb-6">
-          <img src={logo} alt="Logo" className="h-20 w-20 rounded-full shadow" />
-          <h1 className="mt-4 text-3xl font-bold text-indigo-700">MC Explorer</h1>
-          <p className="text-sm text-gray-600">Connect to your Marketing Cloud instance</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow-md w-full max-w-lg space-y-4">
+        <h2 className="text-2xl font-bold text-center text-indigo-700 mb-4">Marketing Cloud Setup</h2>
+
+        <div>
+          <label className="block text-sm font-medium">Subdomain</label>
+          <input
+            type="text"
+            name="subdomain"
+            value={formData.subdomain}
+            onChange={handleChange}
+            className="mt-1 block w-full border border-gray-300 rounded px-3 py-2"
+            placeholder="e.g., mc16yjrwn853grmhd9jpbgwr06f0"
+            required
+          />
         </div>
 
-        {/* We'll add the input fields and button next */}
-      </div>
+        <div>
+          <label className="block text-sm font-medium">Client ID</label>
+          <input
+            type="text"
+            name="clientId"
+            value={formData.clientId}
+            onChange={handleChange}
+            className="mt-1 block w-full border border-gray-300 rounded px-3 py-2"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Client Secret</label>
+          <input
+            type="password"
+            name="clientSecret"
+            value={formData.clientSecret}
+            onChange={handleChange}
+            className="mt-1 block w-full border border-gray-300 rounded px-3 py-2"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Account ID</label>
+          <input
+            type="text"
+            name="accountId"
+            value={formData.accountId}
+            onChange={handleChange}
+            className="mt-1 block w-full border border-gray-300 rounded px-3 py-2"
+            required
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="w-full bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700 transition"
+        >
+          Connect
+        </button>
+      </form>
     </div>
   );
 }
