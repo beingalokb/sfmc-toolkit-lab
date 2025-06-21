@@ -211,28 +211,31 @@ app.get('/search/datafilters', async (req, res) => {
     );
 
     const parser = new xml2js.Parser({ explicitArray: false });
+
     parser.parseString(response.data, (err, result) => {
       if (err) return res.status(500).json({ error: 'Failed to parse XML' });
 
       const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-      if (!results) return res.json([]);
-      
+      if (!results) return res.status(200).json([]);
+
       const items = Array.isArray(results) ? results : [results];
-      const dataFilters = items.map(item => ({
+
+      const dataFilters = items.map(df => ({
         name: df.Name || 'N/A',
         key: df.CustomerKey || 'N/A',
         description: df.Description || 'N/A',
         createdDate: df.CreatedDate || 'N/A',
-        folderId: item.CategoryID ? String(item.CategoryID) : null, // 👈 Ensure it's string
+        folderId: df.CategoryID ? String(df.CategoryID) : null
       }));
 
       res.json(dataFilters);
     });
   } catch (err) {
-    console.error('❌ Error in /search/datafilters:', err);
-    res.status(500).json({ error: 'Failed to fetch data filters' });
+    console.error('❌ /search/datafilters error:', err);
+    res.status(500).json({ error: 'Failed to fetch Data Filters' });
   }
 });
+
 
 // Add /search/datafilters and /search/journeys similar to above...
 
