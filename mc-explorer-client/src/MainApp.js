@@ -23,6 +23,10 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  const fetchData = () => {
+  fetch(`${baseURL}/search/de`)
+    .then(res => res.json())
+    .then(data => setDataExtensions(Array.isArray(data) ? data : []));
 
   useEffect(() => {
   if (!isAuthenticated) return;
