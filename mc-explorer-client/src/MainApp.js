@@ -6,23 +6,6 @@ import './App.css';
 const baseURL = process.env.REACT_APP_BASE_URL;
 
 function MainApp() {
-
-  useEffect(() => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const hasAuth = urlParams.get('auth') === '1';
-
-  if (hasAuth) {
-    console.log('✅ Auth param detected. Setting localStorage.');
-    localStorage.setItem('isAuthenticated', 'true');
-    window.history.replaceState({}, document.title, window.location.pathname);
-  }
-
-  const authStatus = localStorage.getItem('isAuthenticated') === 'true';
-  console.log('🔐 Local auth status:', authStatus);
-  setIsAuthenticated(authStatus);
-  setLoading(false);
-}, []);
-
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState('de');
@@ -36,68 +19,57 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Logout function
+  // 🔐 Read from localStorage once
+  useEffect(() => {
+    const authStatus = localStorage.getItem('isAuthenticated') === 'true';
+    console.log('🔐 Local auth status:', authStatus);
+    setIsAuthenticated(authStatus);
+    setLoading(false);
+  }, []);
+
+  // 🔄 Check server-side session
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    console.log('🔍 Checking session with backend...');
+    fetch(`${baseURL}/business-units`, { credentials: 'include' })
+      .then(res => {
+        if (res.status === 401) {
+          console.warn('🚫 Unauthorized session. Redirecting...');
+          window.location.href = '/auth/login';
+        } else {
+          console.log('✅ Backend session is valid');
+        }
+      })
+      .catch(err => {
+        console.error('⚠️ Error while checking backend session:', err);
+        window.location.href = '/auth/login';
+      });
+  }, [isAuthenticated]);
+
+  // 📦 Fetch marketing data
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    console.log('📦 Fetching data from all endpoints...');
+    fetch(`${baseURL}/search/de`).then(res => res.json()).then(setDataExtensions);
+    fetch(`${baseURL}/search/automation`).then(res => res.json()).then(setAutomations);
+    fetch(`${baseURL}/search/datafilters`).then(res => res.json()).then(setDataFilters);
+    fetch(`${baseURL}/search/journeys`).then(res => res.json()).then(setJourneys);
+    fetch(`${baseURL}/folders`)
+      .then(res => res.json())
+      .then(folders => {
+        const map = {};
+        (folders || []).forEach(f => map[f.ID] = f);
+        setFolderMap(map);
+      });
+  }, [isAuthenticated]);
+
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
     window.location.href = '/';
   };
 
-  // URL auth param handler + localStorage setup
-  useEffect(() => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const hasAuth = urlParams.get('auth') === '1';
-
-  if (hasAuth) {
-    console.log('✅ Auth param detected. Setting localStorage.');
-    localStorage.setItem('isAuthenticated', 'true');
-    window.history.replaceState({}, document.title, window.location.pathname);
-  }
-
-  const authStatus = localStorage.getItem('isAuthenticated') === 'true';
-  console.log('🔐 Local auth status:', authStatus);
-  setIsAuthenticated(authStatus);
-  setLoading(false);
-}, []);
-
-
-useEffect(() => {
-  if (!isAuthenticated) return;
-
-  console.log('🔍 Checking session with backend...');
-  fetch(`${baseURL}/business-units`, { credentials: 'include' })
-    .then(res => {
-      if (res.status === 401) {
-        console.warn('🚫 Unauthorized session. Redirecting...');
-        window.location.href = '/auth/login';
-      } else {
-        console.log('✅ Backend session is valid');
-      }
-    })
-    .catch(err => {
-      console.error('⚠️ Error while checking backend session:', err);
-      window.location.href = '/auth/login';
-    });
-}, [isAuthenticated]);
-
-useEffect(() => {
-  if (!isAuthenticated) return;
-
-  console.log('📦 Fetching data from all endpoints...');
-  fetch(`${baseURL}/search/de`).then(res => res.json()).then(setDataExtensions);
-  fetch(`${baseURL}/search/automation`).then(res => res.json()).then(setAutomations);
-  fetch(`${baseURL}/search/datafilters`).then(res => res.json()).then(setDataFilters);
-  fetch(`${baseURL}/search/journeys`).then(res => res.json()).then(setJourneys);
-  fetch(`${baseURL}/folders`)
-    .then(res => res.json())
-    .then(folders => {
-      const map = {};
-      (folders || []).forEach(f => map[f.ID] = f);
-      setFolderMap(map);
-    });
-}, [isAuthenticated]);
-
-
-  // Folder path resolver
   const buildFolderPath = (id) => {
     if (!id || !folderMap[id]) return 'N/A';
     const path = [];
@@ -161,7 +133,6 @@ useEffect(() => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto bg-gradient-to-br from-slate-50 to-slate-200 min-h-screen font-sans">
-      {/* Place your full table + UI JSX here */}
       <h1 className="text-3xl font-bold text-indigo-700 mb-6">MC Explorer</h1>
       <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
         Logout
