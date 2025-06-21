@@ -28,17 +28,20 @@ function MainApp() {
   // URL auth param handler + localStorage setup
   useEffect(() => {
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('auth') === '1') {
-    console.log('✅ Auth param found, setting local storage...');
+  const hasAuth = urlParams.get('auth') === '1';
+
+  if (hasAuth) {
+    console.log('✅ Auth param detected. Setting localStorage.');
     localStorage.setItem('isAuthenticated', 'true');
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
   const authStatus = localStorage.getItem('isAuthenticated') === 'true';
-  console.log('🔐 LocalStorage auth status:', authStatus);
+  console.log('🔐 Local auth status:', authStatus);
   setIsAuthenticated(authStatus);
   setLoading(false);
 }, []);
+
 
 useEffect(() => {
   if (!isAuthenticated) return;
