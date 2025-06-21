@@ -29,34 +29,34 @@ app.post('/save-credentials', (req, res) => {
   res.json({ redirectUrl: loginUrl });
 });
 
-app.get('/auth', (req, res) => {
-  if (sessionAccessToken) {
-    return res.status(200).json({ status: 'ok' });
-  } else {
-    return res.status(401).json({ status: 'unauthorized' });
-  }
+// OAuth Redirect to Marketing Cloud
+app.get('/auth/login', (req, res) => {
+  const loginUrl = `https://${process.env.MC_SUBDOMAIN}.auth.marketingcloudapis.com/v2/authorize?client_id=${process.env.MC_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BASE_URL + '/auth/callback')}&response_type=code`;
+  res.redirect(loginUrl);
 });
 
 
 
-// 🔁 OAuth2 Callback
-app.get('/callback', async (req, res) => {
-  const { code } = req.query;
-  const redirectUri = `${process.env.BASE_URL}/callback`;
+// OAuth Callback: Exchange code for access token
+app.get('/auth/callback', async (req, res) => {
+  const code = req.query.code;
+
   try {
-    const tokenRes = await axios.post(`https://${dynamicCreds.subdomain}.auth.marketingcloudapis.com/v2/token`, {
+    const tokenRes = await axios.post(`https://${process.env.MC_SUBDOMAIN}.auth.marketingcloudapis.com/v2/token`, {
       grant_type: 'authorization_code',
-      client_id: dynamicCreds.clientId,
-      client_secret: dynamicCreds.clientSecret,
+      client_id: process.env.MC_CLIENT_ID,
+      client_secret: process.env.MC_CLIENT_SECRET,
       code,
-      redirect_uri: redirectUri
+      redirect_uri: `${process.env.BASE_URL}/auth/callback`
     });
-    sessionAccessToken = tokenRes.data.access_token;
-    console.log('✅ Access token acquired via OAuth2');
+
+    const accessToken = tokenRes.data.access_token;
+    req.session.accessToken = accessToken;
+
     res.redirect('/explorer');
   } catch (err) {
-    console.error('❌ OAuth callback error:', err.response?.data || err);
-    res.status(500).send('OAuth callback failed');
+    console.error('OAuth Callback Error:', err.response?.data || err.message);
+    res.status(500).send('OAuth failed');
   }
 });
 
