@@ -23,6 +23,14 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  // ✅ Add this block here
+  if (!localStorage.getItem('isAuthenticated')) {
+    return (
+      <div className="p-6 text-center text-red-600">
+        Unauthorized. Please <a className="text-blue-600 underline" href="/">login</a>.
+      </div>
+    );
+  }
 
   useEffect(() => {
   const urlParams = new URLSearchParams(window.location.search);
