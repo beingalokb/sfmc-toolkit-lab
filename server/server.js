@@ -5,7 +5,7 @@ const cors = require('cors');
 const path = require('path');
 const clientId = process.env.CLIENT_ID;
 const clientSecret = process.env.CLIENT_SECRET;
-const redirectUri = process.env.REDIRECT_URI;
+
 const authUrl = `https://${authDomain}/v2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
 
 require('dotenv').config();
@@ -22,7 +22,8 @@ let sessionAccessToken = null;
 // 🔁 OAuth2 Redirect URI
 app.get('/callback', async (req, res) => {
   const { code } = req.query;
-  const redirectUri = `${process.env.BASE_URL}/callback`; // e.g., http://localhost:3001/callback
+  //const redirectUri = `${process.env.BASE_URL}/callback`; // e.g., http://localhost:3001/callback
+  const redirectUri = process.env.REDIRECT_URI;
 
   try {
     const tokenRes = await axios.post(`https://${process.env.MC_SUBDOMAIN}.auth.marketingcloudapis.com/v2/token`, {
