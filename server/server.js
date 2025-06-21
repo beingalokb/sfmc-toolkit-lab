@@ -193,6 +193,7 @@ app.get('/search/automation', async (req, res) => {
       categoryId: a.categoryId || 'N/A',
     }));
     res.json(simplified);
+    console.log("Fetching Automations...");
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch Automations' });
   }
