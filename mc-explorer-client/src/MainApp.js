@@ -27,54 +27,55 @@ function MainApp() {
 
   // URL auth param handler + localStorage setup
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('auth') === '1') {
-      console.log('✅ auth=1 detected in URL');
-      localStorage.setItem('isAuthenticated', 'true');
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('auth') === '1') {
+    console.log('✅ Auth param found, setting local storage...');
+    localStorage.setItem('isAuthenticated', 'true');
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
 
-    const storedAuth = localStorage.getItem('isAuthenticated') === 'true';
-    setIsAuthenticated(storedAuth);
-    setLoading(false);
-    console.log('🔐 Local auth state:', storedAuth);
-  }, []);
+  const authStatus = localStorage.getItem('isAuthenticated') === 'true';
+  console.log('🔐 LocalStorage auth status:', authStatus);
+  setIsAuthenticated(authStatus);
+  setLoading(false);
+}, []);
 
-  // Check session from backend
-  useEffect(() => {
-    if (!isAuthenticated) return;
+useEffect(() => {
+  if (!isAuthenticated) return;
 
-    fetch(`${baseURL}/business-units`, { credentials: 'include' })
-      .then(res => {
-        if (res.status === 401) {
-          console.log('❌ Backend says session not valid');
-          window.location.href = '/auth/login';
-        } else {
-          console.log('✅ Session is valid with backend');
-        }
-      })
-      .catch(err => {
-        console.error('⚠️ Error checking session:', err);
+  console.log('🔍 Checking session with backend...');
+  fetch(`${baseURL}/business-units`, { credentials: 'include' })
+    .then(res => {
+      if (res.status === 401) {
+        console.warn('🚫 Unauthorized session. Redirecting...');
         window.location.href = '/auth/login';
-      });
-  }, [isAuthenticated]);
+      } else {
+        console.log('✅ Backend session is valid');
+      }
+    })
+    .catch(err => {
+      console.error('⚠️ Error while checking backend session:', err);
+      window.location.href = '/auth/login';
+    });
+}, [isAuthenticated]);
 
-  // Load data only if authenticated
-  useEffect(() => {
-    if (!isAuthenticated) return;
+useEffect(() => {
+  if (!isAuthenticated) return;
 
-    fetch(`${baseURL}/search/de`).then(res => res.json()).then(setDataExtensions);
-    fetch(`${baseURL}/search/automation`).then(res => res.json()).then(setAutomations);
-    fetch(`${baseURL}/search/datafilters`).then(res => res.json()).then(setDataFilters);
-    fetch(`${baseURL}/search/journeys`).then(res => res.json()).then(setJourneys);
-    fetch(`${baseURL}/folders`)
-      .then(res => res.json())
-      .then(folders => {
-        const map = {};
-        (folders || []).forEach(f => map[f.ID] = f);
-        setFolderMap(map);
-      });
-  }, [isAuthenticated]);
+  console.log('📦 Fetching data from all endpoints...');
+  fetch(`${baseURL}/search/de`).then(res => res.json()).then(setDataExtensions);
+  fetch(`${baseURL}/search/automation`).then(res => res.json()).then(setAutomations);
+  fetch(`${baseURL}/search/datafilters`).then(res => res.json()).then(setDataFilters);
+  fetch(`${baseURL}/search/journeys`).then(res => res.json()).then(setJourneys);
+  fetch(`${baseURL}/folders`)
+    .then(res => res.json())
+    .then(folders => {
+      const map = {};
+      (folders || []).forEach(f => map[f.ID] = f);
+      setFolderMap(map);
+    });
+}, [isAuthenticated]);
+
 
   // Folder path resolver
   const buildFolderPath = (id) => {
