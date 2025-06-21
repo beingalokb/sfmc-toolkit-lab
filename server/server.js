@@ -5,6 +5,7 @@ const axios = require('axios');
 const xml2js = require('xml2js');
 const cors = require('cors');
 const path = require('path');
+const redirectUri = process.env.REDIRECT_URI;
 
 console.log("Client ID:", process.env.CLIENT_ID);
 console.log("Client Secret:", process.env.CLIENT_SECRET);
