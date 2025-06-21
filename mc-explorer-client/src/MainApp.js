@@ -19,15 +19,27 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // 🔐 Read from localStorage once
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated');
+    window.location.href = '/';
+  };
+
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasAuth = urlParams.get('auth') === '1';
+
+    if (hasAuth) {
+      console.log('✅ Auth param detected. Setting localStorage.');
+      localStorage.setItem('isAuthenticated', 'true');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     const authStatus = localStorage.getItem('isAuthenticated') === 'true';
     console.log('🔐 Local auth status:', authStatus);
     setIsAuthenticated(authStatus);
     setLoading(false);
   }, []);
 
-  // 🔄 Check server-side session
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -47,16 +59,15 @@ function MainApp() {
       });
   }, [isAuthenticated]);
 
-  // 📦 Fetch marketing data
   useEffect(() => {
     if (!isAuthenticated) return;
 
     console.log('📦 Fetching data from all endpoints...');
-    fetch(`${baseURL}/search/de`).then(res => res.json()).then(setDataExtensions);
-    fetch(`${baseURL}/search/automation`).then(res => res.json()).then(setAutomations);
-    fetch(`${baseURL}/search/datafilters`).then(res => res.json()).then(setDataFilters);
-    fetch(`${baseURL}/search/journeys`).then(res => res.json()).then(setJourneys);
-    fetch(`${baseURL}/folders`)
+    fetch(`${baseURL}/search/de`, { credentials: 'include' }).then(res => res.json()).then(setDataExtensions);
+    fetch(`${baseURL}/search/automation`, { credentials: 'include' }).then(res => res.json()).then(setAutomations);
+    fetch(`${baseURL}/search/datafilters`, { credentials: 'include' }).then(res => res.json()).then(setDataFilters);
+    fetch(`${baseURL}/search/journeys`, { credentials: 'include' }).then(res => res.json()).then(setJourneys);
+    fetch(`${baseURL}/folders`, { credentials: 'include' })
       .then(res => res.json())
       .then(folders => {
         const map = {};
@@ -64,11 +75,6 @@ function MainApp() {
         setFolderMap(map);
       });
   }, [isAuthenticated]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    window.location.href = '/';
-  };
 
   const buildFolderPath = (id) => {
     if (!id || !folderMap[id]) return 'N/A';
@@ -100,15 +106,15 @@ function MainApp() {
   const getFilteredData = () => {
     const term = searchTerm.toLowerCase();
     const matches = (item) =>
-      Object.values(item).some(val =>
+      Object.values(item || {}).some(val =>
         (val || '').toString().toLowerCase().includes(term)
       );
 
     let filtered = [];
-    if (activeTab === 'de') filtered = dataExtensions.filter(matches);
-    else if (activeTab === 'automation') filtered = automations.filter(matches);
-    else if (activeTab === 'datafilter') filtered = dataFilters.filter(matches);
-    else if (activeTab === 'journey') filtered = journeys.filter(matches);
+    if (activeTab === 'de') filtered = (dataExtensions || []).filter(matches);
+    else if (activeTab === 'automation') filtered = (automations || []).filter(matches);
+    else if (activeTab === 'datafilter') filtered = (dataFilters || []).filter(matches);
+    else if (activeTab === 'journey') filtered = (journeys || []).filter(matches);
 
     return sortData(filtered);
   };
@@ -137,6 +143,7 @@ function MainApp() {
       <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
         Logout
       </button>
+      {/* Render your table, tabs, filters, etc. here */}
     </div>
   );
 }
