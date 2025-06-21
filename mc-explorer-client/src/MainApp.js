@@ -137,6 +137,12 @@ function MainApp() {
         <h1 className="text-5xl font-extrabold text-indigo-700 tracking-tight drop-shadow-sm text-center sm:text-left">
           MC Explorer
         </h1>
+    <button
+  onClick={handleLogout}
+  className="ml-auto px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded"
+>
+  Logout
+</button>
       </div>
 
       <div className="flex flex-wrap justify-center gap-3 mb-6">
