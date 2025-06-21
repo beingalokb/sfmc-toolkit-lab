@@ -6,6 +6,8 @@ import LoginPage from './LoginPage';
 
 function App() {
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  console.log('🔐 Local auth status:', isAuthenticated);
+
 
   return (
     <Router>
