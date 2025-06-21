@@ -326,5 +326,5 @@ const handleLogout = () => {
     )
   );
 }
-
+}
 export default MainApp;
