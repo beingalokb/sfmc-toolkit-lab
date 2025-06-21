@@ -6,6 +6,8 @@ import './App.css';
 const baseURL = process.env.REACT_APP_BASE_URL;
 
 function MainApp() {
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState('de');
   const [dataExtensions, setDataExtensions] = useState([]);
   const [automations, setAutomations] = useState([]);
@@ -17,15 +19,22 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-
-  // 🚪 Logout
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
     window.location.href = '/';
   };
 
-  // 🔐 Auth check
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('auth') === '1') {
+      localStorage.setItem('isAuthenticated', 'true');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    const authStatus = localStorage.getItem('isAuthenticated') === 'true';
+    setIsAuthenticated(authStatus);
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -36,16 +45,6 @@ function MainApp() {
       .catch(() => window.location.href = '/auth/login');
   }, [isAuthenticated]);
 
-  // ✅ Set auth from URL param
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('auth') === '1') {
-      localStorage.setItem('isAuthenticated', 'true');
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
-
-  // 📦 Fetch everything
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -116,6 +115,8 @@ function MainApp() {
 
   const totalPages = Math.ceil(getFilteredData().length / itemsPerPage);
 
+  if (loading) return null;
+
   if (!isAuthenticated) {
     return (
       <div className="p-6 text-center text-red-600">
@@ -124,13 +125,9 @@ function MainApp() {
     );
   }
 
-  // ✅ Everything else (UI, table, export...) remains the same
-  // Paste your full `return (...)` JSX block starting from `<div className="p-6 max-w-7xl ...">` below here.
-
   return (
     <div className="p-6 max-w-7xl mx-auto bg-gradient-to-br from-slate-50 to-slate-200 min-h-screen font-sans">
       {/* Keep your existing JSX UI block here unchanged */}
-      {/* (To reduce clutter, I’ve truncated it here) */}
     </div>
   );
 }
