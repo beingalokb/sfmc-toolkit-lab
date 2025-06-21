@@ -3,14 +3,15 @@ import axios from 'axios';
 import { CSVLink } from 'react-csv';
 import logo from './assets/mc-explorer-logo.jpg';
 import './App.css';
-const baseURL = process.env.REACT_APP_BASE_URL;
+
+
+function MainApp() {
+
+  const baseURL = process.env.REACT_APP_BASE_URL;
 const handleLogout = () => {
   localStorage.removeItem('isAuthenticated');
   window.location.href = '/';
 };
-
-function MainApp() {
-
   const [results, setResults] = useState([]);
   const [activeTab, setActiveTab] = useState('de');
   const [dataExtensions, setDataExtensions] = useState([]);
