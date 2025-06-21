@@ -19,32 +19,47 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  // Logout function
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
     window.location.href = '/';
   };
 
+  // URL auth param handler + localStorage setup
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('auth') === '1') {
+      console.log('✅ auth=1 detected in URL');
       localStorage.setItem('isAuthenticated', 'true');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-    const authStatus = localStorage.getItem('isAuthenticated') === 'true';
-    setIsAuthenticated(authStatus);
+
+    const storedAuth = localStorage.getItem('isAuthenticated') === 'true';
+    setIsAuthenticated(storedAuth);
     setLoading(false);
+    console.log('🔐 Local auth state:', storedAuth);
   }, []);
 
+  // Check session from backend
   useEffect(() => {
     if (!isAuthenticated) return;
 
     fetch(`${baseURL}/business-units`, { credentials: 'include' })
       .then(res => {
-        if (res.status === 401) window.location.href = '/auth/login';
+        if (res.status === 401) {
+          console.log('❌ Backend says session not valid');
+          window.location.href = '/auth/login';
+        } else {
+          console.log('✅ Session is valid with backend');
+        }
       })
-      .catch(() => window.location.href = '/auth/login');
+      .catch(err => {
+        console.error('⚠️ Error checking session:', err);
+        window.location.href = '/auth/login';
+      });
   }, [isAuthenticated]);
 
+  // Load data only if authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -52,7 +67,6 @@ function MainApp() {
     fetch(`${baseURL}/search/automation`).then(res => res.json()).then(setAutomations);
     fetch(`${baseURL}/search/datafilters`).then(res => res.json()).then(setDataFilters);
     fetch(`${baseURL}/search/journeys`).then(res => res.json()).then(setJourneys);
-
     fetch(`${baseURL}/folders`)
       .then(res => res.json())
       .then(folders => {
@@ -62,6 +76,7 @@ function MainApp() {
       });
   }, [isAuthenticated]);
 
+  // Folder path resolver
   const buildFolderPath = (id) => {
     if (!id || !folderMap[id]) return 'N/A';
     const path = [];
@@ -91,9 +106,10 @@ function MainApp() {
 
   const getFilteredData = () => {
     const term = searchTerm.toLowerCase();
-    const matches = (item) => Object.values(item).some(val =>
-      (val || '').toString().toLowerCase().includes(term)
-    );
+    const matches = (item) =>
+      Object.values(item).some(val =>
+        (val || '').toString().toLowerCase().includes(term)
+      );
 
     let filtered = [];
     if (activeTab === 'de') filtered = dataExtensions.filter(matches);
@@ -103,9 +119,6 @@ function MainApp() {
 
     return sortData(filtered);
   };
-
-  const renderSortArrow = (key) =>
-    sortConfig.key === key ? (sortConfig.direction === 'asc' ? ' ▲' : ' ▼') : null;
 
   const paginatedData = () => {
     const filtered = getFilteredData();
@@ -127,7 +140,11 @@ function MainApp() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto bg-gradient-to-br from-slate-50 to-slate-200 min-h-screen font-sans">
-      {/* Keep your existing JSX UI block here unchanged */}
+      {/* Place your full table + UI JSX here */}
+      <h1 className="text-3xl font-bold text-indigo-700 mb-6">MC Explorer</h1>
+      <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
+        Logout
+      </button>
     </div>
   );
 }
