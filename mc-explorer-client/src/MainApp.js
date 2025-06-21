@@ -6,6 +6,23 @@ import './App.css';
 const baseURL = process.env.REACT_APP_BASE_URL;
 
 function MainApp() {
+
+  useEffect(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const hasAuth = urlParams.get('auth') === '1';
+
+  if (hasAuth) {
+    console.log('✅ Auth param detected. Setting localStorage.');
+    localStorage.setItem('isAuthenticated', 'true');
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  const authStatus = localStorage.getItem('isAuthenticated') === 'true';
+  console.log('🔐 Local auth status:', authStatus);
+  setIsAuthenticated(authStatus);
+  setLoading(false);
+}, []);
+
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState('de');
