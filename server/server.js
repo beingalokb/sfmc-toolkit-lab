@@ -216,9 +216,9 @@ app.get('/search/datafilters', async (req, res) => {
 
       const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
       if (!results) return res.json([]);
-
-      const dataFilters = Array.isArray(results) ? results : [results];
-      const simplified = dataFilters.map(df => ({
+      
+      const items = Array.isArray(results) ? results : [results];
+      const dataFilters = items.map(item => ({
         name: df.Name || 'N/A',
         key: df.CustomerKey || 'N/A',
         description: df.Description || 'N/A',
@@ -226,7 +226,7 @@ app.get('/search/datafilters', async (req, res) => {
         folderId: item.CategoryID ? String(item.CategoryID) : null, // 👈 Ensure it's string
       }));
 
-      res.json(simplified);
+      res.json(dataFilters);
     });
   } catch (err) {
     console.error('❌ Error in /search/datafilters:', err);
