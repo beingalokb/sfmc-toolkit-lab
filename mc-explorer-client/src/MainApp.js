@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { CSVLink } from 'react-csv';
-import logo from './assets/mc-explorer-logo.jpg';
 import './App.css';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
@@ -19,66 +17,47 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Handle login status via URL param and localStorage
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated');
+    window.location.href = '/';
+  };
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const hasAuth = urlParams.get('auth') === '1';
-    if (hasAuth) {
-      console.log('✅ Auth param detected. Setting localStorage.');
+    if (urlParams.get('auth') === '1') {
       localStorage.setItem('isAuthenticated', 'true');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-
     const authStatus = localStorage.getItem('isAuthenticated') === 'true';
-    console.log('🔐 Local auth status:', authStatus);
     setIsAuthenticated(authStatus);
     setLoading(false);
   }, []);
 
-  // Backend session check
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    console.log('🔍 Checking session with backend...');
     fetch(`${baseURL}/business-units`, { credentials: 'include' })
       .then(res => {
-        if (res.status === 401) {
-          console.warn('🚫 Unauthorized session. Redirecting to login...');
-          localStorage.removeItem('isAuthenticated');
-          window.location.href = '/';
-        } else {
-          console.log('✅ Backend session is valid');
-        }
+        if (res.status === 401) window.location.href = '/auth/login';
       })
-      .catch(err => {
-        console.error('⚠️ Error checking session:', err);
-        localStorage.removeItem('isAuthenticated');
-        window.location.href = '/';
-      });
+      .catch(() => window.location.href = '/auth/login');
   }, [isAuthenticated]);
 
-  // Load all assets
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    console.log('📦 Fetching data from all endpoints...');
-    fetch(`${baseURL}/search/de`).then(res => res.json()).then(setDataExtensions).catch(console.error);
-    fetch(`${baseURL}/search/automation`).then(res => res.json()).then(setAutomations).catch(console.error);
-    fetch(`${baseURL}/search/datafilters`).then(res => res.json()).then(setDataFilters).catch(console.error);
-    fetch(`${baseURL}/search/journeys`).then(res => res.json()).then(setJourneys).catch(console.error);
+    fetch(`${baseURL}/search/de`).then(res => res.json()).then(setDataExtensions);
+    fetch(`${baseURL}/search/automation`).then(res => res.json()).then(setAutomations);
+    fetch(`${baseURL}/search/datafilters`).then(res => res.json()).then(setDataFilters);
+    fetch(`${baseURL}/search/journeys`).then(res => res.json()).then(setJourneys);
     fetch(`${baseURL}/folders`)
       .then(res => res.json())
       .then(folders => {
         const map = {};
         (folders || []).forEach(f => map[f.ID] = f);
         setFolderMap(map);
-      }).catch(console.error);
+      });
   }, [isAuthenticated]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    window.location.href = '/';
-  };
 
   const buildFolderPath = (id) => {
     if (!id || !folderMap[id]) return 'N/A';
@@ -92,7 +71,6 @@ function MainApp() {
   };
 
   const sortData = (data) => {
-    if (!Array.isArray(data)) return [];
     if (!sortConfig.key) return data;
     return [...data].sort((a, b) => {
       const aVal = a[sortConfig.key]?.toString().toLowerCase() || '';
@@ -116,10 +94,10 @@ function MainApp() {
       );
 
     let filtered = [];
-    if (activeTab === 'de') filtered = (dataExtensions || []).filter(matches);
-    else if (activeTab === 'automation') filtered = (automations || []).filter(matches);
-    else if (activeTab === 'datafilter') filtered = (dataFilters || []).filter(matches);
-    else if (activeTab === 'journey') filtered = (journeys || []).filter(matches);
+    if (activeTab === 'de') filtered = dataExtensions.filter(matches);
+    else if (activeTab === 'automation') filtered = automations.filter(matches);
+    else if (activeTab === 'datafilter') filtered = dataFilters.filter(matches);
+    else if (activeTab === 'journey') filtered = journeys.filter(matches);
 
     return sortData(filtered);
   };
@@ -136,23 +114,30 @@ function MainApp() {
 
   if (!isAuthenticated) {
     return (
-      <div className="p-6 text-center text-red-600">
-        Unauthorized. Please <a className="text-blue-600 underline" href="/">login</a>.
+      <div className="flex justify-center items-center h-screen bg-gray-100">
+        <div className="p-8 bg-white rounded-lg shadow-lg text-center max-w-md">
+          <h1 className="text-2xl font-bold text-indigo-700 mb-4">Welcome to MC Explorer</h1>
+          <p className="mb-4 text-gray-700">
+            Click below to login with your Marketing Cloud user
+          </p>
+          <a
+            href={`${baseURL}/auth/login`}
+            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+          >
+            Login with Marketing Cloud
+          </a>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="p-6 max-w-7xl mx-auto bg-gradient-to-br from-slate-50 to-slate-200 min-h-screen font-sans">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold text-indigo-700">MC Explorer</h1>
-        <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
-          Logout
-        </button>
-      </div>
-
-      {/* UI can go here: tabs, search, table, etc. */}
-      {/* This part can be filled in based on what you want to render */}
+      <h1 className="text-3xl font-bold text-indigo-700 mb-6">MC Explorer</h1>
+      <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white mb-4">
+        Logout
+      </button>
+      {/* Main explorer content can go here */}
     </div>
   );
 }
