@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { CSVLink } from 'react-csv';
+import logo from './assets/mc-explorer-logo.jpg';
 import './App.css';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
@@ -50,6 +52,7 @@ function MainApp() {
     fetch(`${baseURL}/search/automation`).then(res => res.json()).then(setAutomations);
     fetch(`${baseURL}/search/datafilters`).then(res => res.json()).then(setDataFilters);
     fetch(`${baseURL}/search/journeys`).then(res => res.json()).then(setJourneys);
+
     fetch(`${baseURL}/folders`)
       .then(res => res.json())
       .then(folders => {
@@ -88,10 +91,9 @@ function MainApp() {
 
   const getFilteredData = () => {
     const term = searchTerm.toLowerCase();
-    const matches = (item) =>
-      Object.values(item).some(val =>
-        (val || '').toString().toLowerCase().includes(term)
-      );
+    const matches = (item) => Object.values(item).some(val =>
+      (val || '').toString().toLowerCase().includes(term)
+    );
 
     let filtered = [];
     if (activeTab === 'de') filtered = dataExtensions.filter(matches);
@@ -101,6 +103,9 @@ function MainApp() {
 
     return sortData(filtered);
   };
+
+  const renderSortArrow = (key) =>
+    sortConfig.key === key ? (sortConfig.direction === 'asc' ? ' ▲' : ' ▼') : null;
 
   const paginatedData = () => {
     const filtered = getFilteredData();
@@ -114,30 +119,15 @@ function MainApp() {
 
   if (!isAuthenticated) {
     return (
-      <div className="flex justify-center items-center h-screen bg-gray-100">
-        <div className="p-8 bg-white rounded-lg shadow-lg text-center max-w-md">
-          <h1 className="text-2xl font-bold text-indigo-700 mb-4">Welcome to MC Explorer</h1>
-          <p className="mb-4 text-gray-700">
-            Click below to login with your Marketing Cloud user
-          </p>
-          <a
-            href={`${baseURL}/auth/login`}
-            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-          >
-            Login with Marketing Cloud
-          </a>
-        </div>
+      <div className="p-6 text-center text-red-600">
+        Unauthorized. Please <a className="text-blue-600 underline" href="/">login</a>.
       </div>
     );
   }
 
   return (
     <div className="p-6 max-w-7xl mx-auto bg-gradient-to-br from-slate-50 to-slate-200 min-h-screen font-sans">
-      <h1 className="text-3xl font-bold text-indigo-700 mb-6">MC Explorer</h1>
-      <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white mb-4">
-        Logout
-      </button>
-      {/* Main explorer content can go here */}
+      {/* Keep your existing JSX UI block here unchanged */}
     </div>
   );
 }
