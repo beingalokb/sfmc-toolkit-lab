@@ -6,6 +6,12 @@ const xml2js = require('xml2js');
 const cors = require('cors');
 const path = require('path');
 
+console.log("Client ID:", process.env.CLIENT_ID);
+console.log("Client Secret:", process.env.CLIENT_SECRET);
+console.log("Auth Domain:", process.env.AUTH_DOMAIN);
+console.log("Redirect URI:", process.env.REDIRECT_URI);
+
+
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: true, credentials: true }));
@@ -59,20 +65,16 @@ app.get('/auth/callback', async (req, res) => {
       }
     );
 
-    const { access_token, rest_instance_url, soap_instance_url } = tokenResponse.data;
+    const { access_token } = tokenResponse.data;
+    console.log('✅ Access token:', access_token);
 
-    // Optional: Save in memory or session if needed
-    console.log('✅ Access token acquired via OAuth2');
-
-    // Save to session or in-memory storage if needed here
-
-    // Redirect to the app (auth=1 will trigger localStorage set on frontend)
     res.redirect('/explorer?auth=1');
   } catch (err) {
-    console.error('OAuth Token Exchange Failed:', err?.response?.data || err.message);
+    console.error('❌ OAuth Token Exchange Failed:', err?.response?.data || err.message);
     res.status(500).send('OAuth callback failed');
   }
 });
+
 
 
 
