@@ -176,7 +176,96 @@ app.get('/search/automation', async (req, res) => {
   }
 });
 
+
+app.get('/search/datafilters', async (req, res) => {
+  try {
+    if (!sessionAccessToken) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const envelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <s:Header><fueloauth>${sessionAccessToken}</fueloauth></s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>FilterDefinition</ObjectType>
+              <Properties>Name</Properties>
+              <Properties>CustomerKey</Properties>
+              <Properties>Description</Properties>
+              <Properties>CreatedDate</Properties>
+              <Properties>CategoryID</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>Name</Property>
+                <SimpleOperator>isNotNull</SimpleOperator>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>`;
+
+    const response = await axios.post(
+      `https://${dynamicCreds.subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      envelope,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(response.data, (err, result) => {
+      if (err) return res.status(500).json({ error: 'Failed to parse XML' });
+
+      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      if (!results) return res.json([]);
+
+      const dataFilters = Array.isArray(results) ? results : [results];
+      const simplified = dataFilters.map(df => ({
+        name: df.Name || 'N/A',
+        key: df.CustomerKey || 'N/A',
+        description: df.Description || 'N/A',
+        createdDate: df.CreatedDate || 'N/A',
+        categoryId: df.CategoryID || 'N/A'
+      }));
+
+      res.json(simplified);
+    });
+  } catch (err) {
+    console.error('❌ Error in /search/datafilters:', err);
+    res.status(500).json({ error: 'Failed to fetch data filters' });
+  }
+});
+
 // Add /search/datafilters and /search/journeys similar to above...
+
+app.get('/search/journeys', async (req, res) => {
+  try {
+    if (!sessionAccessToken) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const response = await axios.get(
+      `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
+      { headers: { Authorization: `Bearer ${sessionAccessToken}` } }
+    );
+
+    const journeys = response.data.items || [];
+    const simplified = journeys.map(j => ({
+      name: j.name || 'N/A',
+      key: j.key || 'N/A',
+      status: j.status || 'N/A',
+      createdDate: j.createdDate || 'N/A',
+      lastPublishedDate: j.lastPublishedDate || 'N/A',
+      versionNumber: j.versionNumber || 'N/A',
+      categoryId: j.categoryId || 'N/A'
+    }));
+
+    res.json(simplified);
+  } catch (err) {
+    console.error('❌ Error in /search/journeys:', err.response?.data || err);
+    res.status(500).json({ error: 'Failed to fetch journeys' });
+  }
+});
+
+
 
 // 🧾 Serve React Frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
