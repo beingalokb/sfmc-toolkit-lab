@@ -3,6 +3,10 @@ const axios = require('axios');
 const xml2js = require('xml2js');
 const cors = require('cors');
 const path = require('path');
+const clientId = process.env.CLIENT_ID;
+const clientSecret = process.env.CLIENT_SECRET;
+const redirectUri = process.env.REDIRECT_URI;
+
 require('dotenv').config();
 
 const app = express();
