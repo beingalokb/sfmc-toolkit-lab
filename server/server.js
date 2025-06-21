@@ -223,7 +223,7 @@ app.get('/search/datafilters', async (req, res) => {
         key: df.CustomerKey || 'N/A',
         description: df.Description || 'N/A',
         createdDate: df.CreatedDate || 'N/A',
-        categoryId: df.CategoryID || 'N/A'
+        folderId: item.CategoryID ? String(item.CategoryID) : null, // 👈 Ensure it's string
       }));
 
       res.json(simplified);
