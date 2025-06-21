@@ -4,7 +4,7 @@
   "main": "server.js",
   "scripts": {
     "build": "cd mc-explorer-client && npm install && npm run build",
-    "start": "cd server && node server.js",
+    "start": "node server/server.js",
     "dev": "nodemon server.js"
   },
   "keywords": [],
