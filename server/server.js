@@ -38,29 +38,42 @@ app.get('/auth/login', (req, res) => {
 
 
 // OAuth Callback: Exchange code for access token
-app.get('/callback', async (req, res) => {
-  const { code } = req.query;
-  const redirectUri = process.env.REDIRECT_URI;
+app.get('/auth/callback', async (req, res) => {
+  const code = req.query.code;
+  if (!code) {
+    return res.status(400).send('Missing authorization code');
+  }
 
   try {
-    const tokenRes = await axios.post(`https://${process.env.MC_SUBDOMAIN}.auth.marketingcloudapis.com/v2/token`, {
-      grant_type: 'authorization_code',
-      client_id: process.env.MC_CLIENT_ID,
-      client_secret: process.env.MC_CLIENT_SECRET,
-      code,
-      redirect_uri: redirectUri
-    });
+    const tokenResponse = await axios.post(
+      `https://${process.env.AUTH_DOMAIN}/v2/token`,
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: code,
+        client_id: process.env.CLIENT_ID,
+        client_secret: process.env.CLIENT_SECRET,
+        redirect_uri: process.env.REDIRECT_URI,
+      }),
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      }
+    );
 
-    sessionAccessToken = tokenRes.data.access_token;
+    const { access_token, rest_instance_url, soap_instance_url } = tokenResponse.data;
+
+    // Optional: Save in memory or session if needed
     console.log('✅ Access token acquired via OAuth2');
 
-    // Redirect to frontend with auth flag
-    res.redirect('https://mc-explorer.onrender.com/explorer?auth=1');
+    // Save to session or in-memory storage if needed here
+
+    // Redirect to the app (auth=1 will trigger localStorage set on frontend)
+    res.redirect('/explorer?auth=1');
   } catch (err) {
-    console.error('❌ OAuth callback error:', err.response?.data || err);
+    console.error('OAuth Token Exchange Failed:', err?.response?.data || err.message);
     res.status(500).send('OAuth callback failed');
   }
 });
+
 
 
 // 🔍 Retrieve folder map
