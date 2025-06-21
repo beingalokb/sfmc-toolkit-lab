@@ -12,7 +12,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={isAuthenticated ? <SetupForm /> : <Navigate to="/login" />} />
-        <Route path="/explorer" element={isAuthenticated ? <MainApp /> : <Navigate to="/login" />} />
+        <Route path="/explorer/*" element={isAuthenticated ? <MainApp /> : <Navigate to="/login" />} />
       </Routes>
     </Router>
   );
