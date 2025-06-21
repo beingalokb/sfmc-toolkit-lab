@@ -6,6 +6,7 @@ const path = require('path');
 const clientId = process.env.CLIENT_ID;
 const clientSecret = process.env.CLIENT_SECRET;
 const authDomain = process.env.AUTH_DOMAIN;
+const redirectUri = process.env.REDIRECT_URI;
 const authUrl = `https://${authDomain}/v2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
 
 require('dotenv').config();
