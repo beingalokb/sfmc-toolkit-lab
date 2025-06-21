@@ -23,14 +23,10 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // ✅ Add this block here
-  if (!localStorage.getItem('isAuthenticated')) {
-    return (
-      <div className="p-6 text-center text-red-600">
-        Unauthorized. Please <a className="text-blue-600 underline" href="/">login</a>.
-      </div>
-    );
-  }
+  useEffect(() => {
+  if (!isAuthenticated) return;
+  fetchData();
+}, [isAuthenticated]);
 
   useEffect(() => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -138,6 +134,12 @@ function MainApp() {
   const totalPages = Math.ceil(getFilteredData().length / itemsPerPage);
 
   return (
+
+    !localStorage.getItem('isAuthenticated') ? (
+    <div className="p-6 text-center text-red-600">
+      Unauthorized. Please <a className="text-blue-600 underline" href="/">login</a>.
+    </div>
+  ) : (
 
     <div className="p-6 max-w-7xl mx-auto bg-gradient-to-br from-slate-50 to-slate-200 min-h-screen font-sans">
       <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6">
@@ -315,7 +317,7 @@ function MainApp() {
         )}
       </div>
     </div>
-
+    )
   );
 }
 
