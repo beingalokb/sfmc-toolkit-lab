@@ -180,7 +180,7 @@ app.get('/search/automation', async (req, res) => {
 
 // 🧾 Serve React Frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
-app.get('*', (req, res) => {
+app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
 });
 
