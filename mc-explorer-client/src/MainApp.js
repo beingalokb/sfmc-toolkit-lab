@@ -3,9 +3,11 @@ import axios from 'axios';
 import { CSVLink } from 'react-csv';
 import logo from './assets/mc-explorer-logo.jpg';
 import './App.css';
+const baseURL = process.env.REACT_APP_BASE_URL;
 
 function MainApp() {
 
+  const [results, setResults] = useState([]);
   const [activeTab, setActiveTab] = useState('de');
   const [dataExtensions, setDataExtensions] = useState([]);
   const [automations, setAutomations] = useState([]);
@@ -19,7 +21,7 @@ function MainApp() {
 
   // 🔐 Auth check
   useEffect(() => {
-    fetch('/business-units', { credentials: 'include' })
+    fetch('`${baseURL}/business-units', { credentials: 'include' })
       .then(res => {
         if (res.status === 401) {
           window.location.href = '/auth/login';
@@ -32,23 +34,23 @@ function MainApp() {
 
   // 📦 Fetch data
   useEffect(() => {
-  fetch('/search/de')
+  fetch(`${baseURL}/search/de`)
     .then(res => res.json())
     .then(data => setDataExtensions(Array.isArray(data) ? data : []));
 
-  fetch('/search/automation')
+  fetch(`${baseURL}/search/automation`)
     .then(res => res.json())
     .then(data => setAutomations(Array.isArray(data) ? data : []));
 
-  fetch('/search/datafilters')
+  fetch(`${baseURL}/search/datafilters`)
     .then(res => res.json())
     .then(data => setDataFilters(Array.isArray(data) ? data : []));
 
-  fetch('/search/journeys')
+  fetch(`${baseURL}/search/journeys`)
     .then(res => res.json())
     .then(data => setJourneys(Array.isArray(data) ? data : []));
 
-  fetch('/folders')
+  fetch(`${baseURL}/folders`)
     .then(res => res.json())
     .then(folders => {
       if (!Array.isArray(folders)) folders = [];
