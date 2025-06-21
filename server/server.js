@@ -38,8 +38,9 @@ app.get('/auth/login', (req, res) => {
 
 
 // OAuth Callback: Exchange code for access token
-app.get('/auth/callback', async (req, res) => {
-  const code = req.query.code;
+app.get('/callback', async (req, res) => {
+  const { code } = req.query;
+  const redirectUri = process.env.REDIRECT_URI;
 
   try {
     const tokenRes = await axios.post(`https://${process.env.MC_SUBDOMAIN}.auth.marketingcloudapis.com/v2/token`, {
@@ -47,18 +48,20 @@ app.get('/auth/callback', async (req, res) => {
       client_id: process.env.MC_CLIENT_ID,
       client_secret: process.env.MC_CLIENT_SECRET,
       code,
-      redirect_uri: `${process.env.BASE_URL}/auth/callback`
+      redirect_uri: redirectUri
     });
 
-    const accessToken = tokenRes.data.access_token;
-    req.session.accessToken = accessToken;
+    sessionAccessToken = tokenRes.data.access_token;
+    console.log('✅ Access token acquired via OAuth2');
 
-    res.redirect('/explorer');
+    // Redirect to frontend with auth flag
+    res.redirect('https://mc-explorer.onrender.com/explorer?auth=1');
   } catch (err) {
-    console.error('OAuth Callback Error:', err.response?.data || err.message);
-    res.status(500).send('OAuth failed');
+    console.error('❌ OAuth callback error:', err.response?.data || err);
+    res.status(500).send('OAuth callback failed');
   }
 });
+
 
 // 🔍 Retrieve folder map
 async function getFolderMap() {
