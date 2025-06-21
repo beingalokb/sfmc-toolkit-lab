@@ -143,12 +143,19 @@ function MainApp() {
       <div className="bg-white p-6 rounded-lg shadow mb-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4">
           <CSVLink
-            data={getFilteredData()}
-            filename={`${activeTab}-results.csv`}
-            className="text-blue-700 underline"
-          >
-            Export to CSV
-          </CSVLink>
+  data={getFilteredData().map(row => ({
+    ...row,
+    folderPath:
+      activeTab === 'datafilter'
+        ? buildFolderPath(row.folderId)
+        : buildFolderPath(row.categoryId),
+  }))}
+  filename={`${activeTab}-results.csv`}
+  className="text-blue-700 underline"
+>
+  Export to CSV
+</CSVLink>
+
 
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium">Results per page:</label>
