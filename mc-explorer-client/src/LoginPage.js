@@ -1,18 +1,26 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 function LoginPage() {
-  const clientId = process.env.REACT_APP_CLIENT_ID;
-  const authDomain = process.env.REACT_APP_AUTH_DOMAIN;
-  const redirectUri = process.env.REACT_APP_REDIRECT_URI;
-  console.log("REACT_APP_REDIRECT_URI:", redirectUri);
-  
+  const [authUrl, setAuthUrl] = useState('');
 
-  const authUrl = `https://${authDomain}/v2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-  console.log("Final OAuth URL:", authUrl);
-  
+  useEffect(() => {
+    // Ask backend to build a safe, complete auth URL from session
+    fetch('/get-auth-url', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        setAuthUrl(data.authUrl);
+      })
+      .catch(() => {
+        console.error('Failed to load auth URL');
+      });
+  }, []);
+
   const handleLogin = () => {
-    // Use the actual constructed auth URL
-    window.location.href = authUrl;
+    if (authUrl) {
+      window.location.href = authUrl;
+    } else {
+      alert('Auth URL not available.');
+    }
   };
 
   return (
@@ -22,6 +30,7 @@ function LoginPage() {
         <p className="mb-4 text-gray-600">Click below to login with your Marketing Cloud user</p>
         <button
           onClick={handleLogin}
+          disabled={!authUrl}
           className="bg-indigo-600 text-white px-6 py-3 rounded-md text-lg font-semibold hover:bg-indigo-700 shadow"
         >
           Login with Marketing Cloud
