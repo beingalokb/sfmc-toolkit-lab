@@ -1,4 +1,4 @@
-// server.js (Debug-enhanced version)
+// server.js (Full with working endpoints)
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
@@ -62,7 +62,6 @@ app.get('/auth/callback', async (req, res) => {
     sessionAccessToken = tokenResponse.data.access_token;
     console.log('✅ Access token received');
 
-    // Extract subdomain from AUTH_DOMAIN
     const match = process.env.AUTH_DOMAIN.match(/^([^.]+)\./);
     if (match) {
       dynamicCreds.subdomain = match[1];
@@ -141,19 +140,38 @@ async function getFolderMap() {
   });
 }
 
+const resourceMap = {
+  de: 'dataextension',
+  automation: 'automation',
+  datafilters: 'datafilter',
+  journeys: 'journey'
+};
 
-['de', 'automation', 'datafilters', 'journeys'].forEach(type => {
-  app.get(`/search/${type}`, async (req, res) => {
-    debugLogTokenAndDomain(`/search/${type}`);
-    if (!sessionAccessToken || !dynamicCreds.subdomain)
-      return res.status(401).json({ error: 'Not authenticated' });
+Object.entries(resourceMap).forEach(([route, resource]) => {
+  app.get(`/search/${route}`, async (req, res) => {
+    debugLogTokenAndDomain(`/search/${route}`);
+    if (!sessionAccessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
 
     try {
-      // Existing logic inside each route remains, just enhanced with error logging
-      // ...
+      const response = await axios.get(
+        `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$filter=assetType.name%20eq%20'${resource}'`,
+        { headers: { Authorization: `Bearer ${sessionAccessToken}` } }
+      );
+
+      const items = response.data?.items || [];
+      const simplified = items.map(item => ({
+        id: item.id,
+        name: item.name,
+        createdDate: item.createdDate,
+        categoryId: item.category?.id || item.folder?.id,
+        status: item.status,
+        versionNumber: item.version?.versionNumber
+      }));
+
+      res.json(simplified);
     } catch (err) {
-      console.error(`❌ /search/${type} error:`, err.response?.data || err.message);
-      res.status(500).json({ error: `Failed to fetch ${type}` });
+      console.error(`❌ /search/${route} error:`, err.response?.data || err.message);
+      res.status(500).json([]);
     }
   });
 });
