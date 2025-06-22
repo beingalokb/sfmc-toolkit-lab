@@ -34,26 +34,23 @@ function MainApp() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+  if (!isAuthenticated) return;
 
-    fetch(`${baseURL}/business-units`, { credentials: 'include' })
-      .then(res => {
-        if (res.status === 401) {
-          console.warn('⚠️ Unauthorized, redirecting to login...');
-          window.location.href = '/auth/login';
-        } else {
-          return res.json();
-        }
-      })
-      .then(data => {
-        if (!data) return;
-        console.log('✅ Business Units fetched');
-      })
-      .catch(err => {
-        console.error('🚨 Error checking session:', err);
-        window.location.href = '/auth/login';
-      });
-  }, [isAuthenticated]);
+  fetch(`${baseURL}/business-units`, { credentials: 'include' })
+    .then(res => {
+      if (res.status === 401) {
+        console.warn('⚠️ Session expired or unauthorized. Redirecting to login...');
+        localStorage.removeItem('isAuthenticated');
+        window.location.href = '/login';
+      }
+    })
+    .catch(err => {
+      console.error('🚨 Error while checking session:', err);
+      localStorage.removeItem('isAuthenticated');
+      window.location.href = '/login';
+    });
+}, [isAuthenticated]);
+
 
   useEffect(() => {
     if (!isAuthenticated) return;
