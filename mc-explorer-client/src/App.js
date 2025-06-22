@@ -3,29 +3,32 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import SetupForm from './SetupForm';
 import MainApp from './MainApp';
 import LoginPage from './LoginPage';
-import AuthCallback from './AuthCallback'; // 👈 import it
+import AuthCallback from './AuthCallback';
 
-// 🔐 Global auth flag setter
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('auth') === '1') {
-  console.log('✅ Auth param detected. Setting localStorage.');
-  localStorage.setItem('isAuthenticated', 'true');
-  window.history.replaceState({}, document.title, window.location.pathname);
-}
+// 🔐 Check auth flag only once
+const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+console.log('🔐 Local auth status:', isAuthenticated);
 
 function App() {
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-  console.log('🔐 Local auth status:', isAuthenticated);
-
   return (
-<Router>
-<Routes>
-  <Route path="/login" element={<LoginPage />} />
-  <Route path="/auth/callback" element={<AuthCallback />} />
-  <Route path="/explorer/*" element={isAuthenticated ? <MainApp /> : <Navigate to="/login" />} />
-  <Route path="/" element={isAuthenticated ? <Navigate to="/explorer" /> : <Navigate to="/login" />} />
-</Routes>                                 
-</Router>
+    <Router>
+      <Routes>
+        {/* Always start here */}
+        <Route path="/" element={<Navigate to="/login" />} />
+
+        {/* Show login page */}
+        <Route path="/login" element={<LoginPage />} />
+
+        {/* Handle redirect from MC OAuth */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
+
+        {/* Main app after auth */}
+        <Route path="/explorer/*" element={isAuthenticated ? <MainApp /> : <Navigate to="/login" />} />
+
+        {/* SetupForm is optional — remove if unused */}
+        <Route path="/setup" element={isAuthenticated ? <SetupForm /> : <Navigate to="/login" />} />
+      </Routes>
+    </Router>
   );
 }
 
