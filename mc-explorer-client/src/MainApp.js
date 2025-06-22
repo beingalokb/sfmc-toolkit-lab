@@ -29,6 +29,7 @@ function MainApp() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
     const authStatus = localStorage.getItem('isAuthenticated') === 'true';
+    console.log("🔐 Auth status (from localStorage):", authStatus);
     setIsAuthenticated(authStatus);
     setLoading(false);
   }, []);
@@ -37,12 +38,13 @@ function MainApp() {
     if (!isAuthenticated) return;
 
     fetch(`${baseURL}/business-units`, { credentials: 'include' })
-      .then(res => {
-        if (res.status === 401) {
-          console.warn('⚠️ Session expired or unauthorized. Redirecting to login...');
-          localStorage.removeItem('isAuthenticated');
-          window.location.href = '/login';
-        }
+  .then(res => {
+    console.log("🔁 Session check /business-units response:", res.status);
+    if (res.status === 401) {
+      console.warn('⚠️ Session expired or unauthorized. Redirecting to login...');
+      localStorage.removeItem('isAuthenticated');
+      window.location.href = '/login';
+    }
       })
       .catch(err => {
         console.error('🚨 Error while checking session:', err);
