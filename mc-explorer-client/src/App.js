@@ -12,18 +12,16 @@ if (urlParams.get('auth') === '1') {
   window.history.replaceState({}, document.title, window.location.pathname);
 }
 
-
 function App() {
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
   console.log('🔐 Local auth status:', isAuthenticated);
 
-
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={isAuthenticated ? <SetupForm /> : <Navigate to="/login" />} />
-        <Route path="/explorer/*" element={isAuthenticated ? <MainApp /> : <Navigate to="/login" />} />
+        <Route path="/" element={<LoginPage />} />
+        <Route path="/setup" element={<SetupForm />} />
+        <Route path="/explorer/*" element={isAuthenticated ? <MainApp /> : <Navigate to="/" />} />
       </Routes>
     </Router>
   );
