@@ -70,7 +70,7 @@ app.get('/auth/callback', async (req, res) => {
       console.warn('⚠️ Failed to extract subdomain from AUTH_DOMAIN');
     }
 
-    res.redirect(`${process.env.BASE_URL}/explorer?auth=1`);
+    res.redirect(`${process.env.BASE_URL}/explorer?auth=1&reload=1`);
   } catch (err) {
     console.error('❌ OAuth Token Exchange Error:', err.response?.data || err.message);
     res.status(500).send('OAuth callback failed');
