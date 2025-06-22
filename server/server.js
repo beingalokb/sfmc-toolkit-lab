@@ -38,8 +38,9 @@ app.post('/save-credentials', (req, res) => {
 
 // OAuth Redirect to Marketing Cloud
 app.get('/auth/login', (req, res) => {
-  const loginUrl = `https://${process.env.MC_SUBDOMAIN}.auth.marketingcloudapis.com/v2/authorize?client_id=${process.env.MC_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BASE_URL + '/auth/callback')}&response_type=code`;
+  const loginUrl = `https://${process.env.AUTH_DOMAIN}/v2/authorize?client_id=${process.env.CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.REDIRECT_URI)}&response_type=code`;
   res.redirect(loginUrl);
+
 });
 
 
