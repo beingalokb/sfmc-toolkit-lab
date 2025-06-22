@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import SetupForm from './SetupForm';
 import MainApp from './MainApp';
 import LoginPage from './LoginPage';
+import AuthCallback from './AuthCallback'; // 👈 import it
 
 // 🔐 Global auth flag setter
 const urlParams = new URLSearchParams(window.location.search);
@@ -17,13 +18,14 @@ function App() {
   console.log('🔐 Local auth status:', isAuthenticated);
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LoginPage />} />
-        <Route path="/setup" element={<SetupForm />} />
-        <Route path="/explorer/*" element={isAuthenticated ? <MainApp /> : <Navigate to="/" />} />
-      </Routes>
-    </Router>
+<Router>
+<Routes>
+<Route path="/login" element={<LoginPage />} />
+<Route path="/" element={isAuthenticated ? <SetupForm /> : <Navigate to="/login" />} />
+<Route path="/auth/callback" element={<AuthCallback />} />  {/* 👈 add this */}
+<Route path="/explorer/*" element={isAuthenticated ? <MainApp /> : <Navigate to="/login" />} />
+</Routes>
+</Router>
   );
 }
 
