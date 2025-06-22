@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { CSVLink } from 'react-csv';
-import logo from './assets/mc-explorer-logo.jpg';
 import './App.css';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
@@ -40,25 +38,51 @@ function MainApp() {
 
     fetch(`${baseURL}/business-units`, { credentials: 'include' })
       .then(res => {
-        if (res.status === 401) window.location.href = '/auth/login';
+        if (res.status === 401) {
+          console.warn('⚠️ Unauthorized, redirecting to login...');
+          window.location.href = '/auth/login';
+        } else {
+          return res.json();
+        }
       })
-      .catch(() => window.location.href = '/auth/login');
+      .then(data => {
+        if (!data) return;
+        console.log('✅ Business Units fetched');
+      })
+      .catch(err => {
+        console.error('🚨 Error checking session:', err);
+        window.location.href = '/auth/login';
+      });
   }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    fetch(`${baseURL}/search/de`).then(res => res.json()).then(setDataExtensions);
-    fetch(`${baseURL}/search/automation`).then(res => res.json()).then(setAutomations);
-    fetch(`${baseURL}/search/datafilters`).then(res => res.json()).then(setDataFilters);
-    fetch(`${baseURL}/search/journeys`).then(res => res.json()).then(setJourneys);
-    fetch(`${baseURL}/folders`)
-      .then(res => res.json())
-      .then(folders => {
-        const map = {};
-        (folders || []).forEach(f => map[f.ID] = f);
-        setFolderMap(map);
-      });
+    const fetchWithLogging = async (path, setter, label) => {
+      try {
+        const res = await fetch(`${baseURL}${path}`, { credentials: 'include' });
+        if (res.status === 401) {
+          console.warn(`🚫 ${label} fetch unauthorized`);
+          return setter([]);
+        }
+        const json = await res.json();
+        console.log(`✅ ${label} fetched`, json);
+        setter(Array.isArray(json) ? json : []);
+      } catch (e) {
+        console.error(`❌ Failed to fetch ${label}`, e);
+        setter([]);
+      }
+    };
+
+    fetchWithLogging('/search/de', setDataExtensions, 'Data Extensions');
+    fetchWithLogging('/search/automation', setAutomations, 'Automations');
+    fetchWithLogging('/search/datafilters', setDataFilters, 'Data Filters');
+    fetchWithLogging('/search/journeys', setJourneys, 'Journeys');
+    fetchWithLogging('/folders', folders => {
+      const map = {};
+      (folders || []).forEach(f => map[f.ID] = f);
+      setFolderMap(map);
+    }, 'Folders');
   }, [isAuthenticated]);
 
   const buildFolderPath = (id) => {
@@ -91,15 +115,15 @@ function MainApp() {
   const getFilteredData = () => {
     const term = searchTerm.toLowerCase();
     const matches = (item) =>
-      Object.values(item).some(val =>
+      Object.values(item || {}).some(val =>
         (val || '').toString().toLowerCase().includes(term)
       );
 
     let filtered = [];
-    if (activeTab === 'de') filtered = dataExtensions.filter(matches);
-    else if (activeTab === 'automation') filtered = automations.filter(matches);
-    else if (activeTab === 'datafilter') filtered = dataFilters.filter(matches);
-    else if (activeTab === 'journey') filtered = journeys.filter(matches);
+    if (activeTab === 'de') filtered = (dataExtensions || []).filter(matches);
+    else if (activeTab === 'automation') filtered = (automations || []).filter(matches);
+    else if (activeTab === 'datafilter') filtered = (dataFilters || []).filter(matches);
+    else if (activeTab === 'journey') filtered = (journeys || []).filter(matches);
 
     return sortData(filtered);
   };
@@ -139,7 +163,7 @@ function MainApp() {
       <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white mb-4">
         Logout
       </button>
-      {/* You can add tabs, search, table UI etc. below this point */}
+      {/* You can now add search bar, tabs, and tables here */}
     </div>
   );
 }
