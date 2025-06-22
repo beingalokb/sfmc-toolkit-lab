@@ -97,12 +97,33 @@ app.get('/folders', async (req, res) => {
 });
 
 async function getFolderMap() {
-  const envelope = `...` // unchanged from your version
+  const envelope = `
+    <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <s:Header><fueloauth>${sessionAccessToken}</fueloauth></s:Header>
+      <s:Body>
+        <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+          <RetrieveRequest>
+            <ObjectType>DataFolder</ObjectType>
+            <Properties>ID</Properties>
+            <Properties>Name</Properties>
+            <Properties>ParentFolder.ID</Properties>
+            <Properties>ContentType</Properties>
+            <Filter xsi:type="SimpleFilterPart">
+              <Property>IsActive</Property>
+              <SimpleOperator>equals</SimpleOperator>
+              <Value>true</Value>
+            </Filter>
+          </RetrieveRequest>
+        </RetrieveRequestMsg>
+      </s:Body>
+    </s:Envelope>`;
+
   const response = await axios.post(
     `https://${dynamicCreds.subdomain}.soap.marketingcloudapis.com/Service.asmx`,
     envelope,
     { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
   );
+
   const parser = new xml2js.Parser({ explicitArray: false });
   return new Promise((resolve, reject) => {
     parser.parseString(response.data, (err, result) => {
@@ -119,6 +140,7 @@ async function getFolderMap() {
     });
   });
 }
+
 
 ['de', 'automation', 'datafilters', 'journeys'].forEach(type => {
   app.get(`/search/${type}`, async (req, res) => {
