@@ -23,7 +23,9 @@ function AuthCallback() {
           if (data.success) {
             console.log('✅ Auth callback success');
             localStorage.setItem('isAuthenticated', 'true');
-            navigate('/explorer');
+            //navigate('/explorer');
+            window.location.href = '/explorer?auth=1';
+
           } else {
             console.error('❌ Auth failed', data);
             navigate('/login');
