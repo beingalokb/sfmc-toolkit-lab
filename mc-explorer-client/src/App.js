@@ -20,11 +20,11 @@ function App() {
   return (
 <Router>
 <Routes>
-<Route path="/login" element={<LoginPage />} />
-<Route path="/" element={isAuthenticated ? <SetupForm /> : <Navigate to="/login" />} />
-<Route path="/auth/callback" element={<AuthCallback />} />  {/* 👈 add this */}
-<Route path="/explorer/*" element={isAuthenticated ? <MainApp /> : <Navigate to="/login" />} />
-</Routes>
+  <Route path="/login" element={<LoginPage />} />
+  <Route path="/auth/callback" element={<AuthCallback />} />
+  <Route path="/explorer/*" element={isAuthenticated ? <MainApp /> : <Navigate to="/login" />} />
+  <Route path="/" element={isAuthenticated ? <Navigate to="/explorer" /> : <Navigate to="/login" />} />
+</Routes>                                 
 </Router>
   );
 }
