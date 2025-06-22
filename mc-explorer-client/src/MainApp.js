@@ -34,23 +34,22 @@ function MainApp() {
   }, []);
 
   useEffect(() => {
-  if (!isAuthenticated) return;
+    if (!isAuthenticated) return;
 
-  fetch(`${baseURL}/business-units`, { credentials: 'include' })
-    .then(res => {
-      if (res.status === 401) {
-        console.warn('⚠️ Session expired or unauthorized. Redirecting to login...');
+    fetch(`${baseURL}/business-units`, { credentials: 'include' })
+      .then(res => {
+        if (res.status === 401) {
+          console.warn('⚠️ Session expired or unauthorized. Redirecting to login...');
+          localStorage.removeItem('isAuthenticated');
+          window.location.href = '/login';
+        }
+      })
+      .catch(err => {
+        console.error('🚨 Error while checking session:', err);
         localStorage.removeItem('isAuthenticated');
         window.location.href = '/login';
-      }
-    })
-    .catch(err => {
-      console.error('🚨 Error while checking session:', err);
-      localStorage.removeItem('isAuthenticated');
-      window.location.href = '/login';
-    });
-}, [isAuthenticated]);
-
+      });
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -156,11 +155,64 @@ function MainApp() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto bg-gradient-to-br from-slate-50 to-slate-200 min-h-screen font-sans">
-      <h1 className="text-3xl font-bold text-indigo-700 mb-6">MC Explorer</h1>
-      <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white mb-4">
-        Logout
-      </button>
-      {/* You can now add search bar, tabs, and tables here */}
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold text-indigo-700">MC Explorer</h1>
+        <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
+          Logout
+        </button>
+      </div>
+
+      <div className="flex gap-4 mb-4">
+        {['de', 'automation', 'datafilter', 'journey'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 rounded text-sm ${activeTab === tab ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+          >
+            {tab.toUpperCase()}
+          </button>
+        ))}
+        <input
+          type="text"
+          placeholder="Search..."
+          className="ml-auto border px-3 py-1 rounded"
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      <div className="overflow-x-auto bg-white shadow rounded">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr>
+              <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
+              <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('createdDate')}>Created</th>
+              <th className="text-left p-2">Folder</th>
+              <th className="text-left p-2">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginatedData().map((item, idx) => (
+              <tr key={idx} className="border-t">
+                <td className="p-2 font-medium">{item.name}</td>
+                <td className="p-2">{item.createdDate || 'N/A'}</td>
+                <td className="p-2">{buildFolderPath(item.categoryId || item.folderId)}</td>
+                <td className="p-2">{item.status || item.versionNumber || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex justify-between items-center mt-4 text-sm">
+        <div>
+          Page {currentPage} of {totalPages}
+        </div>
+        <div className="flex gap-2">
+          <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
+          <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
+        </div>
+      </div>
     </div>
   );
 }
