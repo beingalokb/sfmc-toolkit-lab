@@ -22,17 +22,23 @@ function MainApp() {
     window.location.href = '/';
   };
 
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('auth') === '1') {
-      localStorage.setItem('isAuthenticated', 'true');
+ useEffect(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('auth') === '1') {
+    localStorage.setItem('isAuthenticated', 'true');
+    urlParams.delete('auth');
+    if (urlParams.get('reload') === '1') {
+      urlParams.delete('reload');
+      const cleanUrl = `${window.location.pathname}?${urlParams.toString()}`;
+      window.location.replace(cleanUrl); // force a reload
+    } else {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-    const authStatus = localStorage.getItem('isAuthenticated') === 'true';
-    console.log("🔐 Auth status (from localStorage):", authStatus);
-    setIsAuthenticated(authStatus);
-    setLoading(false);
-  }, []);
+  }
+  const authStatus = localStorage.getItem('isAuthenticated') === 'true';
+  setIsAuthenticated(authStatus);
+  setLoading(false);
+}, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
