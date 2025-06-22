@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
 
 function LoginPage() {
+
+  const clientId = process.env.REACT_APP_CLIENT_ID;
+const authDomain = process.env.REACT_APP_AUTH_DOMAIN;
+const redirectUri = process.env.REACT_APP_REDIRECT_URI;
+
+console.log("🧪 env - clientId:", clientId);
+console.log("🧪 env - authDomain:", authDomain);
+console.log("🧪 env - redirectUri:", redirectUri);
+  
   const [authUrl, setAuthUrl] = useState('');
 
   useEffect(() => {
