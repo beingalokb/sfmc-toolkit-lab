@@ -68,6 +68,8 @@ app.get('/auth/callback', async (req, res) => {
 
     const { access_token } = tokenResponse.data;
     console.log('✅ Access token:', access_token);
+    sessionAccessToken = access_token;
+
 
     res.redirect('/explorer?auth=1');
   } catch (err) {
