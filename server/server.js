@@ -1,4 +1,4 @@
-// server.js (Full with working endpoints)
+// server.js (Updated to use correct APIs for DE, Journeys, Automations, Filters)
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
@@ -140,40 +140,93 @@ async function getFolderMap() {
   });
 }
 
-const resourceMap = {
-  de: 'dataextension',
-  automation: 'automation',
-  datafilters: 'datafilter',
-  journeys: 'journey'
-};
+app.get('/search/de', async (req, res) => {
+  debugLogTokenAndDomain('/search/de');
+  if (!sessionAccessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
+  try {
+    const response = await axios.get(
+      `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/hub/v1/dataevents`,
+      { headers: { Authorization: `Bearer ${sessionAccessToken}` } }
+    );
+    res.json(response.data?.items || []);
+  } catch (err) {
+    console.error('❌ /search/de error:', err.response?.data || err.message);
+    res.status(500).json([]);
+  }
+});
 
-Object.entries(resourceMap).forEach(([route, resource]) => {
-  app.get(`/search/${route}`, async (req, res) => {
-    debugLogTokenAndDomain(`/search/${route}`);
-    if (!sessionAccessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
+app.get('/search/automation', async (req, res) => {
+  debugLogTokenAndDomain('/search/automation');
+  if (!sessionAccessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
+  try {
+    const response = await axios.get(
+      `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/automation/v1/automations`,
+      { headers: { Authorization: `Bearer ${sessionAccessToken}` } }
+    );
+    res.json(response.data?.items || []);
+  } catch (err) {
+    console.error('❌ /search/automation error:', err.response?.data || err.message);
+    res.status(500).json([]);
+  }
+});
 
-    try {
-      const response = await axios.get(
-        `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$filter=assetType.name%20eq%20'${resource}'`,
-        { headers: { Authorization: `Bearer ${sessionAccessToken}` } }
-      );
+app.get('/search/journeys', async (req, res) => {
+  debugLogTokenAndDomain('/search/journeys');
+  if (!sessionAccessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
+  try {
+    const response = await axios.get(
+      `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
+      { headers: { Authorization: `Bearer ${sessionAccessToken}` } }
+    );
+    res.json(response.data?.items || []);
+  } catch (err) {
+    console.error('❌ /search/journeys error:', err.response?.data || err.message);
+    res.status(500).json([]);
+  }
+});
 
-      const items = response.data?.items || [];
-      const simplified = items.map(item => ({
-        id: item.id,
-        name: item.name,
-        createdDate: item.createdDate,
-        categoryId: item.category?.id || item.folder?.id,
-        status: item.status,
-        versionNumber: item.version?.versionNumber
+app.get('/search/datafilters', async (req, res) => {
+  debugLogTokenAndDomain('/search/datafilters');
+  if (!sessionAccessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
+
+  const envelope = `
+    <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <s:Header><fueloauth>${sessionAccessToken}</fueloauth></s:Header>
+      <s:Body>
+        <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+          <RetrieveRequest>
+            <ObjectType>FilterDefinition</ObjectType>
+            <Properties>Name</Properties>
+            <Properties>CustomerKey</Properties>
+            <Properties>Description</Properties>
+          </RetrieveRequest>
+        </RetrieveRequestMsg>
+      </s:Body>
+    </s:Envelope>`;
+
+  try {
+    const response = await axios.post(
+      `https://${dynamicCreds.subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      envelope,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(response.data, (err, result) => {
+      if (err) return res.status(500).json([]);
+      const raw = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      const filters = Array.isArray(raw) ? raw : [raw];
+      const simplified = filters.map(f => ({
+        name: f.Name,
+        customerKey: f.CustomerKey,
+        description: f.Description
       }));
-
       res.json(simplified);
-    } catch (err) {
-      console.error(`❌ /search/${route} error:`, err.response?.data || err.message);
-      res.status(500).json([]);
-    }
-  });
+    });
+  } catch (err) {
+    console.error('❌ /search/datafilters error:', err.response?.data || err.message);
+    res.status(500).json([]);
+  }
 });
 
 // Serve React frontend
