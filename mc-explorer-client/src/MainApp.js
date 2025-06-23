@@ -347,7 +347,6 @@ function MainApp() {
               <th className="text-left p-2">Type</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('createdDate')}>Created</th>
-              <th className="text-left p-2">Created By</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
               {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
                 <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
@@ -362,7 +361,6 @@ function MainApp() {
                 <td className="p-2">{item._type}</td>
                 <td className="p-2 font-medium">{item.name}</td>
                 <td className="p-2">{formatDate(item.createdDate)}</td>
-                <td className="p-2">{item.createdByName || 'N/A'}</td>
                 <td className="p-2">{item.path || 'N/A'}</td>
                 {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
                   <td className="p-2">{item.status || 'N/A'}</td>
