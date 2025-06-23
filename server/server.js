@@ -79,116 +79,213 @@ app.post('/auth/callback', async (req, res) => {
   }
 });
 
+function getAccessTokenFromRequest(req) {
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  return null;
+}
 function getSubdomainFromRequest(req) {
   return req.headers['x-mc-subdomain'] || null;
 }
 
-app.get('/folders', async (req, res) => {
+// Data Extension Search
+app.get('/search/de', async (req, res) => {
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) {
+    return res.status(401).json([]);
+  }
   try {
-    if (!accessToken || !subdomain) {
-      console.error('❌ /folders missing accessToken or subdomain', { accessToken, subdomain });
-      return res.status(401).json([]);
-    }
-    const folderMap = await getFolderMap(accessToken, subdomain);
-    res.json(Object.values(folderMap));
-  } catch (err) {
-    console.error('❌ /folders error:', {
-      message: err.message,
-      stack: err.stack,
-      response: err.response?.data,
-      config: err.config
+    const soapEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+        <s:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataExtension</ObjectType>
+              <Properties>Name</Properties>
+              <Properties>CustomerKey</Properties>
+              <Properties>CreatedDate</Properties>
+              <Properties>CategoryID</Properties>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Retrieve',
+        },
+      }
+    );
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(response.data, (err, result) => {
+      if (err) {
+        console.error('❌ XML Parse Error:', err);
+        return res.status(500).json({ error: 'Failed to parse XML' });
+      }
+      try {
+        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        if (!results) return res.status(200).json([]);
+        const resultArray = Array.isArray(results) ? results : [results];
+        const simplified = resultArray.map(de => ({
+          name: de.Name || 'N/A',
+          key: de.CustomerKey || 'N/A',
+          createdDate: de.CreatedDate || 'N/A',
+          categoryId: de.CategoryID ? String(de.CategoryID) : null
+        }));
+        res.json(simplified);
+      } catch (e) {
+        console.error('❌ DE structure error:', e);
+        res.status(500).json({ error: 'Unexpected DE format' });
+      }
     });
-    res.status(500).json([]);
+  } catch (err) {
+    console.error('❌ DE fetch failed:', err.response?.data || err);
+    res.status(500).json({ error: 'Failed to fetch DEs' });
   }
 });
 
-async function getFolderMap(accessToken, subdomain) {
-  const envelope = `
-    <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      <s:Header><fueloauth>${accessToken}</fueloauth></s:Header>
-      <s:Body>
-        <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-          <RetrieveRequest>
-            <ObjectType>DataFolder</ObjectType>
-            <Properties>ID</Properties>
-            <Properties>Name</Properties>
-            <Properties>ParentFolder.ID</Properties>
-            <Properties>ContentType</Properties>
-            <Filter xsi:type="SimpleFilterPart">
-              <Property>IsActive</Property>
-              <SimpleOperator>equals</SimpleOperator>
-              <Value>true</Value>
-            </Filter>
-          </RetrieveRequest>
-        </RetrieveRequestMsg>
-      </s:Body>
-    </s:Envelope>`;
+// Automation Search
+app.get('/search/automation', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) {
+    return res.status(401).json([]);
+  }
+  try {
+    const response = await axios.get(
+      `https://${subdomain}.rest.marketingcloudapis.com/automation/v1/automations`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+    const automations = response.data.items || [];
+    const simplified = automations.map(a => ({
+      name: a.name || 'N/A',
+      key: a.key || a.customerKey || 'N/A',
+      status: a.status || 'N/A',
+      createdDate: a.createdDate || 'N/A',
+      lastRunTime: a.lastRunTime || 'N/A',
+      categoryId: a.categoryId || 'N/A',
+    }));
+    res.json(simplified);
+  } catch (err) {
+    console.error('❌ Automation REST error:', err.response?.data || err);
+    res.status(500).json({ error: 'Failed to fetch Automations via REST' });
+  }
+});
 
-  const response = await axios.post(
-    `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-    envelope,
-    { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
-  );
-
-  const parser = new xml2js.Parser({ explicitArray: false });
-  return new Promise((resolve, reject) => {
+// Data Filter Search
+app.get('/search/datafilters', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) {
+    return res.status(401).json([]);
+  }
+  try {
+    const envelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" 
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <s:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>FilterDefinition</ObjectType>
+              <Properties>Name</Properties>
+              <Properties>CustomerKey</Properties>
+              <Properties>Description</Properties>
+              <Properties>CreatedDate</Properties>
+              <Properties>CategoryID</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>Name</Property>
+                <SimpleOperator>isNotNull</SimpleOperator>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      envelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          'SOAPAction': 'Retrieve',
+        }
+      }
+    );
+    const parser = new xml2js.Parser({ explicitArray: false });
     parser.parseString(response.data, (err, result) => {
-      if (err) return reject(err);
-      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-      const folders = Array.isArray(results) ? results : [results];
-      const map = {};
-      folders.forEach(f => {
-        const id = String(f.ID);
-        const parentId = f['ParentFolder']?.ID ? String(f['ParentFolder'].ID) : null;
-        map[id] = { ID: id, Name: f.Name, ParentFolder: { ID: parentId }, ContentType: f.ContentType };
-      });
-      resolve(map);
-    });
-  });
-}
-
-const resourceMap = {
-  de: 'dataextension',
-  automation: 'automation',
-  datafilters: 'datafilter',
-  journeys: 'journey'
-};
-
-Object.entries(resourceMap).forEach(([route, resource]) => {
-  app.get(`/search/${route}`, async (req, res) => {
-    const accessToken = getAccessTokenFromRequest(req);
-    const subdomain = getSubdomainFromRequest(req);
-    if (!accessToken || !subdomain) {
-      console.error(`❌ /search/${route} missing accessToken or subdomain`, { accessToken, subdomain });
-      return res.status(401).json([]);
-    }
-    try {
-      const response = await axios.get(
-        `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$filter=assetType.name%20eq%20'${resource}'`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      const items = response.data?.items || [];
-      const simplified = items.map(item => ({
-        id: item.id,
-        name: item.name,
-        createdDate: item.createdDate,
-        categoryId: item.category?.id || item.folder?.id,
-        status: item.status,
-        versionNumber: item.version?.versionNumber
+      if (err) {
+        console.error('❌ Failed to parse data filter SOAP response:', err);
+        return res.status(500).json({ error: 'XML parse error' });
+      }
+      const filterResults =
+        result['soap:Envelope']?.['soap:Body']?.RetrieveResponseMsg?.Results;
+      if (!filterResults) {
+        return res.json([]);
+      }
+      const normalized = Array.isArray(filterResults)
+        ? filterResults
+        : [filterResults];
+      const dataFilters = normalized.map(item => ({
+        name: item.Name || 'N/A',
+        key: item.CustomerKey || 'N/A',
+        description: item.Description || 'N/A',
+        createdDate: item.CreatedDate || 'N/A',
+        folderId: item.CategoryID || 'N/A',
       }));
-      res.json(simplified);
-    } catch (err) {
-      console.error(`❌ /search/${route} error:`, {
-        message: err.message,
-        stack: err.stack,
-        response: err.response?.data,
-        config: err.config
-      });
-      res.status(500).json([]);
-    }
-  });
+      res.json(dataFilters);
+    });
+  } catch (err) {
+    console.error('❌ Data Filter error:', err);
+    res.status(500).json({ error: 'Failed to fetch data filters' });
+  }
+});
+
+// Journey Search
+app.get('/search/journeys', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) {
+    return res.status(401).json([]);
+  }
+  try {
+    const response = await axios.get(
+      `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    );
+    const journeys = response.data.items || [];
+    const simplified = journeys.map(j => ({
+      name: j.name || 'N/A',
+      key: j.key || 'N/A',
+      status: j.status || 'N/A',
+      lastPublishedDate: j.lastPublishedDate || 'N/A',
+      versionNumber: j.versionNumber || 'N/A',
+      categoryId: j.categoryId || null,
+      createdDate: j.createdDate || 'Not Available'
+    }));
+    res.json(simplified);
+  } catch (err) {
+    console.error('❌ Journey fetch error:', err.response?.data || err);
+    res.status(500).json({ error: 'Failed to fetch journeys' });
+  }
 });
 
 // Serve React frontend
