@@ -18,6 +18,7 @@ function MainApp() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [pendingFetches, setPendingFetches] = useState(0);
   const [deDetailModal, setDeDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
+  const [automationDetailModal, setAutomationDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -282,6 +283,26 @@ function MainApp() {
     }
   };
 
+  // Fetch Automation details on demand
+  const fetchAutomationDetails = async (name, programId) => {
+    setAutomationDetailModal({ open: true, loading: true, error: null, details: null, name });
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      const subdomain = localStorage.getItem('subdomain');
+      const res = await fetch(`${baseURL}/automation/details?programId=${encodeURIComponent(programId)}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-mc-subdomain': subdomain
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch details');
+      const details = await res.json();
+      setAutomationDetailModal({ open: true, loading: false, error: null, details, name });
+    } catch (e) {
+      setAutomationDetailModal({ open: true, loading: false, error: e.message, details: null, name });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -380,7 +401,7 @@ function MainApp() {
             <tr>
               <th className="text-left p-2">Type</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
-              <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('createdDate')}>Created</th>
+              {/* Remove Created column for Automations */}
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
               {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
                 <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
@@ -389,12 +410,15 @@ function MainApp() {
           </thead>
           <tbody>
             {paginatedData().map((item, idx) => (
-              <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : ''}`}
-                onClick={() => item._type === 'Data Extension' ? fetchDeDetails(item.name) : undefined}
+              <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
+                onClick={() => {
+                  if (item._type === 'Data Extension') fetchDeDetails(item.name);
+                  if (item._type === 'Automation') fetchAutomationDetails(item.name, item.programId);
+                }}
               >
                 <td className="p-2">{item._type}</td>
                 <td className="p-2 font-medium">{item.name}</td>
-                <td className="p-2">{formatDate(item.createdDate)}</td>
+                {/* Remove Created column for Automations */}
                 <td className="p-2">{item.path || 'N/A'}</td>
                 {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
                   <td className="p-2">{item.status || 'N/A'}</td>
@@ -430,6 +454,25 @@ function MainApp() {
                 <div><span className="font-semibold">Row Count:</span> {deDetailModal.details.rowCount}</div>
                 <div><span className="font-semibold">Is Sendable:</span> {deDetailModal.details.isSendable.toString()}</div>
                 <div><span className="font-semibold">Is Testable:</span> {deDetailModal.details.isTestable.toString()}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Automation details */}
+      {automationDetailModal.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+            <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setAutomationDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
+            <h2 className="text-lg font-bold mb-4 text-green-700">Automation Details: {automationDetailModal.name}</h2>
+            {automationDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
+            {automationDetailModal.error && <div className="text-red-600">{automationDetailModal.error}</div>}
+            {automationDetailModal.details && (
+              <div className="space-y-2">
+                <div><span className="font-semibold">Start Date:</span> {automationDetailModal.details.startDate}</div>
+                <div><span className="font-semibold">End Date:</span> {automationDetailModal.details.endDate}</div>
+                <div><span className="font-semibold">Last Run Time:</span> {automationDetailModal.details.lastRunTime}</div>
               </div>
             )}
           </div>
