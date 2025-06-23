@@ -422,9 +422,9 @@ function MainApp() {
                 {/* Remove Created column for Automations */}
                 <td className="p-2">{item.path || 'N/A'}</td>
                 <td className="p-2">
-                  {item._type === 'Data Extension' && item.categoryId && (item.objectId || item.id) && (
+                  {item._type === 'Data Extension' && item.categoryId && item.id && (
                     <a
-                      href={`https://mc.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.objectId || item.id}/view`}
+                      href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-600 underline hover:text-blue-800"
