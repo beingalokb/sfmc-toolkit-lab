@@ -257,7 +257,7 @@ app.get('/search/automation', async (req, res) => {
     const simplified = automations.map(a => ({
       name: a.name || 'N/A',
       key: a.key || a.customerKey || 'N/A',
-      createdDate: 'Not Available',
+      createdDate: a.createdDate || 'N/A',
       path: buildFolderPath(a.categoryId, folderMap)
     }));
     res.json(simplified);
