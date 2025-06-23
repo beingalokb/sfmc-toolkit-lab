@@ -90,6 +90,17 @@ function getSubdomainFromRequest(req) {
   return req.headers['x-mc-subdomain'] || null;
 }
 
+// Helper to build folder path from folderMap
+function buildFolderPath(folderId, folderMap) {
+  let path = [];
+  let current = folderMap[folderId];
+  while (current) {
+    path.unshift(current.Name);
+    current = current.ParentFolder && folderMap[current.ParentFolder.ID];
+  }
+  return '/' + path.join(' / ');
+}
+
 // Data Extension Search
 app.get('/search/de', async (req, res) => {
   const accessToken = getAccessTokenFromRequest(req);
@@ -98,6 +109,42 @@ app.get('/search/de', async (req, res) => {
     return res.status(401).json([]);
   }
   try {
+    // Fetch all folders first
+    const folderEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <s:Header><fueloauth>${accessToken}</fueloauth></s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataFolder</ObjectType>
+              <Properties>ID</Properties>
+              <Properties>Name</Properties>
+              <Properties>ParentFolder.ID</Properties>
+              <Properties>ContentType</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>IsActive</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>true</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>`;
+    const folderResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      folderEnvelope,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+    const folderParser = new xml2js.Parser({ explicitArray: false });
+    let folderMap = {};
+    await folderParser.parseStringPromise(folderResp.data).then(result => {
+      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      const folders = Array.isArray(results) ? results : [results];
+      folders.forEach(f => {
+        if (f && f.ID) folderMap[String(f.ID)] = f;
+      });
+    });
+    // Fetch DEs
     const soapEnvelope = `
       <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
         <s:Header>
@@ -140,7 +187,7 @@ app.get('/search/de', async (req, res) => {
           name: de.Name || 'N/A',
           key: de.CustomerKey || 'N/A',
           createdDate: de.CreatedDate || 'N/A',
-          categoryId: de.CategoryID ? String(de.CategoryID) : null
+          path: buildFolderPath(de.CategoryID, folderMap)
         }));
         res.json(simplified);
       } catch (e) {
@@ -162,6 +209,42 @@ app.get('/search/automation', async (req, res) => {
     return res.status(401).json([]);
   }
   try {
+    // Fetch all folders first
+    const folderEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <s:Header><fueloauth>${accessToken}</fueloauth></s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataFolder</ObjectType>
+              <Properties>ID</Properties>
+              <Properties>Name</Properties>
+              <Properties>ParentFolder.ID</Properties>
+              <Properties>ContentType</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>IsActive</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>true</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>`;
+    const folderResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      folderEnvelope,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+    const folderParser = new xml2js.Parser({ explicitArray: false });
+    let folderMap = {};
+    await folderParser.parseStringPromise(folderResp.data).then(result => {
+      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      const folders = Array.isArray(results) ? results : [results];
+      folders.forEach(f => {
+        if (f && f.ID) folderMap[String(f.ID)] = f;
+      });
+    });
+    // Fetch Automations
     const response = await axios.get(
       `https://${subdomain}.rest.marketingcloudapis.com/automation/v1/automations`,
       {
@@ -174,10 +257,9 @@ app.get('/search/automation', async (req, res) => {
     const simplified = automations.map(a => ({
       name: a.name || 'N/A',
       key: a.key || a.customerKey || 'N/A',
-      status: a.status || 'N/A',
       createdDate: a.createdDate || 'N/A',
       lastRunTime: a.lastRunTime || 'N/A',
-      categoryId: a.categoryId || 'N/A',
+      path: buildFolderPath(a.categoryId, folderMap)
     }));
     res.json(simplified);
   } catch (err) {
@@ -194,6 +276,42 @@ app.get('/search/datafilters', async (req, res) => {
     return res.status(401).json([]);
   }
   try {
+    // Fetch all folders first
+    const folderEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <s:Header><fueloauth>${accessToken}</fueloauth></s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataFolder</ObjectType>
+              <Properties>ID</Properties>
+              <Properties>Name</Properties>
+              <Properties>ParentFolder.ID</Properties>
+              <Properties>ContentType</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>IsActive</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>true</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>`;
+    const folderResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      folderEnvelope,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+    const folderParser = new xml2js.Parser({ explicitArray: false });
+    let folderMap = {};
+    await folderParser.parseStringPromise(folderResp.data).then(result => {
+      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      const folders = Array.isArray(results) ? results : [results];
+      folders.forEach(f => {
+        if (f && f.ID) folderMap[String(f.ID)] = f;
+      });
+    });
+    // Fetch Data Filters
     const envelope = `
       <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" 
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -247,7 +365,7 @@ app.get('/search/datafilters', async (req, res) => {
         key: item.CustomerKey || 'N/A',
         description: item.Description || 'N/A',
         createdDate: item.CreatedDate || 'N/A',
-        folderId: item.CategoryID || 'N/A',
+        path: buildFolderPath(item.CategoryID, folderMap)
       }));
       res.json(dataFilters);
     });
@@ -265,6 +383,42 @@ app.get('/search/journeys', async (req, res) => {
     return res.status(401).json([]);
   }
   try {
+    // Fetch all folders first
+    const folderEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <s:Header><fueloauth>${accessToken}</fueloauth></s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataFolder</ObjectType>
+              <Properties>ID</Properties>
+              <Properties>Name</Properties>
+              <Properties>ParentFolder.ID</Properties>
+              <Properties>ContentType</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>IsActive</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>true</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>`;
+    const folderResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      folderEnvelope,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+    const folderParser = new xml2js.Parser({ explicitArray: false });
+    let folderMap = {};
+    await folderParser.parseStringPromise(folderResp.data).then(result => {
+      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      const folders = Array.isArray(results) ? results : [results];
+      folders.forEach(f => {
+        if (f && f.ID) folderMap[String(f.ID)] = f;
+      });
+    });
+    // Fetch Journeys
     const response = await axios.get(
       `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
       {
@@ -278,8 +432,8 @@ app.get('/search/journeys', async (req, res) => {
       status: j.status || 'N/A',
       lastPublishedDate: j.lastPublishedDate || 'N/A',
       versionNumber: j.versionNumber || 'N/A',
-      categoryId: j.categoryId || null,
-      createdDate: j.createdDate || 'Not Available'
+      createdDate: j.createdDate || 'Not Available',
+      path: buildFolderPath(j.categoryId, folderMap)
     }));
     res.json(simplified);
   } catch (err) {

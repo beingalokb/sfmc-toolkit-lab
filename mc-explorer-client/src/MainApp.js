@@ -209,8 +209,7 @@ function MainApp() {
             <tr>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('createdDate')}>Created</th>
-              <th className="text-left p-2">Folder</th>
-              <th className="text-left p-2">Status</th>
+              <th className="text-left p-2">Path</th>
             </tr>
           </thead>
           <tbody>
@@ -218,8 +217,7 @@ function MainApp() {
               <tr key={idx} className="border-t">
                 <td className="p-2 font-medium">{item.name}</td>
                 <td className="p-2">{item.createdDate || 'N/A'}</td>
-                <td className="p-2">{buildFolderPath(item.categoryId || item.folderId)}</td>
-                <td className="p-2">{item.status || item.versionNumber || '—'}</td>
+                <td className="p-2">{item.path || 'N/A'}</td>
               </tr>
             ))}
           </tbody>
