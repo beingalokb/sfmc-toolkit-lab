@@ -90,11 +90,19 @@ app.get('/folders', async (req, res) => {
   const accessToken = getAccessTokenFromRequest(req);
   debugLogTokenAndDomain('/folders');
   try {
-    if (!accessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
+    if (!accessToken || !dynamicCreds.subdomain) {
+      console.error('❌ /folders missing accessToken or subdomain', { accessToken, subdomain: dynamicCreds.subdomain });
+      return res.status(401).json([]);
+    }
     const folderMap = await getFolderMap(accessToken);
     res.json(Object.values(folderMap));
   } catch (err) {
-    console.error('❌ /folders error:', err.response?.data || err.message);
+    console.error('❌ /folders error:', {
+      message: err.message,
+      stack: err.stack,
+      response: err.response?.data,
+      config: err.config
+    });
     res.status(500).json([]);
   }
 });
@@ -155,7 +163,10 @@ Object.entries(resourceMap).forEach(([route, resource]) => {
   app.get(`/search/${route}`, async (req, res) => {
     const accessToken = getAccessTokenFromRequest(req);
     debugLogTokenAndDomain(`/search/${route}`);
-    if (!accessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
+    if (!accessToken || !dynamicCreds.subdomain) {
+      console.error(`❌ /search/${route} missing accessToken or subdomain`, { accessToken, subdomain: dynamicCreds.subdomain });
+      return res.status(401).json([]);
+    }
     try {
       const response = await axios.get(
         `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$filter=assetType.name%20eq%20'${resource}'`,
@@ -172,7 +183,12 @@ Object.entries(resourceMap).forEach(([route, resource]) => {
       }));
       res.json(simplified);
     } catch (err) {
-      console.error(`❌ /search/${route} error:`, err.response?.data || err.message);
+      console.error(`❌ /search/${route} error:`, {
+        message: err.message,
+        stack: err.stack,
+        response: err.response?.data,
+        config: err.config
+      });
       res.status(500).json([]);
     }
   });
