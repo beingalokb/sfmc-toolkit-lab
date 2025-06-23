@@ -258,6 +258,7 @@ app.get('/search/automation', async (req, res) => {
       name: a.name || 'N/A',
       key: a.key || a.customerKey || 'N/A',
       createdDate: a.createdDate || 'N/A',
+      status: a.status || a.statusId || 'N/A',
       path: buildFolderPath(a.categoryId, folderMap)
     }));
     res.json(simplified);
