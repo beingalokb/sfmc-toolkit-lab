@@ -20,9 +20,10 @@ function AuthCallback() {
       })
         .then(async res => {
           const data = await res.json().catch(() => ({}));
-          if (res.ok && data.success) {
+          if (res.ok && data.success && data.accessToken) {
             console.log('✅ Auth callback success', data);
             localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('accessToken', data.accessToken);
             window.location.href = '/explorer?auth=1';
           } else {
             console.error('❌ Auth failed', data);

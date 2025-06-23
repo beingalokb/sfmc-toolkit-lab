@@ -11,7 +11,6 @@ app.use(express.json());
 app.use(cors({ origin: true, credentials: true }));
 
 const PORT = process.env.PORT || 3001;
-let sessionAccessToken = null;
 let dynamicCreds = {
   subdomain: '',
   clientId: '',
@@ -56,9 +55,6 @@ app.post('/auth/callback', async (req, res) => {
   }
   try {
     console.log('🔗 Requesting token from:', `https://${process.env.AUTH_DOMAIN}/v2/token`);
-    console.log('🔑 Using client_id:', process.env.CLIENT_ID);
-    console.log('🔑 Using client_secret:', process.env.CLIENT_SECRET ? '***' : 'MISSING');
-    console.log('🔑 Using redirect_uri:', process.env.REDIRECT_URI);
     const tokenResponse = await axios.post(
       `https://${process.env.AUTH_DOMAIN}/v2/token`,
       new URLSearchParams({
@@ -70,35 +66,32 @@ app.post('/auth/callback', async (req, res) => {
       }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
+    const accessToken = tokenResponse.data.access_token;
+    const refreshToken = tokenResponse.data.refresh_token;
     console.log('✅ Token response:', tokenResponse.data);
-    sessionAccessToken = tokenResponse.data.access_token;
-
-    const match = process.env.AUTH_DOMAIN.match(/^([^.]+)\./);
-    if (match) {
-      dynamicCreds.subdomain = match[1];
-      console.log('🌐 Subdomain set (POST):', dynamicCreds.subdomain);
-    } else {
-      console.warn('⚠️ Failed to extract subdomain from AUTH_DOMAIN (POST)');
-    }
-
-    res.json({ success: true });
+    // Don't store in memory, return to frontend
+    res.json({ success: true, accessToken, refreshToken });
   } catch (err) {
     console.error('❌ OAuth Token Exchange Error (POST):', err.response?.data || err.message);
     res.status(500).json({ success: false, error: err.response?.data || err.message });
   }
 });
 
-function debugLogTokenAndDomain(route) {
-  console.log(`\n🔍 ${route}`);
-  console.log('🔑 Access Token:', sessionAccessToken);
-  console.log('🌍 Subdomain:', dynamicCreds.subdomain);
+// Update all data endpoints to use access token from Authorization header
+function getAccessTokenFromRequest(req) {
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  return null;
 }
 
 app.get('/folders', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
   debugLogTokenAndDomain('/folders');
   try {
-    if (!sessionAccessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
-    const folderMap = await getFolderMap();
+    if (!accessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
+    const folderMap = await getFolderMap(accessToken);
     res.json(Object.values(folderMap));
   } catch (err) {
     console.error('❌ /folders error:', err.response?.data || err.message);
@@ -106,10 +99,10 @@ app.get('/folders', async (req, res) => {
   }
 });
 
-async function getFolderMap() {
+async function getFolderMap(accessToken) {
   const envelope = `
     <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      <s:Header><fueloauth>${sessionAccessToken}</fueloauth></s:Header>
+      <s:Header><fueloauth>${accessToken}</fueloauth></s:Header>
       <s:Body>
         <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
           <RetrieveRequest>
@@ -160,15 +153,14 @@ const resourceMap = {
 
 Object.entries(resourceMap).forEach(([route, resource]) => {
   app.get(`/search/${route}`, async (req, res) => {
+    const accessToken = getAccessTokenFromRequest(req);
     debugLogTokenAndDomain(`/search/${route}`);
-    if (!sessionAccessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
-
+    if (!accessToken || !dynamicCreds.subdomain) return res.status(401).json([]);
     try {
       const response = await axios.get(
         `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$filter=assetType.name%20eq%20'${resource}'`,
-        { headers: { Authorization: `Bearer ${sessionAccessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-
       const items = response.data?.items || [];
       const simplified = items.map(item => ({
         id: item.id,
@@ -178,7 +170,6 @@ Object.entries(resourceMap).forEach(([route, resource]) => {
         status: item.status,
         versionNumber: item.version?.versionNumber
       }));
-
       res.json(simplified);
     } catch (err) {
       console.error(`❌ /search/${route} error:`, err.response?.data || err.message);

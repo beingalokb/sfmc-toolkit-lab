@@ -62,9 +62,19 @@ function MainApp() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    const accessToken = localStorage.getItem('accessToken');
+    if (!accessToken) {
+      console.warn('⚠️ No access token found. Redirecting to login...');
+      localStorage.removeItem('isAuthenticated');
+      window.location.href = '/login';
+      return;
+    }
+
     const fetchWithLogging = async (path, setter, label) => {
       try {
-        const res = await fetch(`${baseURL}${path}`, { credentials: 'include' });
+        const res = await fetch(`${baseURL}${path}`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
         if (res.status === 401) {
           console.warn(`🚫 ${label} fetch unauthorized`);
           return setter([]);
