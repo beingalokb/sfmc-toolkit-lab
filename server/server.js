@@ -158,7 +158,6 @@ app.get('/search/de', async (req, res) => {
               <Properties>CustomerKey</Properties>
               <Properties>CreatedDate</Properties>
               <Properties>CategoryID</Properties>
-              <Properties>CreatedBy</Properties>
             </RetrieveRequest>
           </RetrieveRequestMsg>
         </s:Body>
