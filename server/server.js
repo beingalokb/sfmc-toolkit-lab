@@ -201,7 +201,7 @@ app.get('/search/de', async (req, res) => {
   }
 });
 
-// Automation Search (SOAP)
+// Automation Search (REST)
 app.get('/search/automation', async (req, res) => {
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
@@ -244,62 +244,26 @@ app.get('/search/automation', async (req, res) => {
         if (f && f.ID) folderMap[String(f.ID)] = f;
       });
     });
-    // Fetch Automations via SOAP
-    const automationEnvelope = `
-      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-        <s:Header>
-          <fueloauth>${accessToken}</fueloauth>
-        </s:Header>
-        <s:Body>
-          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-            <RetrieveRequest>
-              <ObjectType>Automation</ObjectType>
-              <Properties>Name</Properties>
-              <Properties>CustomerKey</Properties>
-              <Properties>CreatedDate</Properties>
-              <Properties>Status</Properties>
-              <Properties>CategoryID</Properties>
-            </RetrieveRequest>
-          </RetrieveRequestMsg>
-        </s:Body>
-      </s:Envelope>
-    `;
-    const response = await axios.post(
-      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-      automationEnvelope,
+    // Fetch Automations via REST
+    const response = await axios.get(
+      `https://${subdomain}.rest.marketingcloudapis.com/automation/v1/automations`,
       {
         headers: {
-          'Content-Type': 'text/xml',
-          SOAPAction: 'Retrieve',
+          Authorization: `Bearer ${accessToken}`,
         },
       }
     );
-    const parser = new xml2js.Parser({ explicitArray: false });
-    parser.parseString(response.data, (err, result) => {
-      if (err) {
-        console.error('❌ Automation SOAP Parse Error:', err);
-        return res.status(500).json({ error: 'Failed to parse XML' });
-      }
-      try {
-        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-        if (!results) return res.status(200).json([]);
-        const resultArray = Array.isArray(results) ? results : [results];
-        const simplified = resultArray.map(a => ({
-          name: a.Name || 'N/A',
-          key: a.CustomerKey || 'N/A',
-          createdDate: a.CreatedDate || 'N/A',
-          status: a.Status || 'N/A',
-          path: buildFolderPath(a.CategoryID, folderMap)
-        }));
-        res.json(simplified);
-      } catch (e) {
-        console.error('❌ Automation structure error:', e);
-        res.status(500).json({ error: 'Unexpected Automation format' });
-      }
-    });
+    const automations = response.data.items || [];
+    const simplified = automations.map(a => ({
+      name: a.name || 'N/A',
+      key: a.key || a.customerKey || 'N/A',
+      createdDate: 'Not Available',
+      path: buildFolderPath(a.categoryId, folderMap)
+    }));
+    res.json(simplified);
   } catch (err) {
-    console.error('❌ Automation SOAP error:', err.response?.data || err);
-    res.status(500).json({ error: 'Failed to fetch Automations via SOAP' });
+    console.error('❌ Automation REST error:', err.response?.data || err);
+    res.status(500).json({ error: 'Failed to fetch Automations via REST' });
   }
 });
 
