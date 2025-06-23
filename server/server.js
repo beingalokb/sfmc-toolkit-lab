@@ -492,7 +492,10 @@ app.get('/de/details', async (req, res) => {
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const item = restResp.data.items && restResp.data.items.find(obj => obj.name === name);
-    if (!item) return res.status(404).json({ error: 'Data Extension not found' });
+    if (!item) {
+      console.warn(`DE not found in REST for name: ${name}`);
+      return res.status(404).json({ error: 'Data Extension not found' });
+    }
     // SOAP call for rowCount, isSendable, isTestable
     const soapEnvelope = `
       <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
@@ -515,33 +518,41 @@ app.get('/de/details', async (req, res) => {
         </s:Body>
       </s:Envelope>
     `;
-    const soapResp = await axios.post(
-      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-      soapEnvelope,
-      {
-        headers: {
-          'Content-Type': 'text/xml',
-          SOAPAction: 'Retrieve',
-        },
-      }
-    );
-    const parser = new xml2js.Parser({ explicitArray: false });
-    parser.parseString(soapResp.data, (err, result) => {
-      if (err) {
-        return res.status(500).json({ error: 'Failed to parse SOAP response' });
-      }
-      const details = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-      const deDetails = Array.isArray(details) ? details[0] : details;
-      res.json({
-        createdByName: item.createdByName || 'N/A',
-        modifiedByName: item.modifiedByName || 'N/A',
-        rowCount: deDetails?.RowCount || 'N/A',
-        isSendable: deDetails?.IsSendable || 'N/A',
-        isTestable: deDetails?.IsTestable || 'N/A',
+    let deDetails = null;
+    try {
+      const soapResp = await axios.post(
+        `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+        soapEnvelope,
+        {
+          headers: {
+            'Content-Type': 'text/xml',
+            SOAPAction: 'Retrieve',
+          },
+        }
+      );
+      const parser = new xml2js.Parser({ explicitArray: false });
+      await new Promise((resolve, reject) => {
+        parser.parseString(soapResp.data, (err, result) => {
+          if (err) return reject(err);
+          const details = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+          deDetails = Array.isArray(details) ? details[0] : details;
+          resolve();
+        });
       });
+    } catch (soapErr) {
+      console.error('SOAP error for DE details:', soapErr);
+      // Continue, but deDetails may be null
+    }
+    res.json({
+      createdByName: item.createdByName || 'N/A',
+      modifiedByName: item.modifiedByName || 'N/A',
+      rowCount: deDetails?.RowCount || 'N/A',
+      isSendable: deDetails?.IsSendable || 'N/A',
+      isTestable: deDetails?.IsTestable || 'N/A',
     });
   } catch (e) {
-    res.status(500).json({ error: 'Failed to fetch DE details', details: e.message });
+    console.error('Failed to fetch DE details:', e?.response?.data || e);
+    res.status(500).json({ error: 'Failed to fetch DE details', details: e?.message || e });
   }
 });
 
