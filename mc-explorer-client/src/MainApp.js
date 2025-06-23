@@ -136,6 +136,7 @@ function MainApp() {
     setSortConfig({ key, direction });
   };
 
+  // Returns filtered and sorted data across all tabs if searchTerm is not empty, otherwise just the active tab
   const getFilteredData = () => {
     const term = searchTerm.toLowerCase();
     const matches = (item) =>
@@ -144,11 +145,21 @@ function MainApp() {
       );
 
     let filtered = [];
-    if (activeTab === 'de') filtered = (dataExtensions || []).filter(matches);
-    else if (activeTab === 'automation') filtered = (automations || []).filter(matches);
-    else if (activeTab === 'datafilter') filtered = (dataFilters || []).filter(matches);
-    else if (activeTab === 'journey') filtered = (journeys || []).filter(matches);
-
+    if (term) {
+      // Search across all modules
+      filtered = [
+        ...(dataExtensions || []).map(item => ({ ...item, _type: 'Data Extension' })),
+        ...(automations || []).map(item => ({ ...item, _type: 'Automation' })),
+        ...(dataFilters || []).map(item => ({ ...item, _type: 'Data Filter' })),
+        ...(journeys || []).map(item => ({ ...item, _type: 'Journey' }))
+      ].filter(matches);
+    } else {
+      // Only show active tab
+      if (activeTab === 'de') filtered = (dataExtensions || []).map(item => ({ ...item, _type: 'Data Extension' }));
+      else if (activeTab === 'automation') filtered = (automations || []).map(item => ({ ...item, _type: 'Automation' }));
+      else if (activeTab === 'datafilter') filtered = (dataFilters || []).map(item => ({ ...item, _type: 'Data Filter' }));
+      else if (activeTab === 'journey') filtered = (journeys || []).map(item => ({ ...item, _type: 'Journey' }));
+    }
     return sortData(filtered);
   };
 
@@ -240,6 +251,7 @@ function MainApp() {
         <table className="min-w-full text-sm">
           <thead>
             <tr>
+              <th className="text-left p-2">Type</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('createdDate')}>Created</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
@@ -248,6 +260,7 @@ function MainApp() {
           <tbody>
             {paginatedData().map((item, idx) => (
               <tr key={idx} className="border-t">
+                <td className="p-2">{item._type}</td>
                 <td className="p-2 font-medium">{item.name}</td>
                 <td className="p-2">{item.createdDate || 'N/A'}</td>
                 <td className="p-2">{item.path || 'N/A'}</td>
