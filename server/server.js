@@ -101,7 +101,7 @@ function buildFolderPath(folderId, folderMap) {
   return '/' + path.join(' / ');
 }
 
-// Data Extension Search (REST)
+// Data Extension Search (SOAP + REST for createdByName)
 app.get('/search/de', async (req, res) => {
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
@@ -144,27 +144,80 @@ app.get('/search/de', async (req, res) => {
         if (f && f.ID) folderMap[String(f.ID)] = f;
       });
     });
-    // Fetch DEs via REST
-    const response = await axios.get(
-      `https://${subdomain}.rest.marketingcloudapis.com/data/v1/customobjectdataextensions`,
+    // Fetch DEs via SOAP
+    const soapEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+        <s:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataExtension</ObjectType>
+              <Properties>Name</Properties>
+              <Properties>CustomerKey</Properties>
+              <Properties>CreatedDate</Properties>
+              <Properties>CategoryID</Properties>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
       {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Retrieve',
         },
       }
     );
-    const des = response.data.items || [];
-    if (des.length > 0) console.log('🔎 Raw DE REST:', JSON.stringify(des[0], null, 2));
-    const simplified = des.map(de => ({
-      name: de.name || 'N/A',
-      key: de.key || 'N/A',
-      createdDate: de.createdDate || 'N/A',
-      createdByName: de.createdByName || 'N/A',
-      path: buildFolderPath(de.categoryId, folderMap)
-    }));
-    res.json(simplified);
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(response.data, async (err, result) => {
+      if (err) {
+        console.error('❌ XML Parse Error:', err);
+        return res.status(500).json({ error: 'Failed to parse XML' });
+      }
+      try {
+        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        if (!results) return res.status(200).json([]);
+        const resultArray = Array.isArray(results) ? results : [results];
+        // For each DE, fetch createdByName via REST
+        const batchSize = 10;
+        const deWithCreator = [];
+        for (let i = 0; i < resultArray.length; i += batchSize) {
+          const batch = resultArray.slice(i, i + batchSize);
+          const batchResults = await Promise.all(batch.map(async de => {
+            let createdByName = 'N/A';
+            try {
+              const restResp = await axios.get(
+                `https://${subdomain}.rest.marketingcloudapis.com/data/v1/customobjectdataextensions?name=${encodeURIComponent(de.Name)}`,
+                { headers: { Authorization: `Bearer ${accessToken}` } }
+              );
+              const item = restResp.data.items && restResp.data.items[0];
+              if (item && item.createdByName) createdByName = item.createdByName;
+            } catch (e) {
+              // Ignore errors, keep createdByName as N/A
+            }
+            return {
+              name: de.Name || 'N/A',
+              key: de.CustomerKey || 'N/A',
+              createdDate: de.CreatedDate || 'N/A',
+              createdByName,
+              path: buildFolderPath(de.CategoryID, folderMap)
+            };
+          }));
+          deWithCreator.push(...batchResults);
+        }
+        res.json(deWithCreator);
+      } catch (e) {
+        console.error('❌ DE structure error:', e);
+        res.status(500).json({ error: 'Unexpected DE format' });
+      }
+    });
   } catch (err) {
-    console.error('❌ DE REST fetch failed:', err.response?.data || err);
+    console.error('❌ DE fetch failed:', err.response?.data || err);
     res.status(500).json({ error: 'Failed to fetch DEs' });
   }
 });
