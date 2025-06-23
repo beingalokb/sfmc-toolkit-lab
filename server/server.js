@@ -187,6 +187,7 @@ app.get('/search/de', async (req, res) => {
           name: de.Name || 'N/A',
           key: de.CustomerKey || 'N/A',
           createdDate: de.CreatedDate || 'N/A',
+          createdByName: de.CreatedBy || de.CreatedByName || 'N/A',
           path: buildFolderPath(de.CategoryID, folderMap)
         }));
         res.json(simplified);
@@ -258,6 +259,7 @@ app.get('/search/automation', async (req, res) => {
       name: a.name || 'N/A',
       key: a.key || a.customerKey || 'N/A',
       createdDate: a.createdDate || 'N/A',
+      createdByName: a.createdByName || a.createdBy || 'N/A',
       status: a.status || a.statusId || 'N/A',
       path: buildFolderPath(a.categoryId, folderMap)
     }));
@@ -365,6 +367,7 @@ app.get('/search/datafilters', async (req, res) => {
         key: item.CustomerKey || 'N/A',
         description: item.Description || 'N/A',
         createdDate: item.CreatedDate || 'N/A',
+        createdByName: item.CreatedBy || item.CreatedByName || 'N/A',
         path: buildFolderPath(item.CategoryID, folderMap)
       }));
       res.json(dataFilters);
@@ -433,6 +436,7 @@ app.get('/search/journeys', async (req, res) => {
       lastPublishedDate: j.lastPublishedDate || 'N/A',
       versionNumber: j.versionNumber || 'N/A',
       createdDate: j.createdDate || 'Not Available',
+      createdByName: j.createdByName || j.createdBy || 'N/A',
       path: buildFolderPath(j.categoryId, folderMap)
     }));
     res.json(simplified);

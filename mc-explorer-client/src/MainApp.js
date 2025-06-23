@@ -301,8 +301,11 @@ function MainApp() {
               <th className="text-left p-2">Type</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('createdDate')}>Created</th>
+              <th className="text-left p-2">Created By</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
-              <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
+              {['Automation', 'Journey'].includes(sortConfig.key || '') && (
+                <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -310,9 +313,12 @@ function MainApp() {
               <tr key={idx} className="border-t">
                 <td className="p-2">{item._type}</td>
                 <td className="p-2 font-medium">{item.name}</td>
-                <td className="p-2">{item.createdDate || 'N/A'}</td>
+                <td className="p-2">{formatDate(item.createdDate)}</td>
+                <td className="p-2">{item.createdByName || 'N/A'}</td>
                 <td className="p-2">{item.path || 'N/A'}</td>
-                <td className="p-2">{item.status || 'N/A'}</td>
+                {['Automation', 'Journey'].includes(item._type) && (
+                  <td className="p-2">{item.status || 'N/A'}</td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -330,6 +336,14 @@ function MainApp() {
       </div>
     </div>
   );
+}
+
+// Add date formatting helper at the top of the file
+function formatDate(dateStr) {
+  if (!dateStr || dateStr === 'N/A' || dateStr === 'Not Available') return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '');
 }
 
 export default MainApp;
