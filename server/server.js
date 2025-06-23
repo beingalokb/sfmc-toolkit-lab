@@ -101,7 +101,7 @@ function buildFolderPath(folderId, folderMap) {
   return '/' + path.join(' / ');
 }
 
-// Data Extension Search
+// Data Extension Search (REST)
 app.get('/search/de', async (req, res) => {
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
@@ -109,7 +109,7 @@ app.get('/search/de', async (req, res) => {
     return res.status(401).json([]);
   }
   try {
-    // Fetch all folders first
+    // Fetch all folders first (SOAP, as before)
     const folderEnvelope = `
       <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <s:Header><fueloauth>${accessToken}</fueloauth></s:Header>
@@ -144,62 +144,27 @@ app.get('/search/de', async (req, res) => {
         if (f && f.ID) folderMap[String(f.ID)] = f;
       });
     });
-    // Fetch DEs
-    const soapEnvelope = `
-      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-        <s:Header>
-          <fueloauth>${accessToken}</fueloauth>
-        </s:Header>
-        <s:Body>
-          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-            <RetrieveRequest>
-              <ObjectType>DataExtension</ObjectType>
-              <Properties>Name</Properties>
-              <Properties>CustomerKey</Properties>
-              <Properties>CreatedDate</Properties>
-              <Properties>CategoryID</Properties>
-            </RetrieveRequest>
-          </RetrieveRequestMsg>
-        </s:Body>
-      </s:Envelope>
-    `;
-    const response = await axios.post(
-      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-      soapEnvelope,
+    // Fetch DEs via REST
+    const response = await axios.get(
+      `https://${subdomain}.rest.marketingcloudapis.com/data/v1/customobjectdataextensions`,
       {
         headers: {
-          'Content-Type': 'text/xml',
-          SOAPAction: 'Retrieve',
+          Authorization: `Bearer ${accessToken}`,
         },
       }
     );
-    const parser = new xml2js.Parser({ explicitArray: false });
-    parser.parseString(response.data, (err, result) => {
-      if (err) {
-        console.error('❌ XML Parse Error:', err);
-        return res.status(500).json({ error: 'Failed to parse XML' });
-      }
-      try {
-        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-        if (!results) return res.status(200).json([]);
-        const resultArray = Array.isArray(results) ? results : [results];
-        // Log raw DE result for createdByName troubleshooting
-        console.log('🔎 Raw DE Results:', JSON.stringify(resultArray[0], null, 2));
-        const simplified = resultArray.map(de => ({
-          name: de.Name || 'N/A',
-          key: de.CustomerKey || 'N/A',
-          createdDate: de.CreatedDate || 'N/A',
-          createdByName: de.CreatedBy || de.CreatedByName || 'N/A',
-          path: buildFolderPath(de.CategoryID, folderMap)
-        }));
-        res.json(simplified);
-      } catch (e) {
-        console.error('❌ DE structure error:', e);
-        res.status(500).json({ error: 'Unexpected DE format' });
-      }
-    });
+    const des = response.data.items || [];
+    if (des.length > 0) console.log('🔎 Raw DE REST:', JSON.stringify(des[0], null, 2));
+    const simplified = des.map(de => ({
+      name: de.name || 'N/A',
+      key: de.key || 'N/A',
+      createdDate: de.createdDate || 'N/A',
+      createdByName: de.createdByName || 'N/A',
+      path: buildFolderPath(de.categoryId, folderMap)
+    }));
+    res.json(simplified);
   } catch (err) {
-    console.error('❌ DE fetch failed:', err.response?.data || err);
+    console.error('❌ DE REST fetch failed:', err.response?.data || err);
     res.status(500).json({ error: 'Failed to fetch DEs' });
   }
 });
