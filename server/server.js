@@ -44,9 +44,14 @@ app.get('/auth/login', (req, res) => {
 
 app.get('/auth/callback', async (req, res) => {
   const code = req.query.code;
+  console.log('🔔 GET /auth/callback called with code:', code);
   if (!code) return res.status(400).send('Missing authorization code');
 
   try {
+    console.log('🔗 Requesting token from:', `https://${process.env.AUTH_DOMAIN}/v2/token`);
+    console.log('🔑 Using client_id:', process.env.CLIENT_ID);
+    console.log('🔑 Using client_secret:', process.env.CLIENT_SECRET ? '***' : 'MISSING');
+    console.log('🔑 Using redirect_uri:', process.env.REDIRECT_URI);
     const tokenResponse = await axios.post(
       `https://${process.env.AUTH_DOMAIN}/v2/token`,
       new URLSearchParams({
@@ -59,8 +64,8 @@ app.get('/auth/callback', async (req, res) => {
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
 
+    console.log('✅ Token response:', tokenResponse.data);
     sessionAccessToken = tokenResponse.data.access_token;
-    console.log('✅ Access token received');
 
     const match = process.env.AUTH_DOMAIN.match(/^([^.]+)\./);
     if (match) {
@@ -79,9 +84,16 @@ app.get('/auth/callback', async (req, res) => {
 
 app.post('/auth/callback', async (req, res) => {
   const code = req.body.code;
-  if (!code) return res.status(400).json({ success: false, error: 'Missing authorization code' });
-
+  console.log('🔔 POST /auth/callback called with code:', code);
+  if (!code) {
+    console.error('❌ No code provided in POST /auth/callback');
+    return res.status(400).json({ success: false, error: 'Missing authorization code' });
+  }
   try {
+    console.log('🔗 Requesting token from:', `https://${process.env.AUTH_DOMAIN}/v2/token`);
+    console.log('🔑 Using client_id:', process.env.CLIENT_ID);
+    console.log('🔑 Using client_secret:', process.env.CLIENT_SECRET ? '***' : 'MISSING');
+    console.log('🔑 Using redirect_uri:', process.env.REDIRECT_URI);
     const tokenResponse = await axios.post(
       `https://${process.env.AUTH_DOMAIN}/v2/token`,
       new URLSearchParams({
@@ -93,9 +105,8 @@ app.post('/auth/callback', async (req, res) => {
       }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
-
+    console.log('✅ Token response:', tokenResponse.data);
     sessionAccessToken = tokenResponse.data.access_token;
-    console.log('✅ Access token received (POST)');
 
     const match = process.env.AUTH_DOMAIN.match(/^([^.]+)\./);
     if (match) {
@@ -108,7 +119,7 @@ app.post('/auth/callback', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('❌ OAuth Token Exchange Error (POST):', err.response?.data || err.message);
-    res.status(500).json({ success: false, error: 'OAuth callback failed' });
+    res.status(500).json({ success: false, error: err.response?.data || err.message });
   }
 });
 

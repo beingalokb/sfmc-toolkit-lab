@@ -18,25 +18,26 @@ function AuthCallback() {
         credentials: 'include',
         body: JSON.stringify({ code })
       })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            console.log('✅ Auth callback success');
+        .then(async res => {
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.success) {
+            console.log('✅ Auth callback success', data);
             localStorage.setItem('isAuthenticated', 'true');
-            //navigate('/explorer');
             window.location.href = '/explorer?auth=1';
-
           } else {
             console.error('❌ Auth failed', data);
+            alert('Authentication failed: ' + (data.error || 'Unknown error. Please try again.'));
             navigate('/login');
           }
         })
         .catch(err => {
           console.error('🚨 Auth callback error:', err);
+          alert('Network error during authentication. Please try again.');
           navigate('/login');
         });
     } else {
       console.error('🚫 No auth code found in URL');
+      alert('No authorization code found. Please try logging in again.');
       navigate('/login');
     }
   }, [navigate]);
