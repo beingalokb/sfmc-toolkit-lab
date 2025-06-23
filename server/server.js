@@ -42,44 +42,9 @@ app.get('/auth/login', (req, res) => {
   res.redirect(loginUrl);
 });
 
-app.get('/auth/callback', async (req, res) => {
-  const code = req.query.code;
-  console.log('🔔 GET /auth/callback called with code:', code);
-  if (!code) return res.status(400).send('Missing authorization code');
-
-  try {
-    console.log('🔗 Requesting token from:', `https://${process.env.AUTH_DOMAIN}/v2/token`);
-    console.log('🔑 Using client_id:', process.env.CLIENT_ID);
-    console.log('🔑 Using client_secret:', process.env.CLIENT_SECRET ? '***' : 'MISSING');
-    console.log('🔑 Using redirect_uri:', process.env.REDIRECT_URI);
-    const tokenResponse = await axios.post(
-      `https://${process.env.AUTH_DOMAIN}/v2/token`,
-      new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        client_id: process.env.CLIENT_ID,
-        client_secret: process.env.CLIENT_SECRET,
-        redirect_uri: process.env.REDIRECT_URI
-      }),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-    );
-
-    console.log('✅ Token response:', tokenResponse.data);
-    sessionAccessToken = tokenResponse.data.access_token;
-
-    const match = process.env.AUTH_DOMAIN.match(/^([^.]+)\./);
-    if (match) {
-      dynamicCreds.subdomain = match[1];
-      console.log('🌐 Subdomain set:', dynamicCreds.subdomain);
-    } else {
-      console.warn('⚠️ Failed to extract subdomain from AUTH_DOMAIN');
-    }
-
-    res.redirect(`${process.env.BASE_URL}/explorer?auth=1&reload=1`);
-  } catch (err) {
-    console.error('❌ OAuth Token Exchange Error:', err.response?.data || err.message);
-    res.status(500).send('OAuth callback failed');
-  }
+app.get('/auth/callback', (req, res) => {
+  // Serve the React app for SPA routing; do NOT handle code exchange here
+  res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
 });
 
 app.post('/auth/callback', async (req, res) => {
