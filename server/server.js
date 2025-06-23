@@ -254,13 +254,17 @@ app.get('/search/automation', async (req, res) => {
       }
     );
     const automations = response.data.items || [];
-    const simplified = automations.map(a => ({
-      name: a.name || 'N/A',
-      key: a.key || a.customerKey || 'N/A',
-      createdDate: a.createdDate || 'N/A',
-      lastRunTime: a.lastRunTime || 'N/A',
-      path: buildFolderPath(a.categoryId, folderMap)
-    }));
+    const simplified = automations.map(a => {
+      // Try to get created date from multiple possible fields
+      const createdDate = a.createdDate || a.created || a.created_date || a.CreatedDate || a.Created || a.Created_date || 'N/A';
+      return {
+        name: a.name || 'N/A',
+        key: a.key || a.customerKey || 'N/A',
+        createdDate,
+        lastRunTime: a.lastRunTime || 'N/A',
+        path: buildFolderPath(a.categoryId, folderMap)
+      };
+    });
     res.json(simplified);
   } catch (err) {
     console.error('❌ Automation REST error:', err.response?.data || err);
