@@ -216,7 +216,21 @@ function MainApp() {
   const dfGroups = getDateGroups(dataFilters);
   const journeyGroups = getDateGroups(journeys);
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gray-100">
+        <div className="p-8 bg-white rounded-lg shadow-lg text-center max-w-md">
+          <div className="mb-4 animate-spin inline-block">
+            <svg className="w-8 h-8 text-indigo-600" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-indigo-700">Loading data, please wait...</h2>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
