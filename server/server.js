@@ -88,7 +88,6 @@ function getAccessTokenFromRequest(req) {
 
 app.get('/folders', async (req, res) => {
   const accessToken = getAccessTokenFromRequest(req);
-  debugLogTokenAndDomain('/folders');
   try {
     if (!accessToken || !dynamicCreds.subdomain) {
       console.error('❌ /folders missing accessToken or subdomain', { accessToken, subdomain: dynamicCreds.subdomain });
@@ -162,7 +161,6 @@ const resourceMap = {
 Object.entries(resourceMap).forEach(([route, resource]) => {
   app.get(`/search/${route}`, async (req, res) => {
     const accessToken = getAccessTokenFromRequest(req);
-    debugLogTokenAndDomain(`/search/${route}`);
     if (!accessToken || !dynamicCreds.subdomain) {
       console.error(`❌ /search/${route} missing accessToken or subdomain`, { accessToken, subdomain: dynamicCreds.subdomain });
       return res.status(401).json([]);
