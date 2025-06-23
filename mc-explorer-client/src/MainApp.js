@@ -160,6 +160,27 @@ function MainApp() {
 
   const totalPages = Math.ceil(getFilteredData().length / itemsPerPage);
 
+  // CSV download functionality
+  const downloadCSV = () => {
+    const filtered = getFilteredData();
+    const headers = ['Name', 'Created', 'Path'];
+    const rows = filtered.map(item => [
+      '"' + (item.name || '').replace(/"/g, '""') + '"',
+      '"' + (item.createdDate || 'N/A').replace(/"/g, '""') + '"',
+      '"' + (item.path || 'N/A').replace(/"/g, '""') + '"'
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${activeTab}_export.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) return null;
 
   if (!isAuthenticated) {
@@ -200,6 +221,12 @@ function MainApp() {
             {tab.toUpperCase()}
           </button>
         ))}
+        <button
+          onClick={downloadCSV}
+          className="bg-green-600 text-white px-3 py-1 rounded text-sm ml-2"
+        >
+          Download CSV
+        </button>
         <input
           type="text"
           placeholder="Search..."
