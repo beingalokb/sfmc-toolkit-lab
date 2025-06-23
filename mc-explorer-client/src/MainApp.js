@@ -117,8 +117,14 @@ function MainApp() {
   const sortData = (data) => {
     if (!sortConfig.key) return data;
     return [...data].sort((a, b) => {
-      const aVal = a[sortConfig.key]?.toString().toLowerCase() || '';
-      const bVal = b[sortConfig.key]?.toString().toLowerCase() || '';
+      let aVal, bVal;
+      if (sortConfig.key === 'path') {
+        aVal = (a.path || '').toString().toLowerCase();
+        bVal = (b.path || '').toString().toLowerCase();
+      } else {
+        aVal = a[sortConfig.key]?.toString().toLowerCase() || '';
+        bVal = b[sortConfig.key]?.toString().toLowerCase() || '';
+      }
       return sortConfig.direction === 'asc'
         ? aVal.localeCompare(bVal)
         : bVal.localeCompare(aVal);
@@ -209,7 +215,7 @@ function MainApp() {
             <tr>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('createdDate')}>Created</th>
-              <th className="text-left p-2">Path</th>
+              <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
             </tr>
           </thead>
           <tbody>
