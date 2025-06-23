@@ -111,6 +111,40 @@ function MainApp() {
     }, 'Folders');
   }, [isAuthenticated]);
 
+  // Fetch data for the selected tab when activeTab changes
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const accessToken = localStorage.getItem('accessToken');
+    const subdomain = localStorage.getItem('subdomain');
+    if (!accessToken || !subdomain) return;
+    setLoading(true);
+    setPendingFetches(1);
+    const fetchWithLogging = async (path, setter, label) => {
+      try {
+        const res = await fetch(`${baseURL}${path}`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'x-mc-subdomain': subdomain
+          }
+        });
+        if (res.status === 401) {
+          setter([]);
+        } else {
+          const json = await res.json();
+          setter(Array.isArray(json) ? json : []);
+        }
+      } catch (e) {
+        setter([]);
+      } finally {
+        setPendingFetches(prev => prev - 1);
+      }
+    };
+    if (activeTab === 'de') fetchWithLogging('/search/de', setDataExtensions, 'Data Extensions');
+    if (activeTab === 'automation') fetchWithLogging('/search/automation', setAutomations, 'Automations');
+    if (activeTab === 'datafilter') fetchWithLogging('/search/datafilters', setDataFilters, 'Data Filters');
+    if (activeTab === 'journey') fetchWithLogging('/search/journeys', setJourneys, 'Journeys');
+  }, [activeTab, isAuthenticated]);
+
   useEffect(() => {
     if (pendingFetches === 0 && isAuthenticated) setLoading(false);
   }, [pendingFetches, isAuthenticated]);
