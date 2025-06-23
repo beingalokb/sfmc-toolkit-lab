@@ -303,9 +303,9 @@ function MainApp() {
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('createdDate')}>Created</th>
               <th className="text-left p-2">Created By</th>
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
-              {['Automation', 'Journey'].includes(sortConfig.key || '') && (
+              {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
                 <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
-              )}
+              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -316,7 +316,7 @@ function MainApp() {
                 <td className="p-2">{formatDate(item.createdDate)}</td>
                 <td className="p-2">{item.createdByName || 'N/A'}</td>
                 <td className="p-2">{item.path || 'N/A'}</td>
-                {['Automation', 'Journey'].includes(item._type) && (
+                {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
                   <td className="p-2">{item.status || 'N/A'}</td>
                 )}
               </tr>

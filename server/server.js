@@ -158,6 +158,7 @@ app.get('/search/de', async (req, res) => {
               <Properties>CustomerKey</Properties>
               <Properties>CreatedDate</Properties>
               <Properties>CategoryID</Properties>
+              <Properties>CreatedBy</Properties>
             </RetrieveRequest>
           </RetrieveRequestMsg>
         </s:Body>
@@ -183,6 +184,8 @@ app.get('/search/de', async (req, res) => {
         const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
         if (!results) return res.status(200).json([]);
         const resultArray = Array.isArray(results) ? results : [results];
+        // Log raw DE result for createdByName troubleshooting
+        console.log('🔎 Raw DE Results:', JSON.stringify(resultArray[0], null, 2));
         const simplified = resultArray.map(de => ({
           name: de.Name || 'N/A',
           key: de.CustomerKey || 'N/A',
@@ -255,6 +258,8 @@ app.get('/search/automation', async (req, res) => {
       }
     );
     const automations = response.data.items || [];
+    // Log raw Automation result for createdByName troubleshooting
+    if (automations.length > 0) console.log('🔎 Raw Automation:', JSON.stringify(automations[0], null, 2));
     const simplified = automations.map(a => ({
       name: a.name || 'N/A',
       key: a.key || a.customerKey || 'N/A',
@@ -362,6 +367,8 @@ app.get('/search/datafilters', async (req, res) => {
       const normalized = Array.isArray(filterResults)
         ? filterResults
         : [filterResults];
+      // Log raw Data Filter result for createdByName troubleshooting
+      if (normalized.length > 0) console.log('🔎 Raw DataFilter:', JSON.stringify(normalized[0], null, 2));
       const dataFilters = normalized.map(item => ({
         name: item.Name || 'N/A',
         key: item.CustomerKey || 'N/A',
@@ -429,6 +436,8 @@ app.get('/search/journeys', async (req, res) => {
       }
     );
     const journeys = response.data.items || [];
+    // Log raw Journey result for createdByName troubleshooting
+    if (journeys.length > 0) console.log('🔎 Raw Journey:', JSON.stringify(journeys[0], null, 2));
     const simplified = journeys.map(j => ({
       name: j.name || 'N/A',
       key: j.key || 'N/A',
