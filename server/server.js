@@ -68,32 +68,30 @@ app.post('/auth/callback', async (req, res) => {
     );
     const accessToken = tokenResponse.data.access_token;
     const refreshToken = tokenResponse.data.refresh_token;
+    // Extract subdomain from AUTH_DOMAIN
+    const match = process.env.AUTH_DOMAIN.match(/^([^.]+)\./);
+    const subdomain = match ? match[1] : null;
     console.log('✅ Token response:', tokenResponse.data);
-    // Don't store in memory, return to frontend
-    res.json({ success: true, accessToken, refreshToken });
+    res.json({ success: true, accessToken, refreshToken, subdomain });
   } catch (err) {
     console.error('❌ OAuth Token Exchange Error (POST):', err.response?.data || err.message);
     res.status(500).json({ success: false, error: err.response?.data || err.message });
   }
 });
 
-// Update all data endpoints to use access token from Authorization header
-function getAccessTokenFromRequest(req) {
-  const authHeader = req.headers['authorization'];
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7);
-  }
-  return null;
+function getSubdomainFromRequest(req) {
+  return req.headers['x-mc-subdomain'] || null;
 }
 
 app.get('/folders', async (req, res) => {
   const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
   try {
-    if (!accessToken || !dynamicCreds.subdomain) {
-      console.error('❌ /folders missing accessToken or subdomain', { accessToken, subdomain: dynamicCreds.subdomain });
+    if (!accessToken || !subdomain) {
+      console.error('❌ /folders missing accessToken or subdomain', { accessToken, subdomain });
       return res.status(401).json([]);
     }
-    const folderMap = await getFolderMap(accessToken);
+    const folderMap = await getFolderMap(accessToken, subdomain);
     res.json(Object.values(folderMap));
   } catch (err) {
     console.error('❌ /folders error:', {
@@ -106,7 +104,7 @@ app.get('/folders', async (req, res) => {
   }
 });
 
-async function getFolderMap(accessToken) {
+async function getFolderMap(accessToken, subdomain) {
   const envelope = `
     <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
       <s:Header><fueloauth>${accessToken}</fueloauth></s:Header>
@@ -129,7 +127,7 @@ async function getFolderMap(accessToken) {
     </s:Envelope>`;
 
   const response = await axios.post(
-    `https://${dynamicCreds.subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+    `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
     envelope,
     { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
   );
@@ -161,13 +159,14 @@ const resourceMap = {
 Object.entries(resourceMap).forEach(([route, resource]) => {
   app.get(`/search/${route}`, async (req, res) => {
     const accessToken = getAccessTokenFromRequest(req);
-    if (!accessToken || !dynamicCreds.subdomain) {
-      console.error(`❌ /search/${route} missing accessToken or subdomain`, { accessToken, subdomain: dynamicCreds.subdomain });
+    const subdomain = getSubdomainFromRequest(req);
+    if (!accessToken || !subdomain) {
+      console.error(`❌ /search/${route} missing accessToken or subdomain`, { accessToken, subdomain });
       return res.status(401).json([]);
     }
     try {
       const response = await axios.get(
-        `https://${dynamicCreds.subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$filter=assetType.name%20eq%20'${resource}'`,
+        `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$filter=assetType.name%20eq%20'${resource}'`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       const items = response.data?.items || [];

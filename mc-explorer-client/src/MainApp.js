@@ -63,8 +63,9 @@ function MainApp() {
     if (!isAuthenticated) return;
 
     const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-      console.warn('⚠️ No access token found. Redirecting to login...');
+    const subdomain = localStorage.getItem('subdomain');
+    if (!accessToken || !subdomain) {
+      console.warn('⚠️ No access token or subdomain found. Redirecting to login...');
       localStorage.removeItem('isAuthenticated');
       window.location.href = '/login';
       return;
@@ -73,7 +74,10 @@ function MainApp() {
     const fetchWithLogging = async (path, setter, label) => {
       try {
         const res = await fetch(`${baseURL}${path}`, {
-          headers: { 'Authorization': `Bearer ${accessToken}` }
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'x-mc-subdomain': subdomain
+          }
         });
         if (res.status === 401) {
           console.warn(`🚫 ${label} fetch unauthorized`);
