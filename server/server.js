@@ -191,11 +191,16 @@ app.get('/search/de', async (req, res) => {
           const batchResults = await Promise.all(batch.map(async de => {
             let createdByName = 'N/A';
             try {
+              // Use the correct endpoint and $search param
               const restResp = await axios.get(
-                `https://${subdomain}.rest.marketingcloudapis.com/data/v1/customobjectdataextensions?name=${encodeURIComponent(de.Name)}`,
+                `https://${subdomain}.rest.marketingcloudapis.com/data/v1/customobjects?$search=${encodeURIComponent(de.Name)}`,
                 { headers: { Authorization: `Bearer ${accessToken}` } }
               );
-              const item = restResp.data.items && restResp.data.items[0];
+              // Log the response for troubleshooting
+              if (restResp.data && restResp.data.items && restResp.data.items.length > 0) {
+                console.log('🔎 Raw DE REST:', JSON.stringify(restResp.data.items[0], null, 2));
+              }
+              const item = restResp.data.items && restResp.data.items.find(obj => obj.name === de.Name);
               if (item && item.createdByName) createdByName = item.createdByName;
             } catch (e) {
               // Ignore errors, keep createdByName as N/A
