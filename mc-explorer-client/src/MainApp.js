@@ -192,6 +192,30 @@ function MainApp() {
     URL.revokeObjectURL(url);
   };
 
+  // Helper to group by created date
+  const getDateGroups = (items) => {
+    const now = new Date();
+    const daysAgo = (d) => {
+      if (!d) return Infinity;
+      const dt = new Date(d);
+      return (now - dt) / (1000 * 60 * 60 * 24);
+    };
+    let last7 = 0, last30 = 0, last180 = 0, last365 = 0;
+    items.forEach(item => {
+      const days = daysAgo(item.createdDate);
+      if (days <= 7) last7++;
+      if (days <= 30) last30++;
+      if (days <= 180) last180++;
+      if (days <= 365) last365++;
+    });
+    return { last7, last30, last180, last365 };
+  };
+
+  const deGroups = getDateGroups(dataExtensions);
+  const autoGroups = getDateGroups(automations);
+  const dfGroups = getDateGroups(dataFilters);
+  const journeyGroups = getDateGroups(journeys);
+
   if (loading) return null;
 
   if (!isAuthenticated) {
@@ -220,6 +244,29 @@ function MainApp() {
         <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
           Logout
         </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded shadow p-4">
+          <div className="text-lg font-bold text-indigo-700">Data Extensions</div>
+          <div className="text-2xl font-bold">{dataExtensions.length}</div>
+          <div className="text-xs text-gray-500 mt-2">Last 7d: {deGroups.last7} | 30d: {deGroups.last30} | 6mo: {deGroups.last180} | 1yr: {deGroups.last365}</div>
+        </div>
+        <div className="bg-white rounded shadow p-4">
+          <div className="text-lg font-bold text-indigo-700">Automations</div>
+          <div className="text-2xl font-bold">{automations.length}</div>
+          <div className="text-xs text-gray-500 mt-2">Last 7d: {autoGroups.last7} | 30d: {autoGroups.last30} | 6mo: {autoGroups.last180} | 1yr: {autoGroups.last365}</div>
+        </div>
+        <div className="bg-white rounded shadow p-4">
+          <div className="text-lg font-bold text-indigo-700">Data Filters</div>
+          <div className="text-2xl font-bold">{dataFilters.length}</div>
+          <div className="text-xs text-gray-500 mt-2">Last 7d: {dfGroups.last7} | 30d: {dfGroups.last30} | 6mo: {dfGroups.last180} | 1yr: {dfGroups.last365}</div>
+        </div>
+        <div className="bg-white rounded shadow p-4">
+          <div className="text-lg font-bold text-indigo-700">Journeys</div>
+          <div className="text-2xl font-bold">{journeys.length}</div>
+          <div className="text-xs text-gray-500 mt-2">Last 7d: {journeyGroups.last7} | 30d: {journeyGroups.last30} | 6mo: {journeyGroups.last180} | 1yr: {journeyGroups.last365}</div>
+        </div>
       </div>
 
       <div className="flex gap-4 mb-4">
