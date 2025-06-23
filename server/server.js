@@ -77,6 +77,41 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
+app.post('/auth/callback', async (req, res) => {
+  const code = req.body.code;
+  if (!code) return res.status(400).json({ success: false, error: 'Missing authorization code' });
+
+  try {
+    const tokenResponse = await axios.post(
+      `https://${process.env.AUTH_DOMAIN}/v2/token`,
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        client_id: process.env.CLIENT_ID,
+        client_secret: process.env.CLIENT_SECRET,
+        redirect_uri: process.env.REDIRECT_URI
+      }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    sessionAccessToken = tokenResponse.data.access_token;
+    console.log('✅ Access token received (POST)');
+
+    const match = process.env.AUTH_DOMAIN.match(/^([^.]+)\./);
+    if (match) {
+      dynamicCreds.subdomain = match[1];
+      console.log('🌐 Subdomain set (POST):', dynamicCreds.subdomain);
+    } else {
+      console.warn('⚠️ Failed to extract subdomain from AUTH_DOMAIN (POST)');
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ OAuth Token Exchange Error (POST):', err.response?.data || err.message);
+    res.status(500).json({ success: false, error: 'OAuth callback failed' });
+  }
+});
+
 function debugLogTokenAndDomain(route) {
   console.log(`\n🔍 ${route}`);
   console.log('🔑 Access Token:', sessionAccessToken);
