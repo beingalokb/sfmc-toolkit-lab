@@ -477,6 +477,74 @@ app.get('/search/journeys', async (req, res) => {
   }
 });
 
+// On-demand Data Extension details endpoint
+app.get('/de/details', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  const name = req.query.name;
+  if (!accessToken || !subdomain || !name) {
+    return res.status(400).json({ error: 'Missing required parameters' });
+  }
+  try {
+    // REST call for DE details
+    const restResp = await axios.get(
+      `https://${subdomain}.rest.marketingcloudapis.com/data/v1/customobjects?$search=${encodeURIComponent(name)}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const item = restResp.data.items && restResp.data.items.find(obj => obj.name === name);
+    if (!item) return res.status(404).json({ error: 'Data Extension not found' });
+    // SOAP call for rowCount, isSendable, isTestable
+    const soapEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataExtension</ObjectType>
+              <Properties>Name</Properties>
+              <Properties>CustomerKey</Properties>
+              <Properties>IsSendable</Properties>
+              <Properties>IsTestable</Properties>
+              <Properties>RowCount</Properties>
+              <Filter xsi:type="SimpleFilterPart" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                <Property>Name</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>${name}</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>
+    `;
+    const soapResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Retrieve',
+        },
+      }
+    );
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(soapResp.data, (err, result) => {
+      if (err) {
+        return res.status(500).json({ error: 'Failed to parse SOAP response' });
+      }
+      const details = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      const deDetails = Array.isArray(details) ? details[0] : details;
+      res.json({
+        createdByName: item.createdByName || 'N/A',
+        modifiedByName: item.modifiedByName || 'N/A',
+        rowCount: deDetails?.RowCount || 'N/A',
+        isSendable: deDetails?.IsSendable || 'N/A',
+        isTestable: deDetails?.IsTestable || 'N/A',
+      });
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch DE details', details: e.message });
+  }
+});
+
 // Serve React frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
 app.get(/(.*)/, (req, res) => {

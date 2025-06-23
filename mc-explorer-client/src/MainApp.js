@@ -17,6 +17,7 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [pendingFetches, setPendingFetches] = useState(0);
+  const [deDetailModal, setDeDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -227,6 +228,26 @@ function MainApp() {
   const dfGroups = getDateGroups(dataFilters);
   const journeyGroups = getDateGroups(journeys);
 
+  // Fetch DE details on demand
+  const fetchDeDetails = async (name) => {
+    setDeDetailModal({ open: true, loading: true, error: null, details: null, name });
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      const subdomain = localStorage.getItem('subdomain');
+      const res = await fetch(`${baseURL}/de/details?name=${encodeURIComponent(name)}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-mc-subdomain': subdomain
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch details');
+      const details = await res.json();
+      setDeDetailModal({ open: true, loading: false, error: null, details, name });
+    } catch (e) {
+      setDeDetailModal({ open: true, loading: false, error: e.message, details: null, name });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -335,7 +356,9 @@ function MainApp() {
           </thead>
           <tbody>
             {paginatedData().map((item, idx) => (
-              <tr key={idx} className="border-t">
+              <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : ''}`}
+                onClick={() => item._type === 'Data Extension' ? fetchDeDetails(item.name) : undefined}
+              >
                 <td className="p-2">{item._type}</td>
                 <td className="p-2 font-medium">{item.name}</td>
                 <td className="p-2">{formatDate(item.createdDate)}</td>
@@ -359,6 +382,27 @@ function MainApp() {
           <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
         </div>
       </div>
+
+      {/* Modal for DE details */}
+      {deDetailModal.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+            <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setDeDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
+            <h2 className="text-lg font-bold mb-4 text-indigo-700">Data Extension Details: {deDetailModal.name}</h2>
+            {deDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
+            {deDetailModal.error && <div className="text-red-600">{deDetailModal.error}</div>}
+            {deDetailModal.details && (
+              <div className="space-y-2">
+                <div><span className="font-semibold">Created By:</span> {deDetailModal.details.createdByName}</div>
+                <div><span className="font-semibold">Modified By:</span> {deDetailModal.details.modifiedByName}</div>
+                <div><span className="font-semibold">Row Count:</span> {deDetailModal.details.rowCount}</div>
+                <div><span className="font-semibold">Is Sendable:</span> {deDetailModal.details.isSendable.toString()}</div>
+                <div><span className="font-semibold">Is Testable:</span> {deDetailModal.details.isTestable.toString()}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
