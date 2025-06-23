@@ -455,7 +455,7 @@ function MainApp() {
 
       {/* Modal for DE details */}
       {deDetailModal.open && (
-        <div className="fixed inset-0 bg-black bg
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
             <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setDeDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
             <h2 className="text-lg font-bold mb-4 text-indigo-700">Data Extension Details: {deDetailModal.name}</h2>
