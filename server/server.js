@@ -158,6 +158,7 @@ app.get('/search/de', async (req, res) => {
               <Properties>CustomerKey</Properties>
               <Properties>CreatedDate</Properties>
               <Properties>CategoryID</Properties>
+              <Properties>ObjectID</Properties>
             </RetrieveRequest>
           </RetrieveRequestMsg>
         </s:Body>
@@ -188,6 +189,8 @@ app.get('/search/de', async (req, res) => {
           name: de.Name || 'N/A',
           key: de.CustomerKey || 'N/A',
           createdDate: de.CreatedDate || 'N/A',
+          categoryId: de.CategoryID || '',
+          objectId: de.ObjectID || '',
           path: buildFolderPath(de.CategoryID, folderMap)
         }));
         res.json(deList);
