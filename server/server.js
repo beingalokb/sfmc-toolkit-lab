@@ -257,6 +257,7 @@ app.get('/search/automation', async (req, res) => {
     const automations = response.data.items || [];
     if (automations.length > 0) console.log('🔎 Raw Automation:', JSON.stringify(automations[0], null, 2));
     const simplified = automations.map(a => ({
+      id: a.id,
       name: a.name || 'N/A',
       key: a.key || a.customerKey || 'N/A',
       status: a.status || a.statusId || 'N/A',

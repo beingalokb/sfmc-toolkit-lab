@@ -284,12 +284,12 @@ function MainApp() {
   };
 
   // Fetch Automation details on demand
-  const fetchAutomationDetails = async (name, programId) => {
+  const fetchAutomationDetails = async (name, id) => {
     setAutomationDetailModal({ open: true, loading: true, error: null, details: null, name });
     try {
       const accessToken = localStorage.getItem('accessToken');
       const subdomain = localStorage.getItem('subdomain');
-      const res = await fetch(`${baseURL}/automation/details?programId=${encodeURIComponent(programId)}`, {
+      const res = await fetch(`${baseURL}/automation/details?programId=${encodeURIComponent(id)}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'x-mc-subdomain': subdomain
@@ -413,7 +413,7 @@ function MainApp() {
               <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
                 onClick={() => {
                   if (item._type === 'Data Extension') fetchDeDetails(item.name);
-                  if (item._type === 'Automation') fetchAutomationDetails(item.name, item.programId);
+                  if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
                 }}
               >
                 <td className="p-2">{item._type}</td>
