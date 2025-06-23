@@ -521,9 +521,9 @@ app.get('/de/details', async (req, res) => {
     res.json({
       createdByName: item.createdByName || 'N/A',
       modifiedByName: item.modifiedByName || 'N/A',
-      rowCount: deDetails?.RowCount || 'N/A',
-      isSendable: deDetails?.IsSendable || 'N/A',
-      isTestable: deDetails?.IsTestable || 'N/A',
+      rowCount: item.rowCount !== undefined ? item.rowCount : (deDetails?.RowCount || 'N/A'),
+      isSendable: item.isSendable !== undefined ? item.isSendable : (deDetails?.IsSendable || 'N/A'),
+      isTestable: item.isTestable !== undefined ? item.isTestable : (deDetails?.IsTestable || 'N/A'),
     });
   } catch (e) {
     console.error('Failed to fetch DE details:', e?.response?.data || e);
