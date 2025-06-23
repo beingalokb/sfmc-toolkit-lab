@@ -16,6 +16,7 @@ function MainApp() {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [pendingFetches, setPendingFetches] = useState(0);
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -37,7 +38,7 @@ function MainApp() {
   }
   const authStatus = localStorage.getItem('isAuthenticated') === 'true';
   setIsAuthenticated(authStatus);
-  setLoading(false);
+  // Don't setLoading(false) here!
 }, []);
 
   useEffect(() => {
@@ -71,6 +72,9 @@ function MainApp() {
       return;
     }
 
+    setLoading(true);
+    setPendingFetches(5); // 5 fetches: DE, Automation, DataFilter, Journey, Folders
+
     const fetchWithLogging = async (path, setter, label) => {
       try {
         const res = await fetch(`${baseURL}${path}`, {
@@ -81,14 +85,17 @@ function MainApp() {
         });
         if (res.status === 401) {
           console.warn(`🚫 ${label} fetch unauthorized`);
-          return setter([]);
+          setter([]);
+        } else {
+          const json = await res.json();
+          console.log(`✅ ${label} fetched`, json);
+          setter(Array.isArray(json) ? json : []);
         }
-        const json = await res.json();
-        console.log(`✅ ${label} fetched`, json);
-        setter(Array.isArray(json) ? json : []);
       } catch (e) {
         console.error(`❌ Failed to fetch ${label}`, e);
         setter([]);
+      } finally {
+        setPendingFetches(prev => prev - 1);
       }
     };
 
@@ -102,6 +109,10 @@ function MainApp() {
       setFolderMap(map);
     }, 'Folders');
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (pendingFetches === 0 && isAuthenticated) setLoading(false);
+  }, [pendingFetches, isAuthenticated]);
 
   const buildFolderPath = (id) => {
     if (!id || !folderMap[id]) return 'N/A';
