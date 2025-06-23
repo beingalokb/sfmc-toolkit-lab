@@ -403,7 +403,7 @@ function MainApp() {
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
               {/* Remove Created column for Automations */}
               <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
-              <th className="text-left p-2">View</th>
+              <th className="text-left p-2">View in folder</th>
               {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
                 <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
               ) : null}

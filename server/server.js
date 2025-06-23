@@ -191,6 +191,7 @@ app.get('/search/de', async (req, res) => {
           createdDate: de.CreatedDate || 'N/A',
           categoryId: de.CategoryID || '',
           objectId: de.ObjectID || '',
+          id: de.ID || de.ObjectID || '', // fallback to ObjectID if ID is missing
           path: buildFolderPath(de.CategoryID, folderMap)
         }));
         res.json(deList);
