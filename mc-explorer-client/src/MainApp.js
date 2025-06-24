@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 const PreferenceCenterProjectForm = require('./PreferenceCenterProjectForm').default;
+import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -535,7 +536,7 @@ function MainApp() {
         </>
       ) : (
         <div className="p-8 bg-white rounded shadow text-center mt-8">
-          <PreferenceCenterProjectForm />
+          <PreferenceCenterNoCoreForm />
         </div>
       )}
       </div>
