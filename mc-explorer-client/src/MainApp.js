@@ -538,6 +538,7 @@ function MainApp() {
           <p className="text-gray-600">Coming soon: Build and manage Preference Centers with AI-guided prompts and best practices.</p>
         </div>
       )}
+      </div>
     </div>
   );
 }
