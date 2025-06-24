@@ -314,7 +314,7 @@ export default function MainApp() {
       setPreviewResult({ loading: true });
       const accessToken = localStorage.getItem('accessToken');
       const subdomain = localStorage.getItem('subdomain');
-      const res = await fetch('/preference-center/save-config', {
+      const res = await fetch('/preference-center/project', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
