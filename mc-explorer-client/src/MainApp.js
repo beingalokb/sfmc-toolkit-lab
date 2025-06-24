@@ -370,254 +370,253 @@ export default function MainApp() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* App Title */}
+      {/* App Title and Header */}
       <div id="mc-explorer-root" className="bg-white rounded-xl shadow-lg p-6 mt-6 mb-8 mx-auto" style={{maxWidth: '1100px'}}>
-      {/* App Header */}
-      <header className="bg-indigo-800 text-white p-4 shadow flex items-center gap-4 rounded-t-lg">
-        <img src={require('./logo.svg').default} alt="MC Explorer Logo" className="h-10 w-10" />
-        <h1 className="text-2xl font-bold tracking-wide" style={{ color: '#61DAFB', letterSpacing: '0.04em' }}>MC Explorer</h1>
-      </header>
-      {/* Parent Navigation */}
-      <div className="flex gap-4 p-4 bg-white shadow mb-4 rounded-b-lg">
-        <button
-          className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'search' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-          onClick={() => setParentNav('search')}
-        >
-          Search Assets
-        </button>
-        <button
-          className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'preference' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-          onClick={() => setParentNav('preference')}
-        >
-          Guided Preference Center
-        </button>
-      </div>
-
-      {/* Render content based on parentNav */}
-      {parentNav === 'search' ? (
-        <>
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold text-indigo-700">MC Explorer</h1>
-            <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
-              Logout
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded shadow p-4">
-              <div className="text-lg font-bold text-indigo-700">Data Extensions</div>
-              <div className="text-2xl font-bold">{dataExtensions.length}</div>
-              <div className="text-xs text-gray-500 mt-2">Last 7d: {deGroups.last7} | 30d: {deGroups.last30} | 6mo: {deGroups.last180} | 1yr: {deGroups.last365}</div>
-            </div>
-            <div className="bg-white rounded shadow p-4">
-              <div className="text-lg font-bold text-indigo-700">Automations</div>
-              <div className="text-2xl font-bold">{automations.length}</div>
-              <div className="text-xs text-gray-500 mt-2">Last 7d: {autoGroups.last7} | 30d: {autoGroups.last30} | 6mo: {autoGroups.last180} | 1yr: {autoGroups.last365}</div>
-            </div>
-            <div className="bg-white rounded shadow p-4">
-              <div className="text-lg font-bold text-indigo-700">Data Filters</div>
-              <div className="text-2xl font-bold">{dataFilters.length}</div>
-              <div className="text-xs text-gray-500 mt-2">Last 7d: {dfGroups.last7} | 30d: {dfGroups.last30} | 6mo: {dfGroups.last180} | 1yr: {dfGroups.last365}</div>
-            </div>
-            <div className="bg-white rounded shadow p-4">
-              <div className="text-lg font-bold text-indigo-700">Journeys</div>
-              <div className="text-2xl font-bold">{journeys.length}</div>
-              <div className="text-xs text-gray-500 mt-2">Last 7d: {journeyGroups.last7} | 30d: {journeyGroups.last30} | 6mo: {journeyGroups.last180} | 1yr: {journeyGroups.last365}</div>
-            </div>
-          </div>
-
-          <div className="flex gap-4 mb-4">
-            {['de', 'automation', 'datafilter', 'journey'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded text-sm ${activeTab === tab ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-              >
-                {tab.toUpperCase()}
-              </button>
-            ))}
-            <button
-              onClick={downloadCSV}
-              className="bg-green-600 text-white px-3 py-1 rounded text-sm ml-2"
-            >
-              Download CSV
-            </button>
-            <input
-              type="text"
-              placeholder="Search..."
-              className="ml-auto border px-3 py-1 rounded"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          <div className="overflow-x-auto bg-white shadow rounded">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="text-left p-2">Type</th>
-                  <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
-                  {/* Remove Created column for Automations */}
-                  <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
-                  <th className="text-left p-2">View in folder</th>
-                  {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
-                    <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
-                  ) : null}
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedData().map((item, idx) => (
-                  <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
-                    onClick={() => {
-                      if (item._type === 'Data Extension') fetchDeDetails(item.name);
-                      if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
-                    }}
-                  >
-                    <td className="p-2">{item._type}</td>
-                    <td className="p-2 font-medium">{item.name}</td>
-                    {/* Remove Created column for Automations */}
-                    <td className="p-2">{item.path || 'N/A'}</td>
-                    <td className="p-2">
-                      {item._type === 'Data Extension' && item.categoryId && item.id && (
-                        <a
-                          href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 underline hover:text-blue-800"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          View
-                        </a>
-                      )}
-                      {item._type === 'Data Filter' && item.id && (
-                        <a
-                          href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 underline hover:text-blue-800 ml-2"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          View
-                        </a>
-                      )}
-                    </td>
-                    {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
-                      <td className="p-2">{item.status || 'N/A'}</td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex justify-between items-center mt-4 text-sm">
-            <div>
-              Page {currentPage} of {totalPages}
-            </div>
-            <div className="flex gap-2">
-              <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
-              <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
-            </div>
-          </div>
-
-          {/* Modal for DE details */}
-          {deDetailModal.open && (
-            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
-                <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setDeDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
-                <h2 className="text-lg font-bold mb-4 text-indigo-700">Data Extension Details: {deDetailModal.name}</h2>
-                {deDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
-                {deDetailModal.error && <div className="text-red-600">{deDetailModal.error}</div>}
-                {deDetailModal.details && (
-                  <div className="space-y-2">
-                    <div><span className="font-semibold">Created By:</span> {deDetailModal.details.createdByName}</div>
-                    <div><span className="font-semibold">Modified By:</span> {deDetailModal.details.modifiedByName}</div>
-                    <div><span className="font-semibold">Row Count:</span> {deDetailModal.details.rowCount}</div>
-                    <div><span className="font-semibold">Is Sendable:</span> {deDetailModal.details.isSendable.toString()}</div>
-                    <div><span className="font-semibold">Is Testable:</span> {deDetailModal.details.isTestable.toString()}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Modal for Automation details */}
-          {automationDetailModal.open && (
-            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
-                <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setAutomationDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
-                <h2 className="text-lg font-bold mb-4 text-green-700">Automation Details: {automationDetailModal.name}</h2>
-                {automationDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
-                {automationDetailModal.error && <div className="text-red-600">{automationDetailModal.error}</div>}
-                {automationDetailModal.details && (
-                  <div className="space-y-2">
-                    <div><span className="font-semibold">Start Date:</span> {automationDetailModal.details.startDate}</div>
-                    <div><span className="font-semibold">End Date:</span> {automationDetailModal.details.endDate}</div>
-                    <div><span className="font-semibold">Last Run Time:</span> {automationDetailModal.details.lastRunTime}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </>
-      ) : parentNav === 'preference' ? (
-        <div className="p-8 bg-white rounded shadow text-center mt-8 max-w-2xl mx-auto">
-          <h2 className="text-xl font-bold mb-4 text-indigo-700">How do you want your preference center to be set up?</h2>
-          <select
-            className="border rounded px-3 py-2 w-full mb-6"
-            value={guidedPrefOption || ''}
-            onChange={e => setGuidedPrefOption(e.target.value)}
+        <header className="bg-indigo-800 text-white p-4 shadow flex items-center gap-4 rounded-t-lg">
+          <img src={require('./logo.svg').default} alt="MC Explorer Logo" className="h-10 w-10" />
+          <h1 className="text-2xl font-bold tracking-wide" style={{ color: '#61DAFB', letterSpacing: '0.04em' }}>MC Explorer</h1>
+        </header>
+        {/* Parent Navigation */}
+        <div className="flex gap-4 p-4 bg-white shadow mb-4 rounded-b-lg">
+          <button
+            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'search' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+            onClick={() => setParentNav('search')}
           >
-            <option value="" disabled>Select an option...</option>
-            <option value="no_sf_core">Marketing Cloud Preference Center with no Salesforce core integration</option>
-            <option value="sf_core_contact_lead">Marketing Cloud Preference Center with Salesforce core contact, Lead integration</option>
-            <option value="sf_core_consent">Marketing Cloud Preference Center with Salesforce core consent model</option>
-          </select>
+            Search Assets
+          </button>
+          <button
+            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'preference' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+            onClick={() => setParentNav('preference')}
+          >
+            Guided Preference Center
+          </button>
+        </div>
+        {/* Render content based on parentNav */}
+        {parentNav === 'search' ? (
+          <>
+            <div className="flex justify-between items-center mb-4">
+              <h1 className="text-3xl font-bold text-indigo-700">MC Explorer</h1>
+              <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
+                Logout
+              </button>
+            </div>
 
-          {guidedPrefOption === 'no_sf_core' && (
-            <div className="mt-6 text-left">
-              <a
-                href="/Custom%20Preference%20Center_No_SF_Integration.zip"
-                download
-                className="inline-block bg-indigo-600 text-white px-4 py-2 rounded font-semibold mb-4 hover:bg-indigo-700"
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white rounded shadow p-4">
+                <div className="text-lg font-bold text-indigo-700">Data Extensions</div>
+                <div className="text-2xl font-bold">{dataExtensions.length}</div>
+                <div className="text-xs text-gray-500 mt-2">Last 7d: {deGroups.last7} | 30d: {deGroups.last30} | 6mo: {deGroups.last180} | 1yr: {deGroups.last365}</div>
+              </div>
+              <div className="bg-white rounded shadow p-4">
+                <div className="text-lg font-bold text-indigo-700">Automations</div>
+                <div className="text-2xl font-bold">{automations.length}</div>
+                <div className="text-xs text-gray-500 mt-2">Last 7d: {autoGroups.last7} | 30d: {autoGroups.last30} | 6mo: {autoGroups.last180} | 1yr: {autoGroups.last365}</div>
+              </div>
+              <div className="bg-white rounded shadow p-4">
+                <div className="text-lg font-bold text-indigo-700">Data Filters</div>
+                <div className="text-2xl font-bold">{dataFilters.length}</div>
+                <div className="text-xs text-gray-500 mt-2">Last 7d: {dfGroups.last7} | 30d: {dfGroups.last30} | 6mo: {dfGroups.last180} | 1yr: {dfGroups.last365}</div>
+              </div>
+              <div className="bg-white rounded shadow p-4">
+                <div className="text-lg font-bold text-indigo-700">Journeys</div>
+                <div className="text-2xl font-bold">{journeys.length}</div>
+                <div className="text-xs text-gray-500 mt-2">Last 7d: {journeyGroups.last7} | 30d: {journeyGroups.last30} | 6mo: {journeyGroups.last180} | 1yr: {journeyGroups.last365}</div>
+              </div>
+            </div>
+
+            <div className="flex gap-4 mb-4">
+              {['de', 'automation', 'datafilter', 'journey'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 rounded text-sm ${activeTab === tab ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+                >
+                  {tab.toUpperCase()}
+                </button>
+              ))}
+              <button
+                onClick={downloadCSV}
+                className="bg-green-600 text-white px-3 py-1 rounded text-sm ml-2"
               >
-                Download Preference Center Package (ZIP)
-              </a>
-              <div className="bg-gray-50 border-l-4 border-indigo-400 p-4 rounded">
-                <h3 className="font-bold mb-2 text-indigo-700">Instructions</h3>
-                <ol className="list-decimal ml-6 text-sm text-gray-800 space-y-1">
-                  <li>In the <b>Package Manager</b> folder, deploy the JSON into SFMC via Package Manager.</li>
-                  <li>Go into the Cloud pages and do a search all and replace for the cloudpageURL IDs; there will be 2-3 that did not get deployed correctly.</li>
-                  <li>In <b>cpc_main</b> on line 301, ensure that the cloud page ID is for <b>cpc_main</b>.</li>
-                  <li>In <b>cpc_main</b> on line 331, ensure that the cloud page ID is for <b>cpc_handler</b>.</li>
-                  <li>In <b>cpc_handler</b>, every <b>CloudPagesURL</b> function should point to the cloud page ID for <b>cpc_main</b>.</li>
-                  <li>Test, validate, and add additional features as needed.</li>
-                  <li>To use the preference center, the url expects a <b>subkey</b> parameter at the end of the URL (e.g. <span className="break-all">https://mcf7bhdjzswk278tj2j38nqtlq2q.pub.sfmc-content.com/jqi02yqkmgp?subkey=TEST10001</span>).</li>
-                </ol>
-                <div className="mt-2 text-xs text-gray-600">
-                  <b>NOTE:</b> The preference center assumes that a record with email exists in All Subscribers.
+                Download CSV
+              </button>
+              <input
+                type="text"
+                placeholder="Search..."
+                className="ml-auto border px-3 py-1 rounded"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="overflow-x-auto bg-white shadow rounded">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="text-left p-2">Type</th>
+                    <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
+                    {/* Remove Created column for Automations */}
+                    <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
+                    <th className="text-left p-2">View in folder</th>
+                    {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
+                      <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
+                    ) : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedData().map((item, idx) => (
+                    <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
+                      onClick={() => {
+                        if (item._type === 'Data Extension') fetchDeDetails(item.name);
+                        if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
+                      }}
+                    >
+                      <td className="p-2">{item._type}</td>
+                      <td className="p-2 font-medium">{item.name}</td>
+                      {/* Remove Created column for Automations */}
+                      <td className="p-2">{item.path || 'N/A'}</td>
+                      <td className="p-2">
+                        {item._type === 'Data Extension' && item.categoryId && item.id && (
+                          <a
+                            href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline hover:text-blue-800"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            View
+                          </a>
+                        )}
+                        {item._type === 'Data Filter' && item.id && (
+                          <a
+                            href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline hover:text-blue-800 ml-2"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            View
+                          </a>
+                        )}
+                      </td>
+                      {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
+                        <td className="p-2">{item.status || 'N/A'}</td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-between items-center mt-4 text-sm">
+              <div>
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex gap-2">
+                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
+                <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
+              </div>
+            </div>
+
+            {/* Modal for DE details */}
+            {deDetailModal.open && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setDeDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
+                  <h2 className="text-lg font-bold mb-4 text-indigo-700">Data Extension Details: {deDetailModal.name}</h2>
+                  {deDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
+                  {deDetailModal.error && <div className="text-red-600">{deDetailModal.error}</div>}
+                  {deDetailModal.details && (
+                    <div className="space-y-2">
+                      <div><span className="font-semibold">Created By:</span> {deDetailModal.details.createdByName}</div>
+                      <div><span className="font-semibold">Modified By:</span> {deDetailModal.details.modifiedByName}</div>
+                      <div><span className="font-semibold">Row Count:</span> {deDetailModal.details.rowCount}</div>
+                      <div><span className="font-semibold">Is Sendable:</span> {deDetailModal.details.isSendable.toString()}</div>
+                      <div><span className="font-semibold">Is Testable:</span> {deDetailModal.details.isTestable.toString()}</div>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {guidedPrefOption === 'sf_core_contact_lead' && (
-            <div className="mt-6 text-left text-gray-600">
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core contact, Lead integration is in development.
+            {/* Modal for Automation details */}
+            {automationDetailModal.open && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setAutomationDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
+                  <h2 className="text-lg font-bold mb-4 text-green-700">Automation Details: {automationDetailModal.name}</h2>
+                  {automationDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
+                  {automationDetailModal.error && <div className="text-red-600">{automationDetailModal.error}</div>}
+                  {automationDetailModal.details && (
+                    <div className="space-y-2">
+                      <div><span className="font-semibold">Start Date:</span> {automationDetailModal.details.startDate}</div>
+                      <div><span className="font-semibold">End Date:</span> {automationDetailModal.details.endDate}</div>
+                      <div><span className="font-semibold">Last Run Time:</span> {automationDetailModal.details.lastRunTime}</div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </>
+        ) : parentNav === 'preference' ? (
+          <div className="p-6 bg-white rounded shadow">
+            <h2 className="text-xl font-bold mb-4 text-indigo-700">How do you want your preference center to be set up?</h2>
+            <select
+              className="border rounded px-3 py-2 w-full mb-6"
+              value={guidedPrefOption || ''}
+              onChange={e => setGuidedPrefOption(e.target.value)}
+            >
+              <option value="" disabled>Select an option...</option>
+              <option value="no_sf_core">Marketing Cloud Preference Center with no Salesforce core integration</option>
+              <option value="sf_core_contact_lead">Marketing Cloud Preference Center with Salesforce core contact, Lead integration</option>
+              <option value="sf_core_consent">Marketing Cloud Preference Center with Salesforce core consent model</option>
+            </select>
 
-          {guidedPrefOption === 'sf_core_consent' && (
-            <div className="mt-6 text-left text-gray-600">
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core consent model is in development.
+            {guidedPrefOption === 'no_sf_core' && (
+              <div className="mt-6 text-left">
+                <a
+                  href="/Custom%20Preference%20Center_No_SF_Integration.zip"
+                  download
+                  className="inline-block bg-indigo-600 text-white px-4 py-2 rounded font-semibold mb-4 hover:bg-indigo-700"
+                >
+                  Download Preference Center Package (ZIP)
+                </a>
+                <div className="bg-gray-50 border-l-4 border-indigo-400 p-4 rounded">
+                  <h3 className="font-bold mb-2 text-indigo-700">Instructions</h3>
+                  <ol className="list-decimal ml-6 text-sm text-gray-800 space-y-1">
+                    <li>In the <b>Package Manager</b> folder, deploy the JSON into SFMC via Package Manager.</li>
+                    <li>Go into the Cloud pages and do a search all and replace for the cloudpageURL IDs; there will be 2-3 that did not get deployed correctly.</li>
+                    <li>In <b>cpc_main</b> on line 301, ensure that the cloud page ID is for <b>cpc_main</b>.</li>
+                    <li>In <b>cpc_main</b> on line 331, ensure that the cloud page ID is for <b>cpc_handler</b>.</li>
+                    <li>In <b>cpc_handler</b>, every <b>CloudPagesURL</b> function should point to the cloud page ID for <b>cpc_main</b>.</li>
+                    <li>Test, validate, and add additional features as needed.</li>
+                    <li>To use the preference center, the url expects a <b>subkey</b> parameter at the end of the URL (e.g. <span className="break-all">https://mcf7bhdjzswk278tj2j38nqtlq2q.pub.sfmc-content.com/jqi02yqkmgp?subkey=TEST10001</span>).</li>
+                  </ol>
+                  <div className="mt-2 text-xs text-gray-600">
+                    <b>NOTE:</b> The preference center assumes that a record with email exists in All Subscribers.
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      ) : null}
+            )}
+
+            {guidedPrefOption === 'sf_core_contact_lead' && (
+              <div className="mt-6 text-left text-gray-600">
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                  <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core contact, Lead integration is in development.
+                </div>
+              </div>
+            )}
+
+            {guidedPrefOption === 'sf_core_consent' && (
+              <div className="mt-6 text-left text-gray-600">
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                  <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core consent model is in development.
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -626,5 +625,11 @@ function formatDate(dateStr) {
   if (!dateStr || dateStr === 'N/A' || dateStr === 'Not Available') return 'N/A';
   const d = new Date(dateStr);
   if (isNaN(d)) return dateStr;
-  return d.toLocaleString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+  return d.toLocaleString('en-GB', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).replace(',', '');
 }
