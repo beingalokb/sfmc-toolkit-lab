@@ -19,6 +19,8 @@ function MainApp() {
   const [pendingFetches, setPendingFetches] = useState(0);
   const [deDetailModal, setDeDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
   const [automationDetailModal, setAutomationDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
+  // Parent navigation state
+  const [parentNav, setParentNav] = useState('search'); // 'search' or 'preference'
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -339,168 +341,194 @@ function MainApp() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto bg-gradient-to-br from-slate-50 to-slate-200 min-h-screen font-sans">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold text-indigo-700">MC Explorer</h1>
-        <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
-          Logout
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded shadow p-4">
-          <div className="text-lg font-bold text-indigo-700">Data Extensions</div>
-          <div className="text-2xl font-bold">{dataExtensions.length}</div>
-          <div className="text-xs text-gray-500 mt-2">Last 7d: {deGroups.last7} | 30d: {deGroups.last30} | 6mo: {deGroups.last180} | 1yr: {deGroups.last365}</div>
-        </div>
-        <div className="bg-white rounded shadow p-4">
-          <div className="text-lg font-bold text-indigo-700">Automations</div>
-          <div className="text-2xl font-bold">{automations.length}</div>
-          <div className="text-xs text-gray-500 mt-2">Last 7d: {autoGroups.last7} | 30d: {autoGroups.last30} | 6mo: {autoGroups.last180} | 1yr: {autoGroups.last365}</div>
-        </div>
-        <div className="bg-white rounded shadow p-4">
-          <div className="text-lg font-bold text-indigo-700">Data Filters</div>
-          <div className="text-2xl font-bold">{dataFilters.length}</div>
-          <div className="text-xs text-gray-500 mt-2">Last 7d: {dfGroups.last7} | 30d: {dfGroups.last30} | 6mo: {dfGroups.last180} | 1yr: {dfGroups.last365}</div>
-        </div>
-        <div className="bg-white rounded shadow p-4">
-          <div className="text-lg font-bold text-indigo-700">Journeys</div>
-          <div className="text-2xl font-bold">{journeys.length}</div>
-          <div className="text-xs text-gray-500 mt-2">Last 7d: {journeyGroups.last7} | 30d: {journeyGroups.last30} | 6mo: {journeyGroups.last180} | 1yr: {journeyGroups.last365}</div>
-        </div>
-      </div>
-
-      <div className="flex gap-4 mb-4">
-        {['de', 'automation', 'datafilter', 'journey'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded text-sm ${activeTab === tab ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-          >
-            {tab.toUpperCase()}
-          </button>
-        ))}
+    <div className="min-h-screen bg-gray-100">
+      {/* Parent Navigation */}
+      <div className="flex gap-4 p-4 bg-white shadow mb-4">
         <button
-          onClick={downloadCSV}
-          className="bg-green-600 text-white px-3 py-1 rounded text-sm ml-2"
+          className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'search' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+          onClick={() => setParentNav('search')}
         >
-          Download CSV
+          Search Assets
         </button>
-        <input
-          type="text"
-          placeholder="Search..."
-          className="ml-auto border px-3 py-1 rounded"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-        />
+        <button
+          className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'preference' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+          onClick={() => setParentNav('preference')}
+        >
+          Guided Preference Center
+        </button>
       </div>
 
-      <div className="overflow-x-auto bg-white shadow rounded">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr>
-              <th className="text-left p-2">Type</th>
-              <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
-              {/* Remove Created column for Automations */}
-              <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
-              <th className="text-left p-2">View in folder</th>
-              {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
-                <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedData().map((item, idx) => (
-              <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
-                onClick={() => {
-                  if (item._type === 'Data Extension') fetchDeDetails(item.name);
-                  if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
-                }}
+      {/* Render content based on parentNav */}
+      {parentNav === 'search' ? (
+        <>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-3xl font-bold text-indigo-700">MC Explorer</h1>
+            <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
+              Logout
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white rounded shadow p-4">
+              <div className="text-lg font-bold text-indigo-700">Data Extensions</div>
+              <div className="text-2xl font-bold">{dataExtensions.length}</div>
+              <div className="text-xs text-gray-500 mt-2">Last 7d: {deGroups.last7} | 30d: {deGroups.last30} | 6mo: {deGroups.last180} | 1yr: {deGroups.last365}</div>
+            </div>
+            <div className="bg-white rounded shadow p-4">
+              <div className="text-lg font-bold text-indigo-700">Automations</div>
+              <div className="text-2xl font-bold">{automations.length}</div>
+              <div className="text-xs text-gray-500 mt-2">Last 7d: {autoGroups.last7} | 30d: {autoGroups.last30} | 6mo: {autoGroups.last180} | 1yr: {autoGroups.last365}</div>
+            </div>
+            <div className="bg-white rounded shadow p-4">
+              <div className="text-lg font-bold text-indigo-700">Data Filters</div>
+              <div className="text-2xl font-bold">{dataFilters.length}</div>
+              <div className="text-xs text-gray-500 mt-2">Last 7d: {dfGroups.last7} | 30d: {dfGroups.last30} | 6mo: {dfGroups.last180} | 1yr: {dfGroups.last365}</div>
+            </div>
+            <div className="bg-white rounded shadow p-4">
+              <div className="text-lg font-bold text-indigo-700">Journeys</div>
+              <div className="text-2xl font-bold">{journeys.length}</div>
+              <div className="text-xs text-gray-500 mt-2">Last 7d: {journeyGroups.last7} | 30d: {journeyGroups.last30} | 6mo: {journeyGroups.last180} | 1yr: {journeyGroups.last365}</div>
+            </div>
+          </div>
+
+          <div className="flex gap-4 mb-4">
+            {['de', 'automation', 'datafilter', 'journey'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded text-sm ${activeTab === tab ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
               >
-                <td className="p-2">{item._type}</td>
-                <td className="p-2 font-medium">{item.name}</td>
-                {/* Remove Created column for Automations */}
-                <td className="p-2">{item.path || 'N/A'}</td>
-                <td className="p-2">
-                  {item._type === 'Data Extension' && item.categoryId && item.id && (
-                    <a
-                      href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 underline hover:text-blue-800"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      View
-                    </a>
-                  )}
-                  {item._type === 'Data Filter' && item.id && (
-                    <a
-                      href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 underline hover:text-blue-800 ml-2"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      View
-                    </a>
-                  )}
-                </td>
-                {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
-                  <td className="p-2">{item.status || 'N/A'}</td>
-                )}
-              </tr>
+                {tab.toUpperCase()}
+              </button>
             ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="flex justify-between items-center mt-4 text-sm">
-        <div>
-          Page {currentPage} of {totalPages}
-        </div>
-        <div className="flex gap-2">
-          <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
-          <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
-        </div>
-      </div>
-
-      {/* Modal for DE details */}
-      {deDetailModal.open && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
-            <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setDeDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
-            <h2 className="text-lg font-bold mb-4 text-indigo-700">Data Extension Details: {deDetailModal.name}</h2>
-            {deDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
-            {deDetailModal.error && <div className="text-red-600">{deDetailModal.error}</div>}
-            {deDetailModal.details && (
-              <div className="space-y-2">
-                <div><span className="font-semibold">Created By:</span> {deDetailModal.details.createdByName}</div>
-                <div><span className="font-semibold">Modified By:</span> {deDetailModal.details.modifiedByName}</div>
-                <div><span className="font-semibold">Row Count:</span> {deDetailModal.details.rowCount}</div>
-                <div><span className="font-semibold">Is Sendable:</span> {deDetailModal.details.isSendable.toString()}</div>
-                <div><span className="font-semibold">Is Testable:</span> {deDetailModal.details.isTestable.toString()}</div>
-              </div>
-            )}
+            <button
+              onClick={downloadCSV}
+              className="bg-green-600 text-white px-3 py-1 rounded text-sm ml-2"
+            >
+              Download CSV
+            </button>
+            <input
+              type="text"
+              placeholder="Search..."
+              className="ml-auto border px-3 py-1 rounded"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
           </div>
-        </div>
-      )}
 
-      {/* Modal for Automation details */}
-      {automationDetailModal.open && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
-            <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setAutomationDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
-            <h2 className="text-lg font-bold mb-4 text-green-700">Automation Details: {automationDetailModal.name}</h2>
-            {automationDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
-            {automationDetailModal.error && <div className="text-red-600">{automationDetailModal.error}</div>}
-            {automationDetailModal.details && (
-              <div className="space-y-2">
-                <div><span className="font-semibold">Start Date:</span> {automationDetailModal.details.startDate}</div>
-                <div><span className="font-semibold">End Date:</span> {automationDetailModal.details.endDate}</div>
-                <div><span className="font-semibold">Last Run Time:</span> {automationDetailModal.details.lastRunTime}</div>
-              </div>
-            )}
+          <div className="overflow-x-auto bg-white shadow rounded">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left p-2">Type</th>
+                  <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
+                  {/* Remove Created column for Automations */}
+                  <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
+                  <th className="text-left p-2">View in folder</th>
+                  {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
+                    <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
+                  ) : null}
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedData().map((item, idx) => (
+                  <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
+                    onClick={() => {
+                      if (item._type === 'Data Extension') fetchDeDetails(item.name);
+                      if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
+                    }}
+                  >
+                    <td className="p-2">{item._type}</td>
+                    <td className="p-2 font-medium">{item.name}</td>
+                    {/* Remove Created column for Automations */}
+                    <td className="p-2">{item.path || 'N/A'}</td>
+                    <td className="p-2">
+                      {item._type === 'Data Extension' && item.categoryId && item.id && (
+                        <a
+                          href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline hover:text-blue-800"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          View
+                        </a>
+                      )}
+                      {item._type === 'Data Filter' && item.id && (
+                        <a
+                          href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline hover:text-blue-800 ml-2"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          View
+                        </a>
+                      )}
+                    </td>
+                    {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
+                      <td className="p-2">{item.status || 'N/A'}</td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+
+          <div className="flex justify-between items-center mt-4 text-sm">
+            <div>
+              Page {currentPage} of {totalPages}
+            </div>
+            <div className="flex gap-2">
+              <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
+              <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
+            </div>
+          </div>
+
+          {/* Modal for DE details */}
+          {deDetailModal.open && (
+            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setDeDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
+                <h2 className="text-lg font-bold mb-4 text-indigo-700">Data Extension Details: {deDetailModal.name}</h2>
+                {deDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
+                {deDetailModal.error && <div className="text-red-600">{deDetailModal.error}</div>}
+                {deDetailModal.details && (
+                  <div className="space-y-2">
+                    <div><span className="font-semibold">Created By:</span> {deDetailModal.details.createdByName}</div>
+                    <div><span className="font-semibold">Modified By:</span> {deDetailModal.details.modifiedByName}</div>
+                    <div><span className="font-semibold">Row Count:</span> {deDetailModal.details.rowCount}</div>
+                    <div><span className="font-semibold">Is Sendable:</span> {deDetailModal.details.isSendable.toString()}</div>
+                    <div><span className="font-semibold">Is Testable:</span> {deDetailModal.details.isTestable.toString()}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Modal for Automation details */}
+          {automationDetailModal.open && (
+            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setAutomationDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
+                <h2 className="text-lg font-bold mb-4 text-green-700">Automation Details: {automationDetailModal.name}</h2>
+                {automationDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
+                {automationDetailModal.error && <div className="text-red-600">{automationDetailModal.error}</div>}
+                {automationDetailModal.details && (
+                  <div className="space-y-2">
+                    <div><span className="font-semibold">Start Date:</span> {automationDetailModal.details.startDate}</div>
+                    <div><span className="font-semibold">End Date:</span> {automationDetailModal.details.endDate}</div>
+                    <div><span className="font-semibold">Last Run Time:</span> {automationDetailModal.details.lastRunTime}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="p-8 bg-white rounded shadow text-center mt-8">
+          <h2 className="text-2xl font-bold text-indigo-700 mb-4">Guided Preference Center</h2>
+          <p className="text-gray-600">Coming soon: Build and manage Preference Centers with AI-guided prompts and best practices.</p>
         </div>
       )}
     </div>
