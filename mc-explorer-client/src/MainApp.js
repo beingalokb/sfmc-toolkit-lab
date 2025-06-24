@@ -24,6 +24,7 @@ export default function MainApp() {
   // Parent navigation state
   const [parentNav, setParentNav] = useState('search'); // 'search' or 'preference'
   const [previewResult, setPreviewResult] = useState(null);
+  const [guidedPrefOption, setGuidedPrefOption] = useState('');
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -559,29 +560,68 @@ export default function MainApp() {
             </div>
           )}
         </>
-      ) : (
-        <div className="p-8 bg-white rounded shadow text-center mt-8">
-          <PreferenceCenterNoCoreForm onSubmit={handlePreferenceCenterSubmit} />
-          {previewResult && (
-            <div className="mt-6 text-left max-w-2xl mx-auto">
-              {previewResult.loading && <div>Generating Preference Center...</div>}
-              {previewResult.error && <div className="text-red-600">Error: {previewResult.error}</div>}
-              {previewResult.data && (
-                <>
-                  <div className="font-bold text-green-700 mb-2">Preference Center Generated!</div>
-                  <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto max-h-96">{JSON.stringify(previewResult.data, null, 2)}</pre>
-                </>
-              )}
+      ) : parentNav === 'preference' ? (
+        <div className="p-8 bg-white rounded shadow text-center mt-8 max-w-2xl mx-auto">
+          <h2 className="text-xl font-bold mb-4 text-indigo-700">How do you want your preference center to be set up?</h2>
+          <select
+            className="border rounded px-3 py-2 w-full mb-6"
+            value={guidedPrefOption || ''}
+            onChange={e => setGuidedPrefOption(e.target.value)}
+          >
+            <option value="" disabled>Select an option...</option>
+            <option value="no_sf_core">Marketing Cloud Preference Center with no Salesforce core integration</option>
+            <option value="sf_core_contact_lead">Marketing Cloud Preference Center with Salesforce core contact, Lead integration</option>
+            <option value="sf_core_consent">Marketing Cloud Preference Center with Salesforce core consent model</option>
+          </select>
+
+          {guidedPrefOption === 'no_sf_core' && (
+            <div className="mt-6 text-left">
+              <a
+                href="/Custom%20Preference%20Center_No_SF_Integration.zip"
+                download
+                className="inline-block bg-indigo-600 text-white px-4 py-2 rounded font-semibold mb-4 hover:bg-indigo-700"
+              >
+                Download Preference Center Package (ZIP)
+              </a>
+              <div className="bg-gray-50 border-l-4 border-indigo-400 p-4 rounded">
+                <h3 className="font-bold mb-2 text-indigo-700">Instructions</h3>
+                <ol className="list-decimal ml-6 text-sm text-gray-800 space-y-1">
+                  <li>In the <b>Package Manager</b> folder, deploy the JSON into SFMC via Package Manager.</li>
+                  <li>Go into the Cloud pages and do a search all and replace for the cloudpageURL IDs; there will be 2-3 that did not get deployed correctly.</li>
+                  <li>In <b>cpc_main</b> on line 301, ensure that the cloud page ID is for <b>cpc_main</b>.</li>
+                  <li>In <b>cpc_main</b> on line 331, ensure that the cloud page ID is for <b>cpc_handler</b>.</li>
+                  <li>In <b>cpc_handler</b>, every <b>CloudPagesURL</b> function should point to the cloud page ID for <b>cpc_main</b>.</li>
+                  <li>Test, validate, and add additional features as needed.</li>
+                  <li>To use the preference center, the url expects a <b>subkey</b> parameter at the end of the URL (e.g. <span className="break-all">https://mcf7bhdjzswk278tj2j38nqtlq2q.pub.sfmc-content.com/jqi02yqkmgp?subkey=TEST10001</span>).</li>
+                </ol>
+                <div className="mt-2 text-xs text-gray-600">
+                  <b>NOTE:</b> The preference center assumes that a record with email exists in All Subscribers.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {guidedPrefOption === 'sf_core_contact_lead' && (
+            <div className="mt-6 text-left text-gray-600">
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core contact, Lead integration is in development.
+              </div>
+            </div>
+          )}
+
+          {guidedPrefOption === 'sf_core_consent' && (
+            <div className="mt-6 text-left text-gray-600">
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core consent model is in development.
+              </div>
             </div>
           )}
         </div>
-      )}
-      </div>
+      ) : null}
     </div>
   );
 }
 
-// Add date formatting helper at the top of the file
 function formatDate(dateStr) {
   if (!dateStr || dateStr === 'N/A' || dateStr === 'Not Available') return 'N/A';
   const d = new Date(dateStr);
