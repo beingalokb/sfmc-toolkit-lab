@@ -398,7 +398,7 @@ app.get('/search/datafilters', async (req, res) => {
         name: item.Name || 'N/A',
         key: item.CustomerKey || 'N/A',
         customerKey: item.CustomerKey || '',
-        id: item.CustomerKey || '', // Use CustomerKey as the unique id for Data Filters
+        id: item.CategoryID || '', // Use CategoryID for Data Filter View link
         description: item.Description || 'N/A',
         createdDate: item.CreatedDate || 'N/A',
         createdByName: item.CreatedBy || item.CreatedByName || 'N/A',
