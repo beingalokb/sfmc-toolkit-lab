@@ -1,3 +1,13 @@
+// =========================
+// MC-Explorer: Search Assets Module
+// =========================
+// This section implements robust, stateless endpoints for searching and displaying
+// Salesforce Marketing Cloud assets (Data Extensions, Automations, Data Filters, Journeys)
+// with full folder paths, metadata, and user-friendly frontend integration.
+//
+// Future enhancements: prompt-based asset building, Preference Center, etc.
+// =========================
+
 // server.js (Full with working auth redirect)
 require('dotenv').config();
 const express = require('express');
