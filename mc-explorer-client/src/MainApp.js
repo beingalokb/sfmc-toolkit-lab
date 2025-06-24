@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-const PreferenceCenterProjectForm = require('./PreferenceCenterProjectForm').default;
+import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
 import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
