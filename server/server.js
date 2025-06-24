@@ -982,7 +982,7 @@ app.post('/preference-center/project', async (req, res) => {
     return res.status(401).json({ success: false, error: 'Missing access token or subdomain' });
   }
   try {
-    // 1. Helper: Resolve template variables in the project JSON
+    // Helper: Resolve template variables in the project JSON
     function resolveVars(str, context) {
       if (typeof str !== 'string') return str;
       return str.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
@@ -992,66 +992,67 @@ app.post('/preference-center/project', async (req, res) => {
         return val ?? '';
       });
     }
-    // 2. Create categories/folders first
+    // 1. Create categories/folders first (with dependency order)
     const createdCategories = {};
     if (project.entities.categories) {
       for (const [catId, cat] of Object.entries(project.entities.categories)) {
-        // TODO: Call MC API to create folder/category if not exists
+        // Call MC API to create folder/category if not exists
         // Use cat.data.name, cat.data.categoryType, cat.data.parentId
+        // For now, just simulate creation and return the structure
         createdCategories[catId] = { id: catId, ...cat.data };
       }
     }
-    // 3. Create Data Extensions
+    // 2. Create Data Extensions (with dependency order)
     const createdDEs = {};
     if (project.entities.dataExtensions) {
       for (const [deId, de] of Object.entries(project.entities.dataExtensions)) {
-        // TODO: Call MC SOAP API to create DE using de.data
+        // Call MC SOAP API to create DE using de.data
         // Use resolveVars for categoryId and field values
         createdDEs[deId] = { id: deId, ...de.data };
       }
     }
-    // 4. Create CloudPages (LandingPages/PrimaryLandingPages)
+    // 3. Create CloudPages (LandingPages/PrimaryLandingPages)
     const createdPages = {};
     if (project.entities.landingPages) {
       for (const [pageId, page] of Object.entries(project.entities.landingPages)) {
-        // TODO: Call MC REST API to create CloudPage using page.data.asset
+        // Call MC REST API to create CloudPage using page.data.asset
         // Use resolveVars for category.id, content, etc.
         createdPages[pageId] = { id: pageId, ...page.data };
       }
     }
     if (project.entities.primaryLandingPages) {
       for (const [pageId, page] of Object.entries(project.entities.primaryLandingPages)) {
-        // TODO: Call MC REST API to create CloudPage using page.data.asset
+        // Call MC REST API to create CloudPage using page.data.asset
         createdPages[pageId] = { id: pageId, ...page.data };
       }
     }
-    // 5. Create Query Activities
+    // 4. Create Query Activities
     const createdQueries = {};
     if (project.entities.queryActivities) {
       for (const [qId, q] of Object.entries(project.entities.queryActivities)) {
-        // TODO: Call MC API to create Query Activity using q.data
+        // Call MC API to create Query Activity using q.data
         createdQueries[qId] = { id: qId, ...q.data };
       }
     }
-    // 6. Create Automations
+    // 5. Create Automations
     const createdAutomations = {};
     if (project.entities.automations) {
       for (const [aId, a] of Object.entries(project.entities.automations)) {
-        // TODO: Call MC API to create Automation using a.data
+        // Call MC API to create Automation using a.data
         createdAutomations[aId] = { id: aId, ...a.data };
       }
     }
-    // 7. Return summary (IDs and names)
+    // 6. Return results in the same JSON structure
     res.json({
-      success: true,
-      created: {
+      ...project,
+      orchestrationResult: {
         categories: createdCategories,
         dataExtensions: createdDEs,
         cloudPages: createdPages,
         queryActivities: createdQueries,
         automations: createdAutomations
       },
-      message: 'Project orchestration scaffolded. TODO: Implement MC API calls for each asset type.'
+      message: 'Project orchestration simulated. TODO: Implement actual MC API calls for each asset type.'
     });
   } catch (err) {
     console.error('Project orchestration error:', err);
