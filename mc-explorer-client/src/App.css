@@ -51,6 +51,28 @@ body {
   color: #333;
 }
 
+#mc-explorer-root {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+  padding: 2rem 2.5rem 2.5rem 2.5rem;
+  min-height: 90vh;
+}
+
+@media (max-width: 900px) {
+  #mc-explorer-root {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  #mc-explorer-root {
+    padding: 0.5rem;
+  }
+}
+
 .App {
   padding: 2rem;
   max-width: 1200px;

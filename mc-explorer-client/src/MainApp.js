@@ -342,8 +342,13 @@ function MainApp() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* App Title */}
+      <header className="bg-indigo-800 text-white p-4 shadow flex items-center gap-4">
+        <img src={require('./logo.svg').default} alt="MC Explorer Logo" className="h-8 w-8" />
+        <h1 className="text-2xl font-bold tracking-wide">MC Explorer</h1>
+      </header>
       {/* Parent Navigation */}
-      <div className="flex gap-4 p-4 bg-white shadow mb-4">
+      <div className="flex gap-4 p-4 bg-white shadow mb-4 rounded-lg">
         <button
           className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'search' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
           onClick={() => setParentNav('search')}
