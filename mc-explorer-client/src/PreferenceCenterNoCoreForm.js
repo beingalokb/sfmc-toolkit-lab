@@ -23,6 +23,21 @@ export default function PreferenceCenterNoCoreForm({ onSubmit }) {
   const [existingDeName, setExistingDeName] = useState('');
   const [newDeName, setNewDeName] = useState('');
   const [newDeFolder, setNewDeFolder] = useState('');
+  const [queryParam, setQueryParam] = useState(''); // NEW: Query Parameter for Subscriber
+  const [showCategories, setShowCategories] = useState(true); // Collapsible
+  const [reorderMode, setReorderMode] = useState(false); // Reorder toggle
+  const [auditDeName, setAuditDeName] = useState(''); // Audit log DE name
+  const [auditDeFolder, setAuditDeFolder] = useState(''); // Audit log DE folder
+  const [folderValidation, setFolderValidation] = useState(null); // Folder validation result
+  const [customFields, setCustomFields] = useState({ timestamp: false, ip: false, region: false });
+  const [theme, setTheme] = useState('default');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [buttonColor, setButtonColor] = useState('#4f46e5');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [enableErrorLog, setEnableErrorLog] = useState(false);
+  const [errorLogDeName, setErrorLogDeName] = useState('');
+  const [errorLogDeFolder, setErrorLogDeFolder] = useState('');
 
   // Handle dynamic category rows
   const handleNumCategories = (n) => {
@@ -38,21 +53,58 @@ export default function PreferenceCenterNoCoreForm({ onSubmit }) {
     setCategories(prev => prev.map((cat, i) => i === idx ? { ...cat, [field]: value } : cat));
   };
 
+  // Preference reorder logic
+  const moveCategory = (from, to) => {
+    setCategories(prev => {
+      const arr = [...prev];
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved);
+      return arr;
+    });
+  };
+
+  // Opt-out field validation
+  const optOutConflict = enableOptOut && categories.some(cat => cat.apiName === optOutApiName);
+
+  // Folder validation handler (dummy, to be replaced with API call)
+  const handleValidateFolder = async () => {
+    // TODO: Call backend /folders API
+    setFolderValidation('Validating...');
+    // Simulate async
+    setTimeout(() => setFolderValidation('Valid (demo)'), 1000);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (optOutConflict) {
+      alert('Opt-out field name cannot match any preference field API name.');
+      return;
+    }
     const config = {
       name,
       subscriberId: subscriberId === 'Custom' ? customSubscriberField : subscriberId,
+      queryParam,
       categories,
       enableOptOut,
       optOutApiName: enableOptOut ? optOutApiName : '',
       enableAudit,
+      auditDeName: enableAudit ? auditDeName : '',
+      auditDeFolder: enableAudit ? auditDeFolder : '',
       submissionType,
       redirectUrl: submissionType === 'redirect' ? redirectUrl : '',
       deOption,
       existingDeName: deOption === 'existing' ? existingDeName : '',
       newDeName: deOption === 'create' ? newDeName : '',
-      newDeFolder: deOption === 'create' ? newDeFolder : ''
+      newDeFolder: deOption === 'create' ? newDeFolder : '',
+      customFields,
+      theme,
+      logoUrl,
+      buttonColor,
+      successMsg,
+      errorMsg,
+      enableErrorLog,
+      errorLogDeName: enableErrorLog ? errorLogDeName : '',
+      errorLogDeFolder: enableErrorLog ? errorLogDeFolder : ''
     };
     if (onSubmit) onSubmit(config);
     // TODO: send to backend or preview next step
@@ -73,6 +125,7 @@ export default function PreferenceCenterNoCoreForm({ onSubmit }) {
         {subscriberId === 'Custom' && (
           <input type="text" className="border rounded px-3 py-2 w-full mt-2" placeholder="Custom Field Name" value={customSubscriberField} onChange={e => setCustomSubscriberField(e.target.value)} required />
         )}
+        <input type="text" className="border rounded px-3 py-2 w-full mt-2" placeholder="Query Parameter (optional)" value={queryParam} onChange={e => setQueryParam(e.target.value)} />
       </div>
       <div className="mb-4">
         <label className="block mb-1 font-semibold">How many preferences do you want to include?</label>
@@ -80,29 +133,50 @@ export default function PreferenceCenterNoCoreForm({ onSubmit }) {
       </div>
       <div className="mb-4">
         <label className="block mb-2 font-semibold">Preference Categories</label>
-        <div className="space-y-2">
-          {categories.map((cat, idx) => (
-            <div key={idx} className="flex flex-col md:flex-row gap-2 items-center border-b pb-2">
-              <input type="text" className="border rounded px-2 py-1 flex-1" placeholder="Category Label" value={cat.label} onChange={e => handleCategoryChange(idx, 'label', e.target.value)} required />
-              <input type="text" className="border rounded px-2 py-1 flex-1" placeholder="Field API Name (DE)" value={cat.apiName} onChange={e => handleCategoryChange(idx, 'apiName', e.target.value)} required />
-              <label className="flex items-center gap-1">
-                <input type="checkbox" checked={cat.defaultChecked} onChange={e => handleCategoryChange(idx, 'defaultChecked', e.target.checked)} /> Default Checked
-              </label>
-              <input type="text" className="border rounded px-2 py-1 flex-1" placeholder="Description (optional)" value={cat.description} onChange={e => handleCategoryChange(idx, 'description', e.target.value)} />
-            </div>
-          ))}
-        </div>
+        {categories.length > 4 && (
+          <div className="flex items-center gap-4 mb-2">
+            <button type="button" className="text-indigo-600 underline" onClick={() => setShowCategories(v => !v)}>{showCategories ? 'Hide' : 'Show'} Preferences</button>
+            <button type="button" className="text-indigo-600 underline" onClick={() => setReorderMode(v => !v)}>{reorderMode ? 'Done Reordering' : 'Reorder'}</button>
+          </div>
+        )}
+        {showCategories && (
+          <div className="space-y-2">
+            {categories.map((cat, idx) => (
+              <div key={idx} className="flex flex-col md:flex-row gap-2 items-center border-b pb-2">
+                <input type="text" className="border rounded px-2 py-1 flex-1" placeholder="Category Label" value={cat.label} onChange={e => handleCategoryChange(idx, 'label', e.target.value)} required />
+                <input type="text" className="border rounded px-2 py-1 flex-1" placeholder="Field API Name (DE)" value={cat.apiName} onChange={e => handleCategoryChange(idx, 'apiName', e.target.value)} required />
+                <label className="flex items-center gap-1">
+                  <input type="checkbox" checked={cat.defaultChecked} onChange={e => handleCategoryChange(idx, 'defaultChecked', e.target.checked)} /> Default Checked
+                </label>
+                <input type="text" className="border rounded px-2 py-1 flex-1" placeholder="Description (optional)" value={cat.description} onChange={e => handleCategoryChange(idx, 'description', e.target.value)} />
+                {reorderMode && (
+                  <div className="flex flex-col gap-1 ml-2">
+                    <button type="button" disabled={idx === 0} onClick={() => moveCategory(idx, idx - 1)} className="text-xs">↑</button>
+                    <button type="button" disabled={idx === categories.length - 1} onClick={() => moveCategory(idx, idx + 1)} className="text-xs">↓</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="mb-4">
         <label className="block mb-1 font-semibold">Enable master opt-out checkbox?</label>
         <input type="checkbox" checked={enableOptOut} onChange={e => setEnableOptOut(e.target.checked)} />
         {enableOptOut && (
-          <input type="text" className="border rounded px-3 py-2 w-full mt-2" placeholder="Opt-Out Field API Name (e.g., Opt_Out_All__c)" value={optOutApiName} onChange={e => setOptOutApiName(e.target.value)} required />
+          <input type="text" className={`border rounded px-3 py-2 w-full mt-2 ${optOutConflict ? 'border-red-500' : ''}`} placeholder="Opt-Out Field API Name (e.g., Opt_Out_All__c)" value={optOutApiName} onChange={e => setOptOutApiName(e.target.value)} required />
         )}
+        {optOutConflict && <div className="text-red-600 text-sm mt-1">Opt-out field name cannot match any preference field API name.</div>}
       </div>
       <div className="mb-4">
         <label className="block mb-1 font-semibold">Enable preference change logging?</label>
         <input type="checkbox" checked={enableAudit} onChange={e => setEnableAudit(e.target.checked)} />
+        {enableAudit && (
+          <div className="flex flex-col gap-2 mt-2">
+            <input type="text" className="border rounded px-3 py-2 w-full" placeholder="Audit Log DE Name" value={auditDeName} onChange={e => setAuditDeName(e.target.value)} />
+            <input type="text" className="border rounded px-3 py-2 w-full" placeholder="Audit Log DE Folder" value={auditDeFolder} onChange={e => setAuditDeFolder(e.target.value)} />
+          </div>
+        )}
       </div>
       <div className="mb-4">
         <label className="block mb-1 font-semibold">After submission, show confirmation message or redirect?</label>
@@ -134,8 +208,47 @@ export default function PreferenceCenterNoCoreForm({ onSubmit }) {
         {deOption === 'create' && (
           <>
             <input type="text" className="border rounded px-3 py-2 w-full mt-2" placeholder="New DE Name" value={newDeName} onChange={e => setNewDeName(e.target.value)} required />
-            <input type="text" className="border rounded px-3 py-2 w-full mt-2" placeholder="Folder Path (e.g., Data Extensions/Preference Centers)" value={newDeFolder} onChange={e => setNewDeFolder(e.target.value)} required />
+            <div className="flex gap-2 mt-2">
+              <input type="text" className="border rounded px-3 py-2 flex-1" placeholder="Folder Path (e.g., Data Extensions/Preference Centers)" value={newDeFolder} onChange={e => setNewDeFolder(e.target.value)} required />
+              <button type="button" className="bg-gray-200 px-2 rounded" onClick={handleValidateFolder}>Validate Folder Path</button>
+            </div>
+            {folderValidation && <div className="text-sm mt-1">{folderValidation}</div>}
           </>
+        )}
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-semibold">Advanced Field Mapping</label>
+        <div className="flex gap-4">
+          <label><input type="checkbox" checked={customFields.timestamp} onChange={e => setCustomFields(f => ({ ...f, timestamp: e.target.checked }))} /> Timestamp</label>
+          <label><input type="checkbox" checked={customFields.ip} onChange={e => setCustomFields(f => ({ ...f, ip: e.target.checked }))} /> IP Address</label>
+          <label><input type="checkbox" checked={customFields.region} onChange={e => setCustomFields(f => ({ ...f, region: e.target.checked }))} /> Region</label>
+        </div>
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-semibold">Form Styling</label>
+        <div className="flex flex-col gap-2">
+          <select className="border rounded px-3 py-2" value={theme} onChange={e => setTheme(e.target.value)}>
+            <option value="default">Default</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+          <input type="text" className="border rounded px-3 py-2" placeholder="Logo URL (optional)" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} />
+          <input type="color" className="w-12 h-8" value={buttonColor} onChange={e => setButtonColor(e.target.value)} />
+        </div>
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-semibold">Custom Success/Error Messages</label>
+        <input type="text" className="border rounded px-3 py-2 w-full mb-2" placeholder="Success Message" value={successMsg} onChange={e => setSuccessMsg(e.target.value)} />
+        <input type="text" className="border rounded px-3 py-2 w-full" placeholder="Error Message" value={errorMsg} onChange={e => setErrorMsg(e.target.value)} />
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-semibold">Enable error logging to DE?</label>
+        <input type="checkbox" checked={enableErrorLog} onChange={e => setEnableErrorLog(e.target.checked)} />
+        {enableErrorLog && (
+          <div className="flex flex-col gap-2 mt-2">
+            <input type="text" className="border rounded px-3 py-2 w-full" placeholder="Error Log DE Name" value={errorLogDeName} onChange={e => setErrorLogDeName(e.target.value)} />
+            <input type="text" className="border rounded px-3 py-2 w-full" placeholder="Error Log DE Folder" value={errorLogDeFolder} onChange={e => setErrorLogDeFolder(e.target.value)} />
+          </div>
         )}
       </div>
       <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded mt-2">Next: Preview & Generate</button>

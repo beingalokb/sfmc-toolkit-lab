@@ -648,6 +648,331 @@ app.post('/api/preference-center/project', async (req, res) => {
   }
 });
 
+// === Preference Center Builder: Advanced Endpoints ===
+
+// 1. Folder Path Validation
+app.post('/folders', async (req, res) => {
+  const { folderPath } = req.body;
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!folderPath || !accessToken || !subdomain) {
+    return res.status(400).json({ valid: false, error: 'Missing folderPath, accessToken, or subdomain' });
+  }
+  try {
+    // Fetch all folders (SOAP)
+    const folderEnvelope = `
+      <s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">
+        <s:Header><fueloauth>${accessToken}</fueloauth></s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns=\"http://exacttarget.com/wsdl/partnerAPI\">
+            <RetrieveRequest>
+              <ObjectType>DataFolder</ObjectType>
+              <Properties>ID</Properties>
+              <Properties>Name</Properties>
+              <Properties>ParentFolder.ID</Properties>
+              <Properties>ContentType</Properties>
+              <Filter xsi:type=\"SimpleFilterPart\">
+                <Property>IsActive</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>true</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>`;
+    const folderResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      folderEnvelope,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+    const folderParser = new xml2js.Parser({ explicitArray: false });
+    let folderMap = {};
+    await folderParser.parseStringPromise(folderResp.data).then(result => {
+      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      const folders = Array.isArray(results) ? results : [results];
+      folders.forEach(f => {
+        if (f && f.ID) folderMap[String(f.ID)] = f;
+      });
+    });
+    // Validate path
+    const pathParts = folderPath.split('/').map(s => s.trim()).filter(Boolean);
+    let currentParent = null;
+    let found = false;
+    for (const part of pathParts) {
+      found = false;
+      for (const id in folderMap) {
+        const f = folderMap[id];
+        if (f.Name === part && (currentParent === null || (f.ParentFolder && String(f.ParentFolder.ID) === String(currentParent)))) {
+          currentParent = id;
+          found = true;
+          break;
+        }
+      }
+      if (!found) break;
+    }
+    if (found) {
+      return res.json({ valid: true, folderId: currentParent });
+    } else {
+      return res.json({ valid: false, error: 'Folder path not found' });
+    }
+  } catch (err) {
+    console.error('/folders error:', err);
+    res.status(500).json({ valid: false, error: 'Server error' });
+  }
+});
+
+// 2. DE Lookup/Autocomplete
+app.get('/de-lookup', async (req, res) => {
+  const { query } = req.query;
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) {
+    return res.status(401).json([]);
+  }
+  try {
+    // Fetch DEs via SOAP
+    const soapEnvelope = `
+      <s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">
+        <s:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns=\"http://exacttarget.com/wsdl/partnerAPI\">
+            <RetrieveRequest>
+              <ObjectType>DataExtension</ObjectType>
+              <Properties>Name</Properties>
+              <Properties>CustomerKey</Properties>
+              <Properties>CategoryID</Properties>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Retrieve',
+        },
+      }
+    );
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(response.data, (err, result) => {
+      if (err) {
+        return res.status(500).json({ error: 'Failed to parse XML' });
+      }
+      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      if (!results) return res.json([]);
+      const resultArray = Array.isArray(results) ? results : [results];
+      let deList = resultArray.map(de => ({
+        name: de.Name || 'N/A',
+        key: de.CustomerKey || 'N/A',
+        categoryId: de.CategoryID || ''
+      }));
+      if (query) {
+        deList = deList.filter(de => de.name.toLowerCase().includes(query.toLowerCase()));
+      }
+      res.json(deList);
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch DEs' });
+  }
+});
+
+// 3. Save Full Preference Center Config
+function generateCloudPageContent(config) {
+  // AMPscript variable setup
+  const identifierField = config.subscriberIdentifier?.customParamName || config.subscriberIdentifier?.type || 'SubscriberKey';
+  const emailField = 'email';
+  const preferences = config.preferences || [];
+  const optOutField = config.masterOptOut?.enabled ? config.masterOptOut.fieldApiName : null;
+  const logDE = config.changeLogging?.enabled ? config.changeLogging.logDE?.name : null;
+  const deName = config.dataExtension?.deName || config.newDeName || config.existingDeName;
+  const redirectUrl = config.confirmationBehavior?.type === 'redirect' ? config.confirmationBehavior.redirectUrl : null;
+  // AMPscript: SET vars
+  let ampscript = [
+    '%%[',
+    'VAR @submit, @cid, @email' + preferences.map((p, i) => `, @pref${i+1}`).join('') + (optOutField ? ', @optout' : ''),
+    logDE ? ', @logDE' : '',
+    redirectUrl ? ', @redirect' : '',
+    `SET @submit = RequestParameter("submit")`,
+    `SET @cid = RequestParameter("${identifierField}")`,
+    `SET @email = RequestParameter("${emailField}")`,
+    ...preferences.map((p, i) => `SET @pref${i+1} = IIF(RequestParameter("${p.fieldApiName}") == "on", "true", "false")`),
+    optOutField ? `SET @optout = IIF(RequestParameter("${optOutField}") == "on", "true", "false")` : '',
+    logDE ? `SET @logDE = "${logDE}"` : '',
+    redirectUrl ? `SET @redirect = "${redirectUrl}"` : ''
+  ];
+  // Opt-out logic
+  if (optOutField) {
+    ampscript.push(`IF @optout == "true" THEN`);
+    preferences.forEach((p, i) => ampscript.push(`  SET @pref${i+1} = "false"`));
+    ampscript.push('ENDIF');
+  }
+  // Submission logic
+  ampscript.push('IF @submit == "Update" THEN');
+  // UpsertDE
+  ampscript.push(`  UpsertDE("${deName}", 1, "${identifierField}", @cid,`);
+  ampscript.push(`    "EmailAddress", @email,`);
+  preferences.forEach((p, i) => ampscript.push(`    "${p.fieldApiName}", @pref${i+1},`));
+  if (optOutField) ampscript.push(`    "${optOutField}", @optout,`);
+  ampscript.push('    "LastUpdated", NOW()');
+  ampscript.push('  )');
+  // Change log
+  if (logDE) {
+    ampscript.push(`  InsertDE(@logDE,`);
+    ampscript.push(`    "SubscriberKey", @cid,`);
+    ampscript.push(`    "EmailAddress", @email,`);
+    ampscript.push('    "Old_Value", "N/A",');
+    ampscript.push(`    "New_Value", Concat(${preferences.map((p, i) => `"${p.label}=" , @pref${i+1}`).join(', "; ", ')}), "; OptOut=", ${optOutField ? '@optout' : '""'}),`);
+    ampscript.push(`    "Subscription", "${config.preferenceCenterName || config.name}",`);
+    ampscript.push('    "Error_Message", "",');
+    ampscript.push('    "DateModified", NOW()');
+    ampscript.push('  )');
+  }
+  // Redirect or message
+  if (redirectUrl) {
+    ampscript.push('  Redirect(@redirect)');
+  }
+  ampscript.push('ENDIF');
+  ampscript.push(']%%');
+  // HTML form
+  let html = `<!DOCTYPE html><html><head><style>body{font-family:Arial;padding:20px;background:#f8f8f8;}h2{color:#004080;}.form-section{background:white;padding:20px;border-radius:6px;max-width:600px;margin:auto;box-shadow:0 0 10px rgba(0,0,0,0.1);}label{display:block;margin-top:15px;font-weight:bold;}.desc{font-size:13px;color:#666;margin-top:4px;}input[type=submit]{background:#004080;color:white;padding:10px 30px;margin-top:20px;border:none;border-radius:4px;cursor:pointer;}</style></head><body><div class='form-section'><h2>${config.preferenceCenterName || config.name || 'Preference Center'}</h2><form method='POST' action='%%=RequestParameter("PAGEURL")=%%'>`;
+  html += `<label>Subscriber Identifier (${identifierField})<input type='text' name='${identifierField}' required /></label>`;
+  html += `<label>Email Address<input type='email' name='email' required /></label>`;
+  preferences.forEach((p, i) => {
+    html += `<label><input type='checkbox' name='${p.fieldApiName}'${p.defaultChecked ? ' checked' : ''}/> ${p.label}</label>`;
+    if (p.description) html += `<div class='desc'>${p.description}</div>`;
+  });
+  if (optOutField) {
+    html += `<label><input type='checkbox' name='${optOutField}' /> Unsubscribe from all preferences</label>`;
+  }
+  html += `<input type='submit' name='submit' value='Update' /></form></div></body></html>`;
+  return ampscript.join('\n') + '\n' + html;
+}
+app.post('/preference-center/save-config', async (req, res) => {
+  const config = req.body;
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) {
+    return res.status(401).json({ success: false, error: 'Missing accessToken or subdomain' });
+  }
+  try {
+    // 1. Build DE SOAP XML
+    const deFields = [
+      {
+        Name: config.subscriberId || 'EmailAddress',
+        FieldType: 'EmailAddress',
+        IsRequired: true,
+        IsPrimaryKey: true
+      },
+      ...config.categories.map(cat => ({
+        Name: cat.apiName,
+        FieldType: 'Boolean',
+        IsRequired: false,
+        IsPrimaryKey: false
+      }))
+    ];
+    if (config.enableOptOut && config.optOutApiName) {
+      deFields.push({
+        Name: config.optOutApiName,
+        FieldType: 'Boolean',
+        IsRequired: false,
+        IsPrimaryKey: false
+      });
+    }
+    // Add advanced fields if enabled
+    if (config.customFields?.timestamp) {
+      deFields.push({ Name: 'Timestamp', FieldType: 'Date', IsRequired: false, IsPrimaryKey: false });
+    }
+    if (config.customFields?.ip) {
+      deFields.push({ Name: 'IP_Address', FieldType: 'Text', IsRequired: false, IsPrimaryKey: false });
+    }
+    if (config.customFields?.region) {
+      deFields.push({ Name: 'Region', FieldType: 'Text', IsRequired: false, IsPrimaryKey: false });
+    }
+    // Build <Fields> XML
+    const fieldsXml = deFields.map(f => `
+      <Field>
+        <Name>${f.Name}</Name>
+        <FieldType>${f.FieldType}</FieldType>
+        <IsRequired>${f.IsRequired}</IsRequired>
+        <IsPrimaryKey>${f.IsPrimaryKey}</IsPrimaryKey>
+      </Field>`).join('');
+    // SOAP XML for DE creation
+    const deSoapXml = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <soapenv:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <Options/>
+            <Objects xsi:type="DataExtension">
+              <CustomerKey>${config.newDeName || config.existingDeName}</CustomerKey>
+              <Name>${config.newDeName || config.existingDeName}</Name>
+              <Description>Preference Center DE created by MC Explorer</Description>
+              <IsSendable>true</IsSendable>
+              <SendableDataExtensionField>
+                <Name>${config.subscriberId || 'EmailAddress'}</Name>
+              </SendableDataExtensionField>
+              <SendableSubscriberField>
+                <Name>${config.subscriberId === 'SubscriberKey' ? 'Subscriber Key' : 'Email Address'}</Name>
+              </SendableSubscriberField>
+              <Fields>${fieldsXml}</Fields>
+            </Objects>
+          </CreateRequest>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+    // 2. Call SOAP API to create DE
+    let deResult = null;
+    if (config.deOption === 'create') {
+      const deResp = await axios.post(
+        `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+        deSoapXml,
+        {
+          headers: {
+            'Content-Type': 'text/xml',
+            'SOAPAction': 'Create',
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+      deResult = deResp.data;
+    }
+    // 3. Generate CloudPage HTML/AMPscript dynamically
+    const html = generateCloudPageContent(config);
+    // 4. Create CloudPage via REST
+    const cloudPagePayload = {
+      name: `${config.name || config.preferenceCenterName || 'Preference Center'} - MC Explorer`,
+      assetType: { id: 207, name: 'webpage' },
+      content: html,
+      category: { id: 0 }, // TODO: Lookup or use folder/category ID
+      data: { views: { html: { content: html } } }
+    };
+    const cpResp = await axios.post(
+      `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets`,
+      cloudPagePayload,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    // 5. Return results
+    res.json({ success: true, deResult, cloudPage: cpResp.data });
+  } catch (err) {
+    console.error('Preference Center automation error:', err?.response?.data || err);
+    res.status(500).json({ success: false, error: err?.response?.data || err.message });
+  }
+});
+
 // Serve React frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
 app.get(/(.*)/, (req, res) => {
