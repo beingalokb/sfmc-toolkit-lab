@@ -571,6 +571,83 @@ app.get('/de/details', async (req, res) => {
   }
 });
 
+// =========================
+// Preference Center API (Step 1)
+// =========================
+const PREFERENCE_PROJECTS_DE = 'Preference_Center_Projects';
+
+app.post('/api/preference-center/project', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  const { name, routeType, targetBU } = req.body;
+  if (!accessToken || !subdomain || !name || !routeType || !targetBU) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  try {
+    // Create the DE if it doesn't exist (idempotent)
+    const soapEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+        <s:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </s:Header>
+        <s:Body>
+          <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <Options/>
+            <Objects xsi:type="DataExtension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+              <CustomerKey>${PREFERENCE_PROJECTS_DE}</CustomerKey>
+              <Name>${PREFERENCE_PROJECTS_DE}</Name>
+              <Description>Preference Center Projects created by MC Explorer</Description>
+              <Fields>
+                <Field><Name>ProjectName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength></Field>
+                <Field><Name>RouteType</Name><FieldType>Text</FieldType><MaxLength>30</MaxLength></Field>
+                <Field><Name>TargetBU</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength></Field>
+                <Field><Name>CreatedDate</Name><FieldType>Date</FieldType></Field>
+              </Fields>
+            </Objects>
+          </CreateRequest>
+        </s:Body>
+      </s:Envelope>
+    `;
+    await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
+    );
+    // Insert the project record
+    const now = new Date().toISOString();
+    const insertEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+        <s:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </s:Header>
+        <s:Body>
+          <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <Options/>
+            <Objects xsi:type="DataExtensionObject" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+              <CustomerKey>${PREFERENCE_PROJECTS_DE}</CustomerKey>
+              <Properties>
+                <Property><Name>ProjectName</Name><Value>${name}</Value></Property>
+                <Property><Name>RouteType</Name><Value>${routeType}</Value></Property>
+                <Property><Name>TargetBU</Name><Value>${targetBU}</Value></Property>
+                <Property><Name>CreatedDate</Name><Value>${now}</Value></Property>
+              </Properties>
+            </Objects>
+          </CreateRequest>
+        </s:Body>
+      </s:Envelope>
+    `;
+    await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      insertEnvelope,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
+    );
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Preference Center Project creation error:', e?.response?.data || e);
+    res.status(500).json({ error: 'Failed to create project' });
+  }
+});
+
 // Serve React frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
 app.get(/(.*)/, (req, res) => {

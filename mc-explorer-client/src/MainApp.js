@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+const PreferenceCenterProjectForm = require('./PreferenceCenterProjectForm').default;
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -534,8 +535,7 @@ function MainApp() {
         </>
       ) : (
         <div className="p-8 bg-white rounded shadow text-center mt-8">
-          <h2 className="text-2xl font-bold text-indigo-700 mb-4">Guided Preference Center</h2>
-          <p className="text-gray-600">Coming soon: Build and manage Preference Centers with AI-guided prompts and best practices.</p>
+          <PreferenceCenterProjectForm />
         </div>
       )}
       </div>
