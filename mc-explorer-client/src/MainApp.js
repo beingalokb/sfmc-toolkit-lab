@@ -433,9 +433,9 @@ function MainApp() {
                       View
                     </a>
                   )}
-                  {item._type === 'Data Filter' && item.customerKey && (
+                  {item._type === 'Data Filter' && item.id && (
                     <a
-                      href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/DataFilters/${item.customerKey}/view`}
+                      href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/DataFilters/${item.id}/view`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-600 underline hover:text-blue-800 ml-2"
