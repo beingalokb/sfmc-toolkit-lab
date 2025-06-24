@@ -397,6 +397,7 @@ app.get('/search/datafilters', async (req, res) => {
       const dataFilters = normalized.map(item => ({
         name: item.Name || 'N/A',
         key: item.CustomerKey || 'N/A',
+        customerKey: item.CustomerKey || '',
         description: item.Description || 'N/A',
         createdDate: item.CreatedDate || 'N/A',
         createdByName: item.CreatedBy || item.CreatedByName || 'N/A',
