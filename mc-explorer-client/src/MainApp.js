@@ -5,7 +5,7 @@ import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
-function MainApp() {
+export default function MainApp() {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState('de');
@@ -23,6 +23,7 @@ function MainApp() {
   const [automationDetailModal, setAutomationDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
   // Parent navigation state
   const [parentNav, setParentNav] = useState('search'); // 'search' or 'preference'
+  const [previewResult, setPreviewResult] = useState(null);
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -307,6 +308,30 @@ function MainApp() {
     }
   };
 
+  // Handler for Preference Center Builder form submission
+  const handlePreferenceCenterSubmit = async (config) => {
+    try {
+      setPreviewResult({ loading: true });
+      const accessToken = localStorage.getItem('accessToken');
+      const subdomain = localStorage.getItem('subdomain');
+      const res = await fetch('/preference-center/save-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'x-mc-subdomain': subdomain
+        },
+        body: JSON.stringify(config)
+      });
+      const data = await res.json();
+      setPreviewResult({ loading: false, data });
+      console.log('✅ Preference Center generated:', data);
+    } catch (e) {
+      setPreviewResult({ loading: false, error: e.message });
+      console.error('❌ Preference Center generation failed:', e);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -536,7 +561,19 @@ function MainApp() {
         </>
       ) : (
         <div className="p-8 bg-white rounded shadow text-center mt-8">
-          <PreferenceCenterNoCoreForm />
+          <PreferenceCenterNoCoreForm onSubmit={handlePreferenceCenterSubmit} />
+          {previewResult && (
+            <div className="mt-6 text-left max-w-2xl mx-auto">
+              {previewResult.loading && <div>Generating Preference Center...</div>}
+              {previewResult.error && <div className="text-red-600">Error: {previewResult.error}</div>}
+              {previewResult.data && (
+                <>
+                  <div className="font-bold text-green-700 mb-2">Preference Center Generated!</div>
+                  <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto max-h-96">{JSON.stringify(previewResult.data, null, 2)}</pre>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
       </div>
@@ -551,5 +588,3 @@ function formatDate(dateStr) {
   if (isNaN(d)) return dateStr;
   return d.toLocaleString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '');
 }
-
-export default MainApp;
