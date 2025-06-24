@@ -973,6 +973,56 @@ app.post('/preference-center/save-config', async (req, res) => {
   }
 });
 
+// GET /folders - fetch all folders (for frontend compatibility)
+app.get('/folders', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) {
+    return res.status(401).json([]);
+  }
+  try {
+    const folderEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <s:Header><fueloauth>${accessToken}</fueloauth></s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataFolder</ObjectType>
+              <Properties>ID</Properties>
+              <Properties>Name</Properties>
+              <Properties>ParentFolder.ID</Properties>
+              <Properties>ContentType</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>IsActive</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>true</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>`;
+    const folderResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      folderEnvelope,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+    const folderParser = new xml2js.Parser({ explicitArray: false });
+    let folderMap = {};
+    let folders = [];
+    await folderParser.parseStringPromise(folderResp.data).then(result => {
+      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      folders = Array.isArray(results) ? results : [results];
+      folders.forEach(f => {
+        if (f && f.ID) folderMap[String(f.ID)] = f;
+      });
+    });
+    res.json(folders);
+  } catch (err) {
+    console.error('/folders GET error:', err);
+    res.status(500).json({ error: 'Failed to fetch folders' });
+  }
+});
+
 // Serve React frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
 app.get(/(.*)/, (req, res) => {
