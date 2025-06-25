@@ -1110,7 +1110,7 @@ app.get('/folders', async (req, res) => {
   }
 });
 
-// EmailSendDefinition Search (REST)
+// EmailSendDefinition Search (SOAP)
 app.get('/search/emailsenddefinition', async (req, res) => {
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
@@ -1118,47 +1118,100 @@ app.get('/search/emailsenddefinition', async (req, res) => {
     return res.status(401).json([]);
   }
   try {
-    // Marketing Cloud REST API endpoint for EmailSendDefinition
-    const url = `https://${subdomain}.rest.marketingcloudapis.com/messaging/v1/email/definitions`;
-    const response = await axios.get(url, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
+    const soapEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+        <s:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>EmailSendDefinition</ObjectType>
+              <Properties>Name</Properties>
+              <Properties>BccEmail</Properties>
+              <Properties>CCEmail</Properties>
+              <Properties>CreatedDate</Properties>
+              <Properties>CustomerKey</Properties>
+              <Properties>DeliveryScheduledTime</Properties>
+              <Properties>DomainType</Properties>
+              <Properties>EmailSubject</Properties>
+              <Properties>ExclusionFilter</Properties>
+              <Properties>FooterContentArea</Properties>
+              <Properties>FromAddress</Properties>
+              <Properties>FromName</Properties>
+              <Properties>HeaderContentArea</Properties>
+              <Properties>MessageDeliveryType</Properties>
+              <Properties>ModifiedDate</Properties>
+              <Properties>PreHeader</Properties>
+              <Properties>PrivateDomain</Properties>
+              <Properties>DeliveryProfile</Properties>
+              <Properties>PrivateIP</Properties>
+              <Properties>ReplyToAddress</Properties>
+              <Properties>ReplyToDisplayName</Properties>
+              <Properties>SendClassification</Properties>
+              <Properties>SendDefinitionList</Properties>
+              <Properties>SenderProfile</Properties>
+              <Properties>SendLimit</Properties>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Retrieve',
+        },
+      }
+    );
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(response.data, (err, result) => {
+      if (err) {
+        console.error('❌ XML Parse Error:', err);
+        return res.status(500).json({ error: 'Failed to parse XML' });
+      }
+      try {
+        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        if (!results) return res.status(200).json([]);
+        const resultArray = Array.isArray(results) ? results : [results];
+        const sendDefs = resultArray.map(item => ({
+          Name: item.Name || '',
+          BccEmail: item.BccEmail || '',
+          CCEmail: item.CCEmail || '',
+          CreatedDate: item.CreatedDate || '',
+          CustomerKey: item.CustomerKey || '',
+          DeliveryScheduledTime: item.DeliveryScheduledTime || '',
+          DomainType: item.DomainType || '',
+          EmailSubject: item.EmailSubject || '',
+          ExclusionFilter: item.ExclusionFilter || '',
+          FooterContentArea: item.FooterContentArea || '',
+          FromAddress: item.FromAddress || '',
+          FromName: item.FromName || '',
+          HeaderContentArea: item.HeaderContentArea || '',
+          MessageDeliveryType: item.MessageDeliveryType || '',
+          ModifiedDate: item.ModifiedDate || '',
+          PreHeader: item.PreHeader || '',
+          PrivateDomain: item.PrivateDomain || '',
+          DeliveryProfile: item.DeliveryProfile || '',
+          PrivateIP: item.PrivateIP || '',
+          ReplyToAddress: item.ReplyToAddress || '',
+          ReplyToDisplayName: item.ReplyToDisplayName || '',
+          SendClassification: item.SendClassification || '',
+          SendDefinitionList: item.SendDefinitionList || '',
+          SenderProfile: item.SenderProfile || '',
+          SendLimit: item.SendLimit || ''
+        }));
+        res.json(sendDefs);
+      } catch (e) {
+        console.error('❌ Error parsing EmailSendDefinition SOAP response:', e);
+        res.status(500).json([]);
       }
     });
-    // The API returns an array in response.data.items
-    const items = response.data.items || [];
-    // Only return the requested fields
-    const filtered = items.map(item => ({
-      Name: item.name,
-      BccEmail: item.bccEmail,
-      CCEmail: item.ccEmail,
-      CreatedDate: item.createdDate,
-      CustomerKey: item.customerKey,
-      DeliveryScheduledTime: item.deliveryScheduledTime,
-      DomainType: item.domainType,
-      EmailSubject: item.emailSubject,
-      ExclusionFilter: item.exclusionFilter,
-      FooterContentArea: item.footerContentArea,
-      FromAddress: item.from,
-      FromName: item.fromName,
-      HeaderContentArea: item.headerContentArea,
-      MessageDeliveryType: item.messageDeliveryType,
-      ModifiedDate: item.modifiedDate,
-      PreHeader: item.preHeader,
-      PrivateDomain: item.privateDomain,
-      DeliveryProfile: item.deliveryProfile,
-      PrivateIP: item.privateIP,
-      ReplyToAddress: item.replyToAddress,
-      ReplyToDisplayName: item.replyToDisplayName,
-      SendClassification: item.sendClassification,
-      SendDefinitionList: item.sendDefinitionList,
-      SenderProfile: item.senderProfile,
-      SendLimit: item.sendLimit
-    }));
-    res.json(filtered);
   } catch (e) {
-    console.error('❌ Failed to fetch EmailSendDefinition:', e.response?.data || e.message);
+    console.error('❌ Failed to fetch EmailSendDefinition (SOAP):', e.response?.data || e.message);
     res.status(500).json([]);
   }
 });
