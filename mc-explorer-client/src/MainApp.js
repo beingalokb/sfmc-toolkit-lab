@@ -21,6 +21,7 @@ export default function MainApp() {
   const [pendingFetches, setPendingFetches] = useState(0);
   const [deDetailModal, setDeDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
   const [automationDetailModal, setAutomationDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
+  const [emailSendDefinitions, setEmailSendDefinitions] = useState([]);
   // Parent navigation state
   const [parentNav, setParentNav] = useState('search'); // 'search' or 'preference'
   const [previewResult, setPreviewResult] = useState(null);
@@ -150,6 +151,7 @@ export default function MainApp() {
     if (activeTab === 'automation') fetchWithLogging('/search/automation', setAutomations, 'Automations');
     if (activeTab === 'datafilter') fetchWithLogging('/search/datafilters', setDataFilters, 'Data Filters');
     if (activeTab === 'journey') fetchWithLogging('/search/journeys', setJourneys, 'Journeys');
+    if (activeTab === 'emailsenddefinition') fetchWithLogging('/search/emailsenddefinition', setEmailSendDefinitions, 'EmailSendDefinitions');
   }, [activeTab, isAuthenticated]);
 
   useEffect(() => {
@@ -482,12 +484,43 @@ export default function MainApp() {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* TODO: Map EmailSendDefinition data here */}
-                    <tr>
-                      <td className="p-2" colSpan="25">
-                        <span className="text-gray-500">No data yet. (API integration coming soon)</span>
-                      </td>
-                    </tr>
+                    {emailSendDefinitions.length === 0 ? (
+                      <tr>
+                        <td className="p-2" colSpan="25">
+                          <span className="text-gray-500">No data found.</span>
+                        </td>
+                      </tr>
+                    ) : (
+                      emailSendDefinitions.map((item, idx) => (
+                        <tr key={idx}>
+                          <td className="p-2">{item.Name}</td>
+                          <td className="p-2">{item.BccEmail}</td>
+                          <td className="p-2">{item.CCEmail}</td>
+                          <td className="p-2">{item.CreatedDate}</td>
+                          <td className="p-2">{item.CustomerKey}</td>
+                          <td className="p-2">{item.DeliveryScheduledTime}</td>
+                          <td className="p-2">{item.DomainType}</td>
+                          <td className="p-2">{item.EmailSubject}</td>
+                          <td className="p-2">{item.ExclusionFilter}</td>
+                          <td className="p-2">{item.FooterContentArea}</td>
+                          <td className="p-2">{item.FromAddress}</td>
+                          <td className="p-2">{item.FromName}</td>
+                          <td className="p-2">{item.HeaderContentArea}</td>
+                          <td className="p-2">{item.MessageDeliveryType}</td>
+                          <td className="p-2">{item.ModifiedDate}</td>
+                          <td className="p-2">{item.PreHeader}</td>
+                          <td className="p-2">{item.PrivateDomain}</td>
+                          <td className="p-2">{item.DeliveryProfile}</td>
+                          <td className="p-2">{item.PrivateIP}</td>
+                          <td className="p-2">{item.ReplyToAddress}</td>
+                          <td className="p-2">{item.ReplyToDisplayName}</td>
+                          <td className="p-2">{item.SendClassification}</td>
+                          <td className="p-2">{item.SendDefinitionList}</td>
+                          <td className="p-2">{item.SenderProfile}</td>
+                          <td className="p-2">{item.SendLimit}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               ) : (
