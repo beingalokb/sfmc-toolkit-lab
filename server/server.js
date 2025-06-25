@@ -1152,6 +1152,7 @@ app.get('/search/emailsenddefinition', async (req, res) => {
         },
       }
     );
+    console.log('🔵 Raw EmailSendDefinition SOAP response:', response.data); // DEBUG
     const parser = new xml2js.Parser({ explicitArray: false });
     parser.parseString(response.data, async (err, result) => {
       if (err) {
@@ -1165,6 +1166,8 @@ app.get('/search/emailsenddefinition', async (req, res) => {
         // 2. Collect unique EmailIDs and SendClassificationIDs
         const emailIds = Array.from(new Set(resultArray.map(item => item.EmailID).filter(Boolean)));
         const sendClassIds = Array.from(new Set(resultArray.map(item => item.SendClassificationID).filter(Boolean)));
+        console.log('🟡 Collected EmailIDs:', emailIds); // DEBUG
+        console.log('🟡 Collected SendClassificationIDs:', sendClassIds); // DEBUG
         // 3. Retrieve Email details
         let emailDetailsMap = {};
         if (emailIds.length > 0) {
@@ -1205,6 +1208,7 @@ app.get('/search/emailsenddefinition', async (req, res) => {
                 },
               }
             );
+            console.log('🔵 Raw Email SOAP response:', emailResp.data); // DEBUG
             const emailResult = await parser.parseStringPromise(emailResp.data);
             const emailResults = emailResult?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
             const emailArr = Array.isArray(emailResults) ? emailResults : [emailResults];
@@ -1212,6 +1216,7 @@ app.get('/search/emailsenddefinition', async (req, res) => {
               if (item && item.ID) acc[item.ID] = item;
               return acc;
             }, {});
+            console.log('🟢 Email details map:', emailDetailsMap); // DEBUG
           } catch (e) {
             console.error('❌ Error retrieving Email details:', e.message);
           }
@@ -1254,6 +1259,7 @@ app.get('/search/emailsenddefinition', async (req, res) => {
                 },
               }
             );
+            console.log('🔵 Raw SendClassification SOAP response:', sendClassResp.data); // DEBUG
             const sendClassResult = await parser.parseStringPromise(sendClassResp.data);
             const sendClassResults = sendClassResult?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
             const sendClassArr = Array.isArray(sendClassResults) ? sendClassResults : [sendClassResults];
@@ -1261,6 +1267,7 @@ app.get('/search/emailsenddefinition', async (req, res) => {
               if (item && item.ObjectID) acc[item.ObjectID] = item;
               return acc;
             }, {});
+            console.log('🟢 SendClassification details map:', sendClassMap); // DEBUG
           } catch (e) {
             console.error('❌ Error retrieving SendClassification details:', e.message);
           }
