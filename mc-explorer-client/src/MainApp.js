@@ -425,13 +425,13 @@ export default function MainApp() {
             </div>
 
             <div className="flex gap-4 mb-4">
-              {['de', 'automation', 'datafilter', 'journey'].map(tab => (
+              {['de', 'automation', 'datafilter', 'journey', 'emailsenddefinition'].map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`px-4 py-2 rounded text-sm ${activeTab === tab ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
                 >
-                  {tab.toUpperCase()}
+                  {tab === 'emailsenddefinition' ? 'EmailSendDefinition' : tab.toUpperCase()}
                 </button>
               ))}
               <button
@@ -450,62 +450,104 @@ export default function MainApp() {
             </div>
 
             <div className="overflow-x-auto bg-white shadow rounded">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr>
-                    <th className="text-left p-2">Type</th>
-                    <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
-                    {/* Remove Created column for Automations */}
-                    <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
-                    <th className="text-left p-2">View in folder</th>
-                    {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
-                      <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
-                    ) : null}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedData().map((item, idx) => (
-                    <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
-                      onClick={() => {
-                        if (item._type === 'Data Extension') fetchDeDetails(item.name);
-                        if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
-                      }}
-                    >
-                      <td className="p-2">{item._type}</td>
-                      <td className="p-2 font-medium">{item.name}</td>
-                      {/* Remove Created column for Automations */}
-                      <td className="p-2">{item.path || 'N/A'}</td>
-                      <td className="p-2">
-                        {item._type === 'Data Extension' && item.categoryId && item.id && (
-                          <a
-                            href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 underline hover:text-blue-800"
-                            onClick={e => e.stopPropagation()}
-                          >
-                            View
-                          </a>
-                        )}
-                        {item._type === 'Data Filter' && item.id && (
-                          <a
-                            href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 underline hover:text-blue-800 ml-2"
-                            onClick={e => e.stopPropagation()}
-                          >
-                            View
-                          </a>
-                        )}
-                      </td>
-                      {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
-                        <td className="p-2">{item.status || 'N/A'}</td>
-                      )}
+              {activeTab === 'emailsenddefinition' ? (
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="text-left p-2">Name</th>
+                      <th className="text-left p-2">BccEmail</th>
+                      <th className="text-left p-2">CCEmail</th>
+                      <th className="text-left p-2">CreatedDate</th>
+                      <th className="text-left p-2">CustomerKey</th>
+                      <th className="text-left p-2">DeliveryScheduledTime</th>
+                      <th className="text-left p-2">DomainType</th>
+                      <th className="text-left p-2">EmailSubject</th>
+                      <th className="text-left p-2">ExclusionFilter</th>
+                      <th className="text-left p-2">FooterContentArea</th>
+                      <th className="text-left p-2">FromAddress</th>
+                      <th className="text-left p-2">FromName</th>
+                      <th className="text-left p-2">HeaderContentArea</th>
+                      <th className="text-left p-2">MessageDeliveryType</th>
+                      <th className="text-left p-2">ModifiedDate</th>
+                      <th className="text-left p-2">PreHeader</th>
+                      <th className="text-left p-2">PrivateDomain</th>
+                      <th className="text-left p-2">DeliveryProfile</th>
+                      <th className="text-left p-2">PrivateIP</th>
+                      <th className="text-left p-2">ReplyToAddress</th>
+                      <th className="text-left p-2">ReplyToDisplayName</th>
+                      <th className="text-left p-2">SendClassification</th>
+                      <th className="text-left p-2">SendDefinitionList</th>
+                      <th className="text-left p-2">SenderProfile</th>
+                      <th className="text-left p-2">SendLimit</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {/* TODO: Map EmailSendDefinition data here */}
+                    <tr>
+                      <td className="p-2" colSpan="25">
+                        <span className="text-gray-500">No data yet. (API integration coming soon)</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              ) : (
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="text-left p-2">Type</th>
+                      <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
+                      {/* Remove Created column for Automations */}
+                      <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
+                      <th className="text-left p-2">View in folder</th>
+                      {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
+                        <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
+                      ) : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedData().map((item, idx) => (
+                      <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
+                        onClick={() => {
+                          if (item._type === 'Data Extension') fetchDeDetails(item.name);
+                          if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
+                        }}
+                      >
+                        <td className="p-2">{item._type}</td>
+                        <td className="p-2 font-medium">{item.name}</td>
+                        {/* Remove Created column for Automations */}
+                        <td className="p-2">{item.path || 'N/A'}</td>
+                        <td className="p-2">
+                          {item._type === 'Data Extension' && item.categoryId && item.id && (
+                            <a
+                              href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 underline hover:text-blue-800"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              View
+                            </a>
+                          )}
+                          {item._type === 'Data Filter' && item.id && (
+                            <a
+                              href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 underline hover:text-blue-800 ml-2"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              View
+                            </a>
+                          )}
+                        </td>
+                        {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
+                          <td className="p-2">{item.status || 'N/A'}</td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
 
             <div className="flex justify-between items-center mt-4 text-sm">
