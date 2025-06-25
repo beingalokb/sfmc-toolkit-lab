@@ -1154,6 +1154,7 @@ app.get('/search/emailsenddefinition', async (req, res) => {
         },
       }
     );
+    console.log('🔵 Raw SOAP response:', response.data); // DEBUG: log full SOAP response
     const parser = new xml2js.Parser({ explicitArray: false });
     parser.parseString(response.data, (err, result) => {
       if (err) {
