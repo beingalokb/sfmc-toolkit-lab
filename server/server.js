@@ -1112,6 +1112,7 @@ app.get('/folders', async (req, res) => {
 
 // EmailSendDefinition Search (SOAP)
 app.get('/search/emailsenddefinition', async (req, res) => {
+  console.log('🔔 /search/emailsenddefinition endpoint hit'); // DEBUG
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
   if (!accessToken || !subdomain) {
