@@ -1132,7 +1132,6 @@ app.get('/search/emailsenddefinition', async (req, res) => {
               <ObjectType>EmailSendDefinition</ObjectType>
               <Properties>Name</Properties>
               <Properties>CustomerKey</Properties>
-              <Properties>SendClassification</Properties>
               <Properties>Email.ID</Properties>
               <Properties>CategoryID</Properties>
               <Properties>ModifiedDate</Properties>
@@ -1165,7 +1164,6 @@ app.get('/search/emailsenddefinition', async (req, res) => {
         const sendDefs = resultArray.map(item => ({
           Name: item.Name || '',
           CustomerKey: item.CustomerKey || '',
-          SendClassification: item.SendClassification || '',
           EmailID: item['Email.ID'] || '',
           CategoryID: item.CategoryID || '',
           ModifiedDate: item.ModifiedDate || ''
