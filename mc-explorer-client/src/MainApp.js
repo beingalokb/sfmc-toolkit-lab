@@ -122,6 +122,7 @@ export default function MainApp() {
   // Fetch data for the selected tab when activeTab changes
   useEffect(() => {
     if (!isAuthenticated) return;
+    console.log('Current activeTab:', activeTab); // DEBUG
     const accessToken = localStorage.getItem('accessToken');
     const subdomain = localStorage.getItem('subdomain');
     if (!accessToken || !subdomain) return;
@@ -129,6 +130,7 @@ export default function MainApp() {
     setPendingFetches(1);
     const fetchWithLogging = async (path, setter, label) => {
       try {
+        console.log('Fetching', label, 'from', path); // DEBUG
         const res = await fetch(`${baseURL}${path}`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -151,7 +153,10 @@ export default function MainApp() {
     if (activeTab === 'automation') fetchWithLogging('/search/automation', setAutomations, 'Automations');
     if (activeTab === 'datafilter') fetchWithLogging('/search/datafilters', setDataFilters, 'Data Filters');
     if (activeTab === 'journey') fetchWithLogging('/search/journeys', setJourneys, 'Journeys');
-    if (activeTab === 'emailsenddefinition') fetchWithLogging('/search/emailsenddefinition', setEmailSendDefinitions, 'EmailSendDefinitions');
+    if (activeTab === 'emailsenddefinition') {
+      console.log('Fetching EmailSendDefinition'); // DEBUG
+      fetchWithLogging('/search/emailsenddefinition', setEmailSendDefinitions, 'EmailSendDefinitions');
+    }
   }, [activeTab, isAuthenticated]);
 
   useEffect(() => {
