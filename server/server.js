@@ -1110,6 +1110,59 @@ app.get('/folders', async (req, res) => {
   }
 });
 
+// EmailSendDefinition Search (REST)
+app.get('/search/emailsenddefinition', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) {
+    return res.status(401).json([]);
+  }
+  try {
+    // Marketing Cloud REST API endpoint for EmailSendDefinition
+    const url = `https://${subdomain}.rest.marketingcloudapis.com/messaging/v1/email/definitions`;
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    // The API returns an array in response.data.items
+    const items = response.data.items || [];
+    // Only return the requested fields
+    const filtered = items.map(item => ({
+      Name: item.name,
+      BccEmail: item.bccEmail,
+      CCEmail: item.ccEmail,
+      CreatedDate: item.createdDate,
+      CustomerKey: item.customerKey,
+      DeliveryScheduledTime: item.deliveryScheduledTime,
+      DomainType: item.domainType,
+      EmailSubject: item.emailSubject,
+      ExclusionFilter: item.exclusionFilter,
+      FooterContentArea: item.footerContentArea,
+      FromAddress: item.from,
+      FromName: item.fromName,
+      HeaderContentArea: item.headerContentArea,
+      MessageDeliveryType: item.messageDeliveryType,
+      ModifiedDate: item.modifiedDate,
+      PreHeader: item.preHeader,
+      PrivateDomain: item.privateDomain,
+      DeliveryProfile: item.deliveryProfile,
+      PrivateIP: item.privateIP,
+      ReplyToAddress: item.replyToAddress,
+      ReplyToDisplayName: item.replyToDisplayName,
+      SendClassification: item.sendClassification,
+      SendDefinitionList: item.sendDefinitionList,
+      SenderProfile: item.senderProfile,
+      SendLimit: item.sendLimit
+    }));
+    res.json(filtered);
+  } catch (e) {
+    console.error('❌ Failed to fetch EmailSendDefinition:', e.response?.data || e.message);
+    res.status(500).json([]);
+  }
+});
+
 // Serve React frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
 app.get(/(.*)/, (req, res) => {
