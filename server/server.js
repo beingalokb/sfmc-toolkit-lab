@@ -1120,43 +1120,29 @@ app.get('/search/emailsenddefinition', async (req, res) => {
   }
   try {
     const soapEnvelope = `
-      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-        <s:Header>
-          <fueloauth>${accessToken}</fueloauth>
-        </s:Header>
-        <s:Body>
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
           <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
             <RetrieveRequest>
               <ObjectType>EmailSendDefinition</ObjectType>
               <Properties>Name</Properties>
-              <Properties>BccEmail</Properties>
-              <Properties>CCEmail</Properties>
-              <Properties>CreatedDate</Properties>
               <Properties>CustomerKey</Properties>
-              <Properties>DeliveryScheduledTime</Properties>
-              <Properties>DomainType</Properties>
-              <Properties>EmailSubject</Properties>
-              <Properties>ExclusionFilter</Properties>
-              <Properties>FooterContentArea</Properties>
-              <Properties>FromAddress</Properties>
-              <Properties>FromName</Properties>
-              <Properties>HeaderContentArea</Properties>
-              <Properties>MessageDeliveryType</Properties>
+              <Properties>SendClassification.CustomerKey</Properties>
+              <Properties>SendClassification.ObjectID</Properties>
+              <Properties>SendClassification.Name</Properties>
+              <Properties>Email.ID</Properties>
+              <Properties>Email.Name</Properties>
+              <Properties>CategoryID</Properties>
               <Properties>ModifiedDate</Properties>
-              <Properties>PreHeader</Properties>
-              <Properties>PrivateDomain</Properties>
-              <Properties>DeliveryProfile</Properties>
-              <Properties>PrivateIP</Properties>
-              <Properties>ReplyToAddress</Properties>
-              <Properties>ReplyToDisplayName</Properties>
-              <Properties>SendClassification</Properties>
-              <Properties>SendDefinitionList</Properties>
-              <Properties>SenderProfile</Properties>
-              <Properties>SendLimit</Properties>
             </RetrieveRequest>
           </RetrieveRequestMsg>
-        </s:Body>
-      </s:Envelope>
+        </soapenv:Body>
+      </soapenv:Envelope>
     `;
     const response = await axios.post(
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
@@ -1180,30 +1166,14 @@ app.get('/search/emailsenddefinition', async (req, res) => {
         const resultArray = Array.isArray(results) ? results : [results];
         const sendDefs = resultArray.map(item => ({
           Name: item.Name || '',
-          BccEmail: item.BccEmail || '',
-          CCEmail: item.CCEmail || '',
-          CreatedDate: item.CreatedDate || '',
           CustomerKey: item.CustomerKey || '',
-          DeliveryScheduledTime: item.DeliveryScheduledTime || '',
-          DomainType: item.DomainType || '',
-          EmailSubject: item.EmailSubject || '',
-          ExclusionFilter: item.ExclusionFilter || '',
-          FooterContentArea: item.FooterContentArea || '',
-          FromAddress: item.FromAddress || '',
-          FromName: item.FromName || '',
-          HeaderContentArea: item.HeaderContentArea || '',
-          MessageDeliveryType: item.MessageDeliveryType || '',
-          ModifiedDate: item.ModifiedDate || '',
-          PreHeader: item.PreHeader || '',
-          PrivateDomain: item.PrivateDomain || '',
-          DeliveryProfile: item.DeliveryProfile || '',
-          PrivateIP: item.PrivateIP || '',
-          ReplyToAddress: item.ReplyToAddress || '',
-          ReplyToDisplayName: item.ReplyToDisplayName || '',
-          SendClassification: item.SendClassification || '',
-          SendDefinitionList: item.SendDefinitionList || '',
-          SenderProfile: item.SenderProfile || '',
-          SendLimit: item.SendLimit || ''
+          SendClassificationCustomerKey: item['SendClassification.CustomerKey'] || '',
+          SendClassificationObjectID: item['SendClassification.ObjectID'] || '',
+          SendClassificationName: item['SendClassification.Name'] || '',
+          EmailID: item['Email.ID'] || '',
+          EmailName: item['Email.Name'] || '',
+          CategoryID: item.CategoryID || '',
+          ModifiedDate: item.ModifiedDate || ''
         }));
         res.json(sendDefs);
       } catch (e) {
