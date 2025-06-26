@@ -22,6 +22,9 @@ export default function MainApp() {
   const [deDetailModal, setDeDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
   const [automationDetailModal, setAutomationDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
   const [emailSendDefinitions, setEmailSendDefinitions] = useState([]);
+  const [senderProfiles, setSenderProfiles] = useState([]);
+  const [sendClassifications, setSendClassifications] = useState([]);
+  const [deliveryProfiles, setDeliveryProfiles] = useState([]);
   // Parent navigation state
   const [parentNav, setParentNav] = useState('search'); // 'search' or 'preference'
   const [previewResult, setPreviewResult] = useState(null);
@@ -156,6 +159,10 @@ export default function MainApp() {
     if (activeTab === 'emailsenddefinition') {
       console.log('Fetching EmailSendDefinition'); // DEBUG
       fetchWithLogging('/search/emailsenddefinition', setEmailSendDefinitions, 'EmailSendDefinitions');
+      // Fetch related profiles/classifications
+      fetchWithLogging('/search/senderprofile', setSenderProfiles, 'SenderProfiles');
+      fetchWithLogging('/search/sendclassification', setSendClassifications, 'SendClassifications');
+      fetchWithLogging('/search/deliveryprofile', setDeliveryProfiles, 'DeliveryProfiles');
     }
   }, [activeTab, isAuthenticated]);
 
@@ -462,36 +469,17 @@ export default function MainApp() {
                   <thead>
                     <tr>
                       <th className="text-left p-2">Name</th>
-                      <th className="text-left p-2">BccEmail</th>
-                      <th className="text-left p-2">CCEmail</th>
-                      <th className="text-left p-2">CreatedDate</th>
                       <th className="text-left p-2">CustomerKey</th>
-                      <th className="text-left p-2">DeliveryScheduledTime</th>
-                      <th className="text-left p-2">DomainType</th>
-                      <th className="text-left p-2">EmailSubject</th>
-                      <th className="text-left p-2">ExclusionFilter</th>
-                      <th className="text-left p-2">FooterContentArea</th>
-                      <th className="text-left p-2">FromAddress</th>
-                      <th className="text-left p-2">FromName</th>
-                      <th className="text-left p-2">HeaderContentArea</th>
-                      <th className="text-left p-2">MessageDeliveryType</th>
-                      <th className="text-left p-2">ModifiedDate</th>
-                      <th className="text-left p-2">PreHeader</th>
-                      <th className="text-left p-2">PrivateDomain</th>
-                      <th className="text-left p-2">DeliveryProfile</th>
-                      <th className="text-left p-2">PrivateIP</th>
-                      <th className="text-left p-2">ReplyToAddress</th>
-                      <th className="text-left p-2">ReplyToDisplayName</th>
-                      <th className="text-left p-2">SendClassification</th>
-                      <th className="text-left p-2">SendDefinitionList</th>
                       <th className="text-left p-2">SenderProfile</th>
-                      <th className="text-left p-2">SendLimit</th>
+                      <th className="text-left p-2">SendClassification</th>
+                      <th className="text-left p-2">DeliveryProfile</th>
+                      <th className="text-left p-2">ModifiedDate</th>
                     </tr>
                   </thead>
                   <tbody>
                     {emailSendDefinitions.length === 0 ? (
                       <tr>
-                        <td className="p-2" colSpan="25">
+                        <td className="p-2" colSpan="6">
                           <span className="text-gray-500">No data found.</span>
                         </td>
                       </tr>
@@ -499,30 +487,23 @@ export default function MainApp() {
                       emailSendDefinitions.map((item, idx) => (
                         <tr key={idx}>
                           <td className="p-2">{item.Name}</td>
-                          <td className="p-2">{item.BccEmail}</td>
-                          <td className="p-2">{item.CCEmail}</td>
-                          <td className="p-2">{item.CreatedDate}</td>
                           <td className="p-2">{item.CustomerKey}</td>
-                          <td className="p-2">{item.DeliveryScheduledTime}</td>
-                          <td className="p-2">{item.DomainType}</td>
-                          <td className="p-2">{item.EmailSubject}</td>
-                          <td className="p-2">{item.ExclusionFilter}</td>
-                          <td className="p-2">{item.FooterContentArea}</td>
-                          <td className="p-2">{item.FromAddress}</td>
-                          <td className="p-2">{item.FromName}</td>
-                          <td className="p-2">{item.HeaderContentArea}</td>
-                          <td className="p-2">{item.MessageDeliveryType}</td>
+                          <td className="p-2">
+                            <span title={getProfileDesc(senderProfiles, item.SenderProfile)}>
+                              {getProfileName(senderProfiles, item.SenderProfile)}
+                            </span>
+                          </td>
+                          <td className="p-2">
+                            <span title={getProfileDesc(sendClassifications, item.SendClassification)}>
+                              {getProfileName(sendClassifications, item.SendClassification)}
+                            </span>
+                          </td>
+                          <td className="p-2">
+                            <span title={getProfileDesc(deliveryProfiles, item.DeliveryProfile)}>
+                              {getProfileName(deliveryProfiles, item.DeliveryProfile)}
+                            </span>
+                          </td>
                           <td className="p-2">{item.ModifiedDate}</td>
-                          <td className="p-2">{item.PreHeader}</td>
-                          <td className="p-2">{item.PrivateDomain}</td>
-                          <td className="p-2">{item.DeliveryProfile}</td>
-                          <td className="p-2">{item.PrivateIP}</td>
-                          <td className="p-2">{item.ReplyToAddress}</td>
-                          <td className="p-2">{item.ReplyToDisplayName}</td>
-                          <td className="p-2">{item.SendClassification}</td>
-                          <td className="p-2">{item.SendDefinitionList}</td>
-                          <td className="p-2">{item.SenderProfile}</td>
-                          <td className="p-2">{item.SendLimit}</td>
                         </tr>
                       ))
                     )}
