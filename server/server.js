@@ -1532,6 +1532,64 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
   }
 });
 
+// Describe SOAP object and print retrievable properties
+app.get('/describe-soap-object', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  const objectType = req.query.objectType;
+  if (!accessToken || !subdomain || !objectType) return res.status(400).json({ error: 'Missing required parameters' });
+  try {
+    const soapEnvelope = `
+      <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\">
+        <soapenv:Header>
+          <fueloauth xmlns=\"http://exacttarget.com\">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <DescribeRequestMsg xmlns=\"http://exacttarget.com/wsdl/partnerAPI\">
+            <DescribeRequests>
+              <ObjectDefinitionRequest>
+                <ObjectType>${objectType}</ObjectType>
+              </ObjectDefinitionRequest>
+            </DescribeRequests>
+          </DescribeRequestMsg>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          'SOAPAction': 'Describe',
+        },
+      }
+    );
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
+    const objDef = result?.['soap:Envelope']?.['soap:Body']?.['DescribeResponseMsg']?.['ObjectDefinition'] || {};
+    let props = objDef?.Properties?.PropertyDefinition || [];
+    if (!Array.isArray(props)) props = [props];
+    const retrievableProps = props.filter(p => p.IsRetrievable === 'true' || p.IsRetrievable === true);
+    console.log(`\n[SOAP Describe] Retrievable properties for ${objectType}:`);
+    retrievableProps.forEach(p => console.log(`- ${p.Name}`));
+    res.json({
+      objectType,
+      retrievableProperties: retrievableProps.map(p => p.Name),
+      allProperties: props.map(p => ({
+        Name: p.Name,
+        IsRetrievable: p.IsRetrievable,
+        IsUpdatable: p.IsUpdatable,
+        IsCreatable: p.IsCreatable,
+        IsFilterable: p.IsFilterable,
+        IsNullable: p.IsNullable
+      }))
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Serve React frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
 app.get(/(.*)/, (req, res) => {
