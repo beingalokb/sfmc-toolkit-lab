@@ -1545,13 +1545,23 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
       const parser = new xml2js.Parser({ explicitArray: false });
       const result = await parser.parseStringPromise(response.data);
       const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-      return results ? (Array.isArray(results) ? results : [results]) : [];
+      // Fix: always return array, and always extract nested CustomerKey values
+      const arr = results ? (Array.isArray(results) ? results : [results]) : [];
+      return arr.map(item => ({
+        Name: item.Name,
+        CustomerKey: item.CustomerKey,
+        CategoryID: item.CategoryID,
+        ModifiedDate: item.ModifiedDate,
+        SendClassificationKey: item.SendClassification?.CustomerKey || '',
+        SenderProfileKey: item.SenderProfile?.CustomerKey || '',
+        DeliveryProfileKey: item.DeliveryProfile?.CustomerKey || ''
+      }));
     })();
 
     // Step 2: Collect all unique CustomerKeys for related objects
-    const sendClassKeys = Array.from(new Set(sendDefs.map(d => d['SendClassification']?.CustomerKey).filter(Boolean)));
-    const senderProfileKeys = Array.from(new Set(sendDefs.map(d => d['SenderProfile']?.CustomerKey).filter(Boolean)));
-    const deliveryProfileKeys = Array.from(new Set(sendDefs.map(d => d['DeliveryProfile']?.CustomerKey).filter(Boolean)));
+    const sendClassKeys = Array.from(new Set(sendDefs.map(d => d.SendClassificationKey).filter(Boolean)));
+    const senderProfileKeys = Array.from(new Set(sendDefs.map(d => d.SenderProfileKey).filter(Boolean)));
+    const deliveryProfileKeys = Array.from(new Set(sendDefs.map(d => d.DeliveryProfileKey).filter(Boolean)));
 
     // Step 3: Fetch details for all related objects
     const [sendClassMap, senderProfileMap, deliveryProfileMap] = await Promise.all([
@@ -1562,30 +1572,28 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
 
     // Step 4: Enrich each EmailSendDefinition with full details
     const resolved = sendDefs.map(def => {
-      const sendClassKey = def['SendClassification']?.CustomerKey || '';
-      const senderProfileKey = def['SenderProfile']?.CustomerKey || '';
-      const deliveryProfileKey = def['DeliveryProfile']?.CustomerKey || '';
-      const sendClass = sendClassMap[sendClassKey] || {};
-      const senderProfile = senderProfileMap[senderProfileKey] || {};
-      const deliveryProfile = deliveryProfileMap[deliveryProfileKey] || {};
+      const sendClass = sendClassMap[def.SendClassificationKey] || {};
+      const senderProfile = senderProfileMap[def.SenderProfileKey] || {};
+      const deliveryProfile = deliveryProfileMap[def.DeliveryProfileKey] || {};
       return {
         Name: def.Name,
         CustomerKey: def.CustomerKey,
+        CategoryID: def.CategoryID,
         ModifiedDate: def.ModifiedDate || '',
         SendClassification: {
-          CustomerKey: sendClassKey,
+          CustomerKey: def.SendClassificationKey,
           Name: sendClass.Name || '',
           Description: sendClass.Description || '',
           SenderProfileKey: sendClass['SenderProfile']?.CustomerKey || '',
           DeliveryProfileKey: sendClass['DeliveryProfile']?.CustomerKey || ''
         },
         SenderProfile: {
-          CustomerKey: senderProfileKey,
+          CustomerKey: def.SenderProfileKey,
           Name: senderProfile.Name || '',
           Description: senderProfile.Description || ''
         },
         DeliveryProfile: {
-          CustomerKey: deliveryProfileKey,
+          CustomerKey: def.DeliveryProfileKey,
           Name: deliveryProfile.Name || '',
           Description: deliveryProfile.Description || ''
         }
