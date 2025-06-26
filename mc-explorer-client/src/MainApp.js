@@ -25,6 +25,19 @@ export default function MainApp() {
   const [senderProfiles, setSenderProfiles] = useState([]);
   const [sendClassifications, setSendClassifications] = useState([]);
   const [deliveryProfiles, setDeliveryProfiles] = useState([]);
+
+  // Helper to get human-readable name for related fields
+  function getProfileName(profiles, key) {
+    if (!key) return '';
+    const found = profiles.find(p => p.CustomerKey === key);
+    return found ? found.Name : key;
+  }
+  function getProfileDesc(profiles, key) {
+    if (!key) return '';
+    const found = profiles.find(p => p.CustomerKey === key);
+    return found ? found.Description : '';
+  }
+
   // Parent navigation state
   const [parentNav, setParentNav] = useState('search'); // 'search' or 'preference'
   const [previewResult, setPreviewResult] = useState(null);
