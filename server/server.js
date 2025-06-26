@@ -1137,7 +1137,6 @@ app.get('/search/emailsenddefinition', async (req, res) => {
               <Properties>CategoryID</Properties>
               <Properties>ModifiedDate</Properties>
               <Properties>SendClassificationID</Properties>
-              <Properties>SendClassificationName</Properties>
             </RetrieveRequest>
           </RetrieveRequestMsg>
         </soapenv:Body>
