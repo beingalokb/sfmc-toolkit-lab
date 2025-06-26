@@ -1452,16 +1452,70 @@ app.post('/parse/emailsenddefinition-config', (req, res) => {
   res.json(result);
 });
 
-// Resolved EmailSendDefinition relationships endpoint (improved: fetch SendClassification details per ESD)
+// Resolved EmailSendDefinition relationships endpoint (enrich with full details for all related objects)
 app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
   if (!accessToken || !subdomain) return res.status(401).json([]);
   try {
-    // Helper to fetch SOAP objects
-    async function fetchSoap(objectType, properties, filter) {
-      const propsXml = properties.map(p => `<Properties>${p}</Properties>`).join('');
-      const filterXml = filter || '';
+    // Helper to fetch SOAP objects by CustomerKey
+    async function fetchSoapByCustomerKeys(objectType, properties, customerKeys) {
+      if (!customerKeys.length) return {};
+      // Batch in groups of 20 (SOAP limit)
+      const batches = [];
+      for (let i = 0; i < customerKeys.length; i += 20) {
+        batches.push(customerKeys.slice(i, i + 20));
+      }
+      let allResults = [];
+      for (const batch of batches) {
+        const propsXml = properties.map(p => `<Properties>${p}</Properties>`).join('');
+        const filterXml = `
+          <Filter xsi:type=\"SimpleFilterPart\">
+            <Property>CustomerKey</Property>
+            <SimpleOperator>IN</SimpleOperator>
+            ${batch.map(k => `<Value>${k}</Value>`).join('')}
+          </Filter>
+        `;
+        const soapEnvelope = `
+          <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">
+            <soapenv:Header>
+              <fueloauth xmlns=\"http://exacttarget.com\">${accessToken}</fueloauth>
+            </soapenv:Header>
+            <soapenv:Body>
+              <RetrieveRequestMsg xmlns=\"http://exacttarget.com/wsdl/partnerAPI\">
+                <RetrieveRequest>
+                  <ObjectType>${objectType}</ObjectType>
+                  ${propsXml}
+                  ${filterXml}
+                </RetrieveRequest>
+              </RetrieveRequestMsg>
+            </soapenv:Body>
+          </soapenv:Envelope>
+        `;
+        const response = await axios.post(
+          `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+          soapEnvelope,
+          { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+        );
+        const parser = new xml2js.Parser({ explicitArray: false });
+        const result = await parser.parseStringPromise(response.data);
+        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        if (results) {
+          allResults = allResults.concat(Array.isArray(results) ? results : [results]);
+        }
+      }
+      // Map by CustomerKey
+      const map = {};
+      allResults.forEach(obj => { if (obj.CustomerKey) map[obj.CustomerKey] = obj; });
+      return map;
+    }
+
+    // Step 1: Fetch all EmailSendDefinitions
+    const sendDefs = await (async () => {
+      const props = [
+        'Name', 'CustomerKey', 'SendClassification.CustomerKey', 'SenderProfile.CustomerKey', 'DeliveryProfile.CustomerKey', 'ModifiedDate'
+      ];
+      const propsXml = props.map(p => `<Properties>${p}</Properties>`).join('');
       const soapEnvelope = `
         <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">
           <soapenv:Header>
@@ -1470,9 +1524,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
           <soapenv:Body>
             <RetrieveRequestMsg xmlns=\"http://exacttarget.com/wsdl/partnerAPI\">
               <RetrieveRequest>
-                <ObjectType>${objectType}</ObjectType>
+                <ObjectType>EmailSendDefinition</ObjectType>
                 ${propsXml}
-                ${filterXml}
               </RetrieveRequest>
             </RetrieveRequestMsg>
           </soapenv:Body>
@@ -1486,46 +1539,52 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
       const parser = new xml2js.Parser({ explicitArray: false });
       const result = await parser.parseStringPromise(response.data);
       const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-      if (!results) return [];
-      return Array.isArray(results) ? results : [results];
-    }
+      return results ? (Array.isArray(results) ? results : [results]) : [];
+    })();
 
-    // Step 1: Fetch all EmailSendDefinitions
-    const sendDefs = await fetchSoap('EmailSendDefinition', [
-      'Name', 'CustomerKey', 'SendClassification.CustomerKey', 'SenderProfile.CustomerKey', 'DeliveryProfile.CustomerKey', 'ModifiedDate'
+    // Step 2: Collect all unique CustomerKeys for related objects
+    const sendClassKeys = Array.from(new Set(sendDefs.map(d => d['SendClassification']?.CustomerKey).filter(Boolean)));
+    const senderProfileKeys = Array.from(new Set(sendDefs.map(d => d['SenderProfile']?.CustomerKey).filter(Boolean)));
+    const deliveryProfileKeys = Array.from(new Set(sendDefs.map(d => d['DeliveryProfile']?.CustomerKey).filter(Boolean)));
+
+    // Step 3: Fetch details for all related objects
+    const [sendClassMap, senderProfileMap, deliveryProfileMap] = await Promise.all([
+      fetchSoapByCustomerKeys('SendClassification', ['CustomerKey', 'Name', 'Description', 'SenderProfile.CustomerKey', 'DeliveryProfile.CustomerKey'], sendClassKeys),
+      fetchSoapByCustomerKeys('SenderProfile', ['CustomerKey', 'Name', 'Description'], senderProfileKeys),
+      fetchSoapByCustomerKeys('DeliveryProfile', ['CustomerKey', 'Name', 'Description'], deliveryProfileKeys)
     ]);
 
-    // Step 2: For each, fetch SendClassification details if CustomerKey present
-    const resolved = [];
-    for (const def of sendDefs) {
+    // Step 4: Enrich each EmailSendDefinition with full details
+    const resolved = sendDefs.map(def => {
       const sendClassKey = def['SendClassification']?.CustomerKey || '';
-      let sendClassDetails = null;
-      if (sendClassKey) {
-        const filter = `
-          <Filter xsi:type=\"SimpleFilterPart\">
-            <Property>CustomerKey</Property>
-            <SimpleOperator>equals</SimpleOperator>
-            <Value>${sendClassKey}</Value>
-          </Filter>
-        `;
-        const results = await fetchSoap('SendClassification', [
-          'CustomerKey', 'Name', 'Description', 'SenderProfile.CustomerKey', 'DeliveryProfile.CustomerKey'
-        ], filter);
-        sendClassDetails = results && results[0] ? results[0] : null;
-      }
-      resolved.push({
+      const senderProfileKey = def['SenderProfile']?.CustomerKey || '';
+      const deliveryProfileKey = def['DeliveryProfile']?.CustomerKey || '';
+      const sendClass = sendClassMap[sendClassKey] || {};
+      const senderProfile = senderProfileMap[senderProfileKey] || {};
+      const deliveryProfile = deliveryProfileMap[deliveryProfileKey] || {};
+      return {
         Name: def.Name,
         CustomerKey: def.CustomerKey,
-        SenderProfileKey: def['SenderProfile']?.CustomerKey || '',
-        SendClassificationKey: sendClassKey,
-        SendClassificationName: sendClassDetails?.Name || '',
-        SendClassificationDescription: sendClassDetails?.Description || '',
-        SendClassificationSenderProfileKey: sendClassDetails?.['SenderProfile']?.CustomerKey || '',
-        SendClassificationDeliveryProfileKey: sendClassDetails?.['DeliveryProfile']?.CustomerKey || '',
-        DeliveryProfileKey: def['DeliveryProfile']?.CustomerKey || '',
-        ModifiedDate: def.ModifiedDate || ''
-      });
-    }
+        ModifiedDate: def.ModifiedDate || '',
+        SendClassification: {
+          CustomerKey: sendClassKey,
+          Name: sendClass.Name || '',
+          Description: sendClass.Description || '',
+          SenderProfileKey: sendClass['SenderProfile']?.CustomerKey || '',
+          DeliveryProfileKey: sendClass['DeliveryProfile']?.CustomerKey || ''
+        },
+        SenderProfile: {
+          CustomerKey: senderProfileKey,
+          Name: senderProfile.Name || '',
+          Description: senderProfile.Description || ''
+        },
+        DeliveryProfile: {
+          CustomerKey: deliveryProfileKey,
+          Name: deliveryProfile.Name || '',
+          Description: deliveryProfile.Description || ''
+        }
+      };
+    });
     res.json(resolved);
   } catch (e) {
     res.status(500).json({ error: e.message });
