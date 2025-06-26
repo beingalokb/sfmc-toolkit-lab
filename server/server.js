@@ -1179,6 +1179,177 @@ app.get('/search/emailsenddefinition', async (req, res) => {
   }
 });
 
+// SenderProfile Search (SOAP)
+app.get('/search/senderprofile', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) return res.status(401).json([]);
+  try {
+    const soapEnvelope = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>SenderProfile</ObjectType>
+              <Properties>CustomerKey</Properties>
+              <Properties>Name</Properties>
+              <Properties>Description</Properties>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Retrieve',
+        },
+      }
+    );
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(response.data, (err, result) => {
+      if (err) return res.status(500).json({ error: 'Failed to parse XML' });
+      try {
+        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        if (!results) return res.status(200).json([]);
+        const arr = Array.isArray(results) ? results : [results];
+        const profiles = arr.map(item => ({
+          CustomerKey: item.CustomerKey || '',
+          Name: item.Name || '',
+          Description: item.Description || ''
+        }));
+        res.json(profiles);
+      } catch (e) {
+        res.status(500).json([]);
+      }
+    });
+  } catch (e) {
+    res.status(500).json([]);
+  }
+});
+
+// SendClassification Search (SOAP)
+app.get('/search/sendclassification', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) return res.status(401).json([]);
+  try {
+    const soapEnvelope = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>SendClassification</ObjectType>
+              <Properties>CustomerKey</Properties>
+              <Properties>Name</Properties>
+              <Properties>Description</Properties>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Retrieve',
+        },
+      }
+    );
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(response.data, (err, result) => {
+      if (err) return res.status(500).json({ error: 'Failed to parse XML' });
+      try {
+        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        if (!results) return res.status(200).json([]);
+        const arr = Array.isArray(results) ? results : [results];
+        const profiles = arr.map(item => ({
+          CustomerKey: item.CustomerKey || '',
+          Name: item.Name || '',
+          Description: item.Description || ''
+        }));
+        res.json(profiles);
+      } catch (e) {
+        res.status(500).json([]);
+      }
+    });
+  } catch (e) {
+    res.status(500).json([]);
+  }
+});
+
+// DeliveryProfile Search (SOAP)
+app.get('/search/deliveryprofile', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) return res.status(401).json([]);
+  try {
+    const soapEnvelope = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DeliveryProfile</ObjectType>
+              <Properties>CustomerKey</Properties>
+              <Properties>Name</Properties>
+              <Properties>Description</Properties>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Retrieve',
+        },
+      }
+    );
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(response.data, (err, result) => {
+      if (err) return res.status(500).json({ error: 'Failed to parse XML' });
+      try {
+        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        if (!results) return res.status(200).json([]);
+        const arr = Array.isArray(results) ? results : [results];
+        const profiles = arr.map(item => ({
+          CustomerKey: item.CustomerKey || '',
+          Name: item.Name || '',
+          Description: item.Description || ''
+        }));
+        res.json(profiles);
+      } catch (e) {
+        res.status(500).json([]);
+      }
+    });
+  } catch (e) {
+    res.status(500).json([]);
+  }
+});
+
 // Serve React frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
 app.get(/(.*)/, (req, res) => {
