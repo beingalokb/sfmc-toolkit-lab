@@ -1403,6 +1403,122 @@ app.post('/update/emailsenddefinition-senderprofile', async (req, res) => {
   }
 });
 
+// Parse EmailSendDefinition config and extract relationships
+app.post('/parse/emailsenddefinition-config', (req, res) => {
+  const config = req.body;
+  if (!config || !config.entities || !config.input) {
+    return res.status(400).json({ error: 'Invalid config format' });
+  }
+  const sendDefs = config.entities.sendDefinitions || {};
+  const inputArr = config.input || [];
+
+  // Build a lookup for input keys
+  const inputKeyMap = {};
+  inputArr.forEach(inp => {
+    inputKeyMap[inp.key] = inp;
+  });
+
+  // Parse each sendDefinition
+  const result = Object.entries(sendDefs).map(([defId, defObj]) => {
+    const data = defObj.data || {};
+    // The IDs are references like {{mcpm:senderProfile}}
+    const senderProfileKey = data.senderProfileId || '';
+    const sendClassificationKey = data.sendClassificationId || '';
+    const deliveryProfileKey = data.deliveryProfileId || '';
+
+    // Map to input keys (strip {{mcpm: and }})
+    const senderProfileInputKey = senderProfileKey.replace(/\{\{mcpm:|}}/g, '');
+    const sendClassificationInputKey = sendClassificationKey.replace(/\{\{mcpm:|}}/g, '');
+    const deliveryProfileInputKey = deliveryProfileKey.replace(/\{\{mcpm:|}}/g, '');
+
+    // Find the input object for each
+    const senderProfileInput = inputKeyMap[senderProfileInputKey] || null;
+    const sendClassificationInput = inputKeyMap[sendClassificationInputKey] || null;
+    const deliveryProfileInput = inputKeyMap[deliveryProfileInputKey] || null;
+
+    return {
+      sendDefinitionId: defId,
+      name: data.name || data.Name || '',
+      key: data.key || data.CustomerKey || '',
+      senderProfile: senderProfileInput ? senderProfileInput.meta.entityType : null,
+      senderProfileKey: senderProfileInputKey,
+      sendClassification: sendClassificationInput ? sendClassificationInput.meta.entityType : null,
+      sendClassificationKey: sendClassificationInputKey,
+      deliveryProfile: deliveryProfileInput ? deliveryProfileInput.meta.entityType : null,
+      deliveryProfileKey: deliveryProfileInputKey
+    };
+  });
+
+  res.json(result);
+});
+
+// Resolved EmailSendDefinition relationships endpoint
+app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) return res.status(401).json([]);
+  try {
+    // Helper to fetch SOAP objects
+    async function fetchSoap(objectType, properties) {
+      const propsXml = properties.map(p => `<Properties>${p}</Properties>`).join('');
+      const soapEnvelope = `
+        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+          <soapenv:Header>
+            <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+          </soapenv:Header>
+          <soapenv:Body>
+            <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <RetrieveRequest>
+                <ObjectType>${objectType}</ObjectType>
+                ${propsXml}
+              </RetrieveRequest>
+            </RetrieveRequestMsg>
+          </soapenv:Body>
+        </soapenv:Envelope>
+      `;
+      const response = await axios.post(
+        `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+        soapEnvelope,
+        { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+      );
+      const parser = new xml2js.Parser({ explicitArray: false });
+      const result = await parser.parseStringPromise(response.data);
+      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      if (!results) return [];
+      return Array.isArray(results) ? results : [results];
+    }
+
+    // Fetch all objects
+    const [sendDefs, senderProfiles, sendClassifications, deliveryProfiles] = await Promise.all([
+      fetchSoap('EmailSendDefinition', ['Name', 'CustomerKey', 'SenderProfile.CustomerKey', 'SendClassification.CustomerKey', 'DeliveryProfile.CustomerKey', 'ModifiedDate']),
+      fetchSoap('SenderProfile', ['CustomerKey', 'Name']),
+      fetchSoap('SendClassification', ['CustomerKey', 'Name']),
+      fetchSoap('DeliveryProfile', ['CustomerKey', 'Name'])
+    ]);
+
+    // Build lookup maps
+    const senderProfileMap = Object.fromEntries(senderProfiles.map(p => [p.CustomerKey, p.Name]));
+    const sendClassificationMap = Object.fromEntries(sendClassifications.map(c => [c.CustomerKey, c.Name]));
+    const deliveryProfileMap = Object.fromEntries(deliveryProfiles.map(d => [d.CustomerKey, d.Name]));
+
+    // Build resolved list
+    const resolved = sendDefs.map(def => ({
+      Name: def.Name,
+      CustomerKey: def.CustomerKey,
+      SenderProfileKey: def['SenderProfile']?.CustomerKey || '',
+      SenderProfileName: senderProfileMap[def['SenderProfile']?.CustomerKey] || def['SenderProfile']?.CustomerKey || '',
+      SendClassificationKey: def['SendClassification']?.CustomerKey || '',
+      SendClassificationName: sendClassificationMap[def['SendClassification']?.CustomerKey] || def['SendClassification']?.CustomerKey || '',
+      DeliveryProfileKey: def['DeliveryProfile']?.CustomerKey || '',
+      DeliveryProfileName: deliveryProfileMap[def['DeliveryProfile']?.CustomerKey] || def['DeliveryProfile']?.CustomerKey || '',
+      ModifiedDate: def.ModifiedDate || ''
+    }));
+    res.json(resolved);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Serve React frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
 app.get(/(.*)/, (req, res) => {
