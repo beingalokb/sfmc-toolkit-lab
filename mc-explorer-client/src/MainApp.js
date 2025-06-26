@@ -27,6 +27,7 @@ export default function MainApp() {
   const [deliveryProfiles, setDeliveryProfiles] = useState([]);
   const [sendClassModal, setSendClassModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
   const [senderProfileModal, setSenderProfileModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
+  const [updateSenderProfileModal, setUpdateSenderProfileModal] = useState({ open: false, loading: false, error: null, customerKey: null, selectedKey: '', success: false });
 
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
@@ -402,6 +403,36 @@ export default function MainApp() {
     }
   };
 
+  // Handler to open update modal
+  const openUpdateSenderProfileModal = (customerKey) => {
+    setUpdateSenderProfileModal({ open: true, loading: false, error: null, customerKey, selectedKey: '', success: false });
+  };
+
+  // Handler to update sender profile
+  const handleUpdateSenderProfile = async () => {
+    setUpdateSenderProfileModal(modal => ({ ...modal, loading: true, error: null, success: false }));
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      const subdomain = localStorage.getItem('subdomain');
+      const res = await fetch(`${baseURL}/update/emailsenddefinition-senderprofile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'x-mc-subdomain': subdomain
+        },
+        body: JSON.stringify({
+          customerKey: updateSenderProfileModal.customerKey,
+          newSenderProfileKey: updateSenderProfileModal.selectedKey
+        })
+      });
+      if (!res.ok) throw new Error('Update failed');
+      setUpdateSenderProfileModal(modal => ({ ...modal, loading: false, error: null, success: true }));
+    } catch (e) {
+      setUpdateSenderProfileModal(modal => ({ ...modal, loading: false, error: e.message, success: false }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -527,13 +558,14 @@ export default function MainApp() {
                       <th className="text-left p-2">CustomerKey</th>
                       <th className="text-left p-2">SendClassification Lookup</th>
                       <th className="text-left p-2">SenderProfile Lookup</th>
+                      <th className="text-left p-2">Update SenderProfile</th>
                       <th className="text-left p-2">ModifiedDate</th>
                     </tr>
                   </thead>
                   <tbody>
                     {emailSendDefinitions.length === 0 ? (
                       <tr>
-                        <td className="p-2" colSpan="5">
+                        <td className="p-2" colSpan="6">
                           <span className="text-gray-500">No data found.</span>
                         </td>
                       </tr>
@@ -556,6 +588,14 @@ export default function MainApp() {
                               onClick={() => fetchSenderProfileDetails(item.Name)}
                             >
                               Lookup
+                            </button>
+                          </td>
+                          <td className="p-2">
+                            <button
+                              className="bg-yellow-600 text-white px-2 py-1 rounded text-xs hover:bg-yellow-700"
+                              onClick={() => openUpdateSenderProfileModal(item.CustomerKey)}
+                            >
+                              Update
                             </button>
                           </td>
                           <td className="p-2">{item.ModifiedDate}</td>
@@ -714,6 +754,39 @@ export default function MainApp() {
                   {senderProfileModal.details && Array.isArray(senderProfileModal.details) && senderProfileModal.details.length === 0 && (
                     <div className="text-gray-600">No details found for this SenderProfile.</div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Modal for updating SenderProfile */}
+            {updateSenderProfileModal.open && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setUpdateSenderProfileModal({ open: false, loading: false, error: null, customerKey: null, selectedKey: '', success: false })}>&#10005;</button>
+                  <h2 className="text-lg font-bold mb-4 text-yellow-700">Update SenderProfile</h2>
+                  {updateSenderProfileModal.loading && <div className="text-center py-4">Updating...</div>}
+                  {updateSenderProfileModal.error && <div className="text-red-600">{updateSenderProfileModal.error}</div>}
+                  {updateSenderProfileModal.success && <div className="text-green-600">SenderProfile updated successfully!</div>}
+                  <div className="mb-4">
+                    <label className="block mb-2 font-semibold">Select new SenderProfile:</label>
+                    <select
+                      className="border rounded px-3 py-2 w-full"
+                      value={updateSenderProfileModal.selectedKey}
+                      onChange={e => setUpdateSenderProfileModal(modal => ({ ...modal, selectedKey: e.target.value }))}
+                    >
+                      <option value="" disabled>Select SenderProfile...</option>
+                      {senderProfiles.map(profile => (
+                        <option key={profile.CustomerKey} value={profile.CustomerKey}>{profile.Name} ({profile.CustomerKey})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    className="bg-yellow-600 text-white px-4 py-2 rounded font-semibold hover:bg-yellow-700"
+                    onClick={handleUpdateSenderProfile}
+                    disabled={!updateSenderProfileModal.selectedKey || updateSenderProfileModal.loading}
+                  >
+                    Update
+                  </button>
                 </div>
               </div>
             )}

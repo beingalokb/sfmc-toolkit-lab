@@ -1350,6 +1350,57 @@ app.get('/search/deliveryprofile', async (req, res) => {
   }
 });
 
+// Update EmailSendDefinition SenderProfile (SOAP)
+app.post('/update/emailsenddefinition-senderprofile', async (req, res) => {
+  const { customerKey, newSenderProfileKey } = req.body;
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) return res.status(401).json({ error: 'Unauthorized' });
+  if (!customerKey || !newSenderProfileKey) return res.status(400).json({ error: 'Missing parameters' });
+  try {
+    const soapEnvelope = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <UpdateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <Objects xsi:type="EmailSendDefinition">
+              <CustomerKey>${customerKey}</CustomerKey>
+              <SenderProfile>${newSenderProfileKey}</SenderProfile>
+            </Objects>
+          </UpdateRequest>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Update',
+        },
+      }
+    );
+    // Parse response for status
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(response.data, (err, result) => {
+      if (err) return res.status(500).json({ error: 'Failed to parse XML' });
+      const status = result?.['soap:Envelope']?.['soap:Body']?.['UpdateResponse']?.['OverallStatus'];
+      if (status && status.toLowerCase().includes('ok')) {
+        res.json({ success: true });
+      } else {
+        res.status(500).json({ error: 'Update failed', details: status });
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Serve React frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
 app.get(/(.*)/, (req, res) => {
