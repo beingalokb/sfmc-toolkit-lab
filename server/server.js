@@ -1369,7 +1369,9 @@ app.post('/update/emailsenddefinition-senderprofile', async (req, res) => {
           <UpdateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
             <Objects xsi:type="EmailSendDefinition">
               <CustomerKey>${customerKey}</CustomerKey>
-              <SenderProfile>${newSenderProfileKey}</SenderProfile>
+              <SenderProfile>
+                <CustomerKey>${newSenderProfileKey}</CustomerKey>
+              </SenderProfile>
             </Objects>
           </UpdateRequest>
         </soapenv:Body>

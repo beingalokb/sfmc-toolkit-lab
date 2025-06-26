@@ -428,6 +428,17 @@ export default function MainApp() {
       });
       if (!res.ok) throw new Error('Update failed');
       setUpdateSenderProfileModal(modal => ({ ...modal, loading: false, error: null, success: true }));
+      // Refresh EmailSendDefinition data after update
+      setPendingFetches(prev => prev + 1);
+      fetch(`${baseURL}/search/emailsenddefinition`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          'x-mc-subdomain': localStorage.getItem('subdomain')
+        }
+      })
+        .then(r => r.json())
+        .then(data => setEmailSendDefinitions(Array.isArray(data) ? data : []))
+        .finally(() => setPendingFetches(prev => prev - 1));
     } catch (e) {
       setUpdateSenderProfileModal(modal => ({ ...modal, loading: false, error: e.message, success: false }));
     }
