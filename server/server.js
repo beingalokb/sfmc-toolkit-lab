@@ -1545,16 +1545,16 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
       const parser = new xml2js.Parser({ explicitArray: false });
       const result = await parser.parseStringPromise(response.data);
       const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-      // Fix: always return array, and always extract nested CustomerKey values
+      // Always return array, and include full nested objects
       const arr = results ? (Array.isArray(results) ? results : [results]) : [];
       return arr.map(item => ({
         Name: item.Name,
         CustomerKey: item.CustomerKey,
         CategoryID: item.CategoryID,
         ModifiedDate: item.ModifiedDate,
-        SendClassificationKey: item.SendClassification?.CustomerKey || '',
-        SenderProfileKey: item.SenderProfile?.CustomerKey || '',
-        DeliveryProfileKey: item.DeliveryProfile?.CustomerKey || ''
+        SendClassification: item.SendClassification || {},
+        SenderProfile: item.SenderProfile || {},
+        DeliveryProfile: item.DeliveryProfile || {}
       }));
     })();
 
