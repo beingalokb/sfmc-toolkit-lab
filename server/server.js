@@ -1119,7 +1119,7 @@ app.get('/search/emailsenddefinition', async (req, res) => {
     return res.status(401).json([]);
   }
   try {
-    // 1. Retrieve EmailSendDefinition rows (only direct properties)
+    // 1. Retrieve EmailSendDefinition rows (only most basic properties)
     const soapEnvelope = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -1133,10 +1133,8 @@ app.get('/search/emailsenddefinition', async (req, res) => {
               <ObjectType>EmailSendDefinition</ObjectType>
               <Properties>Name</Properties>
               <Properties>CustomerKey</Properties>
-              <Properties>Email</Properties>
               <Properties>CategoryID</Properties>
               <Properties>ModifiedDate</Properties>
-              <Properties>SendClassificationID</Properties>
             </RetrieveRequest>
           </RetrieveRequestMsg>
         </soapenv:Body>
