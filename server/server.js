@@ -1119,7 +1119,7 @@ app.get('/search/emailsenddefinition', async (req, res) => {
     return res.status(401).json([]);
   }
   try {
-    // 1. Retrieve EmailSendDefinition rows (only most basic properties)
+    // 1. Retrieve EmailSendDefinition rows with extended fields
     const soapEnvelope = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -1133,8 +1133,19 @@ app.get('/search/emailsenddefinition', async (req, res) => {
               <ObjectType>EmailSendDefinition</ObjectType>
               <Properties>Name</Properties>
               <Properties>CustomerKey</Properties>
-              <Properties>CategoryID</Properties>
+              <Properties>CreatedDate</Properties>
               <Properties>ModifiedDate</Properties>
+              <Properties>SendClassification</Properties>
+              <Properties>SenderProfile</Properties>
+              <Properties>DeliveryProfile</Properties>
+              <Properties>PrivateDomain</Properties>
+              <Properties>ReplyToAddress</Properties>
+              <Properties>ReplyToDisplayName</Properties>
+              <Properties>SendLimit</Properties>
+              <Properties>HeaderContentArea</Properties>
+              <Properties>FooterContentArea</Properties>
+              <Properties>ExclusionFilter</Properties>
+              <Properties>PreHeader</Properties>
             </RetrieveRequest>
           </RetrieveRequestMsg>
         </soapenv:Body>
@@ -1161,15 +1172,14 @@ app.get('/search/emailsenddefinition', async (req, res) => {
         const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
         if (!results) return res.status(200).json([]);
         const resultArray = Array.isArray(results) ? results : [results];
-        // 2. Collect unique Email asset IDs and SendClassificationIDs
-        const emailAssetIds = Array.from(new Set(resultArray.map(item => item.Email).filter(Boolean)));
-        const sendClassIds = Array.from(new Set(resultArray.map(item => item.SendClassificationID).filter(Boolean)));
-        console.log('🟡 Collected Email asset IDs:', emailAssetIds); // DEBUG
-        console.log('🟡 Collected SendClassificationIDs:', sendClassIds); // DEBUG
-        // 3. Retrieve Email details
-        let emailDetailsMap = {};
-        if (emailAssetIds.length > 0) {
-          const emailSoapEnvelope = `
+        // 2. Collect unique CustomerKeys for complex fields
+        const senderProfileKeys = Array.from(new Set(resultArray.map(item => item.SenderProfile).filter(Boolean)));
+        const deliveryProfileKeys = Array.from(new Set(resultArray.map(item => item.DeliveryProfile).filter(Boolean)));
+        const sendClassificationKeys = Array.from(new Set(resultArray.map(item => item.SendClassification).filter(Boolean)));
+        // 3. Retrieve details for complex fields
+        async function retrieveDetails(objectType, keys) {
+          if (!keys.length) return {};
+          const detailEnvelope = `
             <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
                               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                               xmlns:xsd="http://www.w3.org/2001/XMLSchema">
@@ -1179,16 +1189,14 @@ app.get('/search/emailsenddefinition', async (req, res) => {
               <soapenv:Body>
                 <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
                   <RetrieveRequest>
-                    <ObjectType>Email</ObjectType>
-                    <Properties>ID</Properties>
+                    <ObjectType>${objectType}</ObjectType>
+                    <Properties>CustomerKey</Properties>
                     <Properties>Name</Properties>
-                    <Properties>Subject</Properties>
                     <Properties>Description</Properties>
-                    <Properties>CategoryID</Properties>
                     <Filter xsi:type="SimpleFilterPart">
-                      <Property>ID</Property>
+                      <Property>CustomerKey</Property>
                       <SimpleOperator>IN</SimpleOperator>
-                      <Value>${emailAssetIds.join('</Value><Value>')}</Value>
+                      <Value>${keys.join('</Value><Value>')}</Value>
                     </Filter>
                   </RetrieveRequest>
                 </RetrieveRequestMsg>
@@ -1196,9 +1204,9 @@ app.get('/search/emailsenddefinition', async (req, res) => {
             </soapenv:Envelope>
           `;
           try {
-            const emailResp = await axios.post(
+            const detailResp = await axios.post(
               `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-              emailSoapEnvelope,
+              detailEnvelope,
               {
                 headers: {
                   'Content-Type': 'text/xml',
@@ -1206,84 +1214,44 @@ app.get('/search/emailsenddefinition', async (req, res) => {
                 },
               }
             );
-            console.log('🔵 Raw Email SOAP response:', emailResp.data); // DEBUG
-            const emailResult = await parser.parseStringPromise(emailResp.data);
-            const emailResults = emailResult?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-            const emailArr = Array.isArray(emailResults) ? emailResults : [emailResults];
-            emailDetailsMap = emailArr.reduce((acc, item) => {
-              if (item && item.ID) acc[item.ID] = item;
+            const detailResult = await parser.parseStringPromise(detailResp.data);
+            const detailResults = detailResult?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+            const arr = Array.isArray(detailResults) ? detailResults : [detailResults];
+            return arr.reduce((acc, item) => {
+              if (item && item.CustomerKey) acc[item.CustomerKey] = item;
               return acc;
             }, {});
-            console.log('🟢 Email details map:', emailDetailsMap); // DEBUG
           } catch (e) {
-            console.error('❌ Error retrieving Email details:', e.message);
+            console.error(`❌ Error retrieving ${objectType} details:`, e.message);
+            return {};
           }
         }
-        // 4. Retrieve SendClassification details (optional, similar to above)
-        let sendClassMap = {};
-        if (sendClassIds.length > 0) {
-          const sendClassEnvelope = `
-            <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                              xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-              <soapenv:Header>
-                <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
-              </soapenv:Header>
-              <soapenv:Body>
-                <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-                  <RetrieveRequest>
-                    <ObjectType>SendClassification</ObjectType>
-                    <Properties>ObjectID</Properties>
-                    <Properties>Name</Properties>
-                    <Properties>Description</Properties>
-                    <Filter xsi:type="SimpleFilterPart">
-                      <Property>ObjectID</Property>
-                      <SimpleOperator>IN</SimpleOperator>
-                      <Value>${sendClassIds.join('</Value><Value>')}</Value>
-                    </Filter>
-                  </RetrieveRequest>
-                </RetrieveRequestMsg>
-              </soapenv:Body>
-            </soapenv:Envelope>
-          `;
-          try {
-            const sendClassResp = await axios.post(
-              `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-              sendClassEnvelope,
-              {
-                headers: {
-                  'Content-Type': 'text/xml',
-                  SOAPAction: 'Retrieve',
-                },
-              }
-            );
-            console.log('🔵 Raw SendClassification SOAP response:', sendClassResp.data); // DEBUG
-            const sendClassResult = await parser.parseStringPromise(sendClassResp.data);
-            const sendClassResults = sendClassResult?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-            const sendClassArr = Array.isArray(sendClassResults) ? sendClassResults : [sendClassResults];
-            sendClassMap = sendClassArr.reduce((acc, item) => {
-              if (item && item.ObjectID) acc[item.ObjectID] = item;
-              return acc;
-            }, {});
-            console.log('🟢 SendClassification details map:', sendClassMap); // DEBUG
-          } catch (e) {
-            console.error('❌ Error retrieving SendClassification details:', e.message);
-          }
-        }
-        // 5. Merge details into EmailSendDefinition rows
+        const [senderProfileMap, deliveryProfileMap, sendClassificationMap] = await Promise.all([
+          retrieveDetails('SenderProfile', senderProfileKeys),
+          retrieveDetails('DeliveryProfile', deliveryProfileKeys),
+          retrieveDetails('SendClassification', sendClassificationKeys)
+        ]);
+        // 4. Merge details into EmailSendDefinition rows
         const sendDefs = resultArray.map(item => {
-          const email = item.Email ? emailDetailsMap[item.Email] : null;
-          const sendClass = item.SendClassificationID ? sendClassMap[item.SendClassificationID] : null;
           return {
             Name: item.Name || '',
             CustomerKey: item.CustomerKey || '',
-            Email: item.Email || '',
-            CategoryID: item.CategoryID || '',
+            CreatedDate: item.CreatedDate || '',
             ModifiedDate: item.ModifiedDate || '',
-            SendClassificationID: item.SendClassificationID || '',
-            SendClassificationName: item.SendClassificationName || '',
-            EmailDetails: email || {},
-            SendClassificationDetails: sendClass || {}
+            SendClassification: item.SendClassification || '',
+            SenderProfile: item.SenderProfile || '',
+            DeliveryProfile: item.DeliveryProfile || '',
+            PrivateDomain: item.PrivateDomain || '',
+            ReplyToAddress: item.ReplyToAddress || '',
+            ReplyToDisplayName: item.ReplyToDisplayName || '',
+            SendLimit: item.SendLimit || '',
+            HeaderContentArea: item.HeaderContentArea || '',
+            FooterContentArea: item.FooterContentArea || '',
+            ExclusionFilter: item.ExclusionFilter || '',
+            PreHeader: item.PreHeader || '',
+            SenderProfileDetails: item.SenderProfile ? senderProfileMap[item.SenderProfile] || {} : {},
+            DeliveryProfileDetails: item.DeliveryProfile ? deliveryProfileMap[item.DeliveryProfile] || {} : {},
+            SendClassificationDetails: item.SendClassification ? sendClassificationMap[item.SendClassification] || {} : {}
           };
         });
         res.json(sendDefs);
