@@ -26,6 +26,7 @@ export default function MainApp() {
   const [sendClassifications, setSendClassifications] = useState([]);
   const [deliveryProfiles, setDeliveryProfiles] = useState([]);
   const [sendClassModal, setSendClassModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
+  const [senderProfileModal, setSenderProfileModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
 
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
@@ -381,6 +382,26 @@ export default function MainApp() {
     }
   };
 
+  // Handler to fetch SenderProfile details by name
+  const fetchSenderProfileDetails = async (name) => {
+    setSenderProfileModal({ open: true, loading: true, error: null, details: null, name });
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      const subdomain = localStorage.getItem('subdomain');
+      const res = await fetch(`${baseURL}/search/senderprofile?name=${encodeURIComponent(name)}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-mc-subdomain': subdomain
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch details');
+      const details = await res.json();
+      setSenderProfileModal({ open: true, loading: false, error: null, details, name });
+    } catch (e) {
+      setSenderProfileModal({ open: true, loading: false, error: e.message, details: null, name });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -505,13 +526,14 @@ export default function MainApp() {
                       <th className="text-left p-2">Name</th>
                       <th className="text-left p-2">CustomerKey</th>
                       <th className="text-left p-2">SendClassification Lookup</th>
+                      <th className="text-left p-2">SenderProfile Lookup</th>
                       <th className="text-left p-2">ModifiedDate</th>
                     </tr>
                   </thead>
                   <tbody>
                     {emailSendDefinitions.length === 0 ? (
                       <tr>
-                        <td className="p-2" colSpan="4">
+                        <td className="p-2" colSpan="5">
                           <span className="text-gray-500">No data found.</span>
                         </td>
                       </tr>
@@ -524,6 +546,14 @@ export default function MainApp() {
                             <button
                               className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700"
                               onClick={() => fetchSendClassDetails(item.Name)}
+                            >
+                              Lookup
+                            </button>
+                          </td>
+                          <td className="p-2">
+                            <button
+                              className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
+                              onClick={() => fetchSenderProfileDetails(item.Name)}
                             >
                               Lookup
                             </button>
@@ -661,6 +691,28 @@ export default function MainApp() {
                   )}
                   {sendClassModal.details && Array.isArray(sendClassModal.details) && sendClassModal.details.length === 0 && (
                     <div className="text-gray-600">No details found for this SendClassification.</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Modal for SenderProfile details */}
+            {senderProfileModal.open && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setSenderProfileModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
+                  <h2 className="text-lg font-bold mb-4 text-green-700">SenderProfile Details: {senderProfileModal.name}</h2>
+                  {senderProfileModal.loading && <div className="text-center py-4">Loading details...</div>}
+                  {senderProfileModal.error && <div className="text-red-600">{senderProfileModal.error}</div>}
+                  {senderProfileModal.details && Array.isArray(senderProfileModal.details) && senderProfileModal.details.length > 0 && (
+                    <div className="space-y-2">
+                      <div><span className="font-semibold">Name:</span> {senderProfileModal.details[0].Name}</div>
+                      <div><span className="font-semibold">CustomerKey:</span> {senderProfileModal.details[0].CustomerKey}</div>
+                      <div><span className="font-semibold">Description:</span> {senderProfileModal.details[0].Description}</div>
+                    </div>
+                  )}
+                  {senderProfileModal.details && Array.isArray(senderProfileModal.details) && senderProfileModal.details.length === 0 && (
+                    <div className="text-gray-600">No details found for this SenderProfile.</div>
                   )}
                 </div>
               </div>
