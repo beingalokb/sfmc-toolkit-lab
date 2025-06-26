@@ -1513,11 +1513,17 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
     // Step 1: Fetch all EmailSendDefinitions
     const sendDefs = await (async () => {
       const props = [
-        'Name', 'CustomerKey', 'SendClassification.CustomerKey', 'SenderProfile.CustomerKey', 'DeliveryProfile.CustomerKey', 'ModifiedDate'
+        'Name',
+        'CustomerKey',
+        'CategoryID',
+        'ModifiedDate',
+        'SendClassification.CustomerKey',
+        'SenderProfile.CustomerKey',
+        'DeliveryProfile.CustomerKey'
       ];
       const propsXml = props.map(p => `<Properties>${p}</Properties>`).join('');
       const soapEnvelope = `
-        <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">
+        <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">
           <soapenv:Header>
             <fueloauth xmlns=\"http://exacttarget.com\">${accessToken}</fueloauth>
           </soapenv:Header>
