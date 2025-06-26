@@ -1537,7 +1537,7 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
           </soapenv:Body>
         </soapenv:Envelope>
       `;
-      // Print the SOAP request for debugging
+      // Print the SOAP request envelope for debugging
       console.log("\n[SOAP REQUEST] EmailSendDefinition Retrieve:\n" + soapEnvelope.replace(/\\"/g, '"'));
       const response = await axios.post(
         `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
@@ -1664,6 +1664,8 @@ app.get('/describe-soap-object', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// Serve React frontend
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
 app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
