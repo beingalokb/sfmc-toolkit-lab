@@ -28,6 +28,11 @@ export default function MainApp() {
   const [sendClassModal, setSendClassModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
   const [senderProfileModal, setSenderProfileModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
   const [updateSenderProfileModal, setUpdateSenderProfileModal] = useState({ open: false, loading: false, error: null, customerKey: null, selectedKey: '', success: false });
+  const [configJson, setConfigJson] = useState('');
+  const [parsedRelationships, setParsedRelationships] = useState([]);
+  const [configError, setConfigError] = useState('');
+  const [resolvedEmailSendDefs, setResolvedEmailSendDefs] = useState([]);
+  const [resolvedError, setResolvedError] = useState('');
 
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
@@ -444,6 +449,61 @@ export default function MainApp() {
     }
   };
 
+  // Handler for config upload
+  const handleConfigFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      setConfigJson(evt.target.result);
+    };
+    reader.readAsText(file);
+  };
+
+  // Handler for config submit
+  const handleConfigSubmit = async () => {
+    setConfigError('');
+    setParsedRelationships([]);
+    let json;
+    try {
+      json = JSON.parse(configJson);
+    } catch (e) {
+      setConfigError('Invalid JSON');
+      return;
+    }
+    try {
+      const res = await fetch(`${baseURL}/parse/emailsenddefinition-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(json)
+      });
+      if (!res.ok) throw new Error('Failed to parse config');
+      const data = await res.json();
+      setParsedRelationships(data);
+    } catch (e) {
+      setConfigError(e.message);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'emailsenddefinition' && isAuthenticated) {
+      setResolvedError('');
+      setResolvedEmailSendDefs([]);
+      const accessToken = localStorage.getItem('accessToken');
+      const subdomain = localStorage.getItem('subdomain');
+      if (!accessToken || !subdomain) return;
+      fetch(`${baseURL}/resolved/emailsenddefinition-relationships`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-mc-subdomain': subdomain
+        }
+      })
+        .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch resolved relationships'))
+        .then(data => setResolvedEmailSendDefs(Array.isArray(data) ? data : []))
+        .catch(e => setResolvedError(e.toString()));
+    }
+  }, [activeTab, isAuthenticated]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -562,14 +622,62 @@ export default function MainApp() {
 
             <div className="overflow-x-auto bg-white shadow rounded">
               {activeTab === 'emailsenddefinition' ? (
-                <table className="min-w-full text-sm">
+                <>
+                  <div className="p-4 border-b">
+                    <h3 className="font-bold mb-2 text-indigo-700">Resolved EmailSendDefinition Relationships</h3>
+                    {resolvedError && <div className="text-red-600 mb-2">{resolvedError}</div>}
+                    <table className="min-w-full text-xs border">
+                      <thead>
+                        <tr>
+                          <th className="p-2 border">Name</th>
+                          <th className="p-2 border">CustomerKey</th>
+                          <th className="p-2 border">SendClassification</th>
+                          <th className="p-2 border">SenderProfile</th>
+                          <th className="p-2 border">DeliveryProfile</th>
+                          <th className="p-2 border">ModifiedDate</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {resolvedEmailSendDefs.length === 0 ? (
+                          <tr><td className="p-2 border text-gray-500" colSpan={6}>No data found.</td></tr>
+                        ) : (
+                          resolvedEmailSendDefs.map((rel, idx) => (
+                            <tr key={idx}>
+                              <td className="p-2 border">{rel.Name}</td>
+                              <td className="p-2 border">{rel.CustomerKey}</td>
+                              <td className="p-2 border">
+                                <div><b>{rel.SendClassification.Name}</b></div>
+                                <div className="text-xs text-gray-500">Key: {rel.SendClassification.CustomerKey}</div>
+                                <div className="text-xs text-gray-500">Desc: {rel.SendClassification.Description}</div>
+                                <div className="text-xs text-gray-400">SenderProfileKey: {rel.SendClassification.SenderProfileKey}</div>
+                                <div className="text-xs text-gray-400">DeliveryProfileKey: {rel.SendClassification.DeliveryProfileKey}</div>
+                              </td>
+                              <td className="p-2 border">
+                                <div><b>{rel.SenderProfile.Name}</b></div>
+                                <div className="text-xs text-gray-500">Key: {rel.SenderProfile.CustomerKey}</div>
+                                <div className="text-xs text-gray-500">Desc: {rel.SenderProfile.Description}</div>
+                              </td>
+                              <td className="p-2 border">
+                                <div><b>{rel.DeliveryProfile.Name}</b></div>
+                                <div className="text-xs text-gray-500">Key: {rel.DeliveryProfile.CustomerKey}</div>
+                                <div className="text-xs text-gray-500">Desc: {rel.DeliveryProfile.Description}</div>
+                              </td>
+                              <td className="p-2 border">{rel.ModifiedDate}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <table className="min-w-full text-sm">
+                  {/* ...existing EmailSendDefinition table... */}
                   <thead>
                     <tr>
                       <th className="text-left p-2">Name</th>
                       <th className="text-left p-2">CustomerKey</th>
-                      <th className="text-left p-2">SendClassification Lookup</th>
-                      <th className="text-left p-2">SenderProfile Lookup</th>
-                      <th className="text-left p-2">Update SenderProfile</th>
+                      <th className="text-left p-2">SendClassificationKey</th>
+                      <th className="text-left p-2">SenderProfileKey</th>
+                      <th className="text-left p-2">DeliveryProfileKey</th>
                       <th className="text-left p-2">ModifiedDate</th>
                     </tr>
                   </thead>
@@ -585,36 +693,16 @@ export default function MainApp() {
                         <tr key={idx}>
                           <td className="p-2">{item.Name}</td>
                           <td className="p-2">{item.CustomerKey}</td>
-                          <td className="p-2">
-                            <button
-                              className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700"
-                              onClick={() => fetchSendClassDetails(item.Name)}
-                            >
-                              Lookup
-                            </button>
-                          </td>
-                          <td className="p-2">
-                            <button
-                              className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
-                              onClick={() => fetchSenderProfileDetails(item.Name)}
-                            >
-                              Lookup
-                            </button>
-                          </td>
-                          <td className="p-2">
-                            <button
-                              className="bg-yellow-600 text-white px-2 py-1 rounded text-xs hover:bg-yellow-700"
-                              onClick={() => openUpdateSenderProfileModal(item.CustomerKey)}
-                            >
-                              Update
-                            </button>
-                          </td>
+                          <td className="p-2">{item.SendClassificationKey}</td>
+                          <td className="p-2">{item.SenderProfileKey}</td>
+                          <td className="p-2">{item.DeliveryProfileKey}</td>
                           <td className="p-2">{item.ModifiedDate}</td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
+                </>
               ) : (
                 <table className="min-w-full text-sm">
                   <thead>
