@@ -1566,9 +1566,9 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         CustomerKey: item.CustomerKey,
         CategoryID: item.CategoryID,
         ModifiedDate: item.ModifiedDate,
-        SendClassification: item.SendClassification || {},
-        SenderProfile: item.SenderProfile || {},
-        DeliveryProfile: item.DeliveryProfile || {}
+        SendClassificationKey: item.SendClassification?.CustomerKey || item['SendClassification.CustomerKey'] || '',
+        SenderProfileKey: item.SenderProfile?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
+        DeliveryProfileKey: item.DeliveryProfile?.CustomerKey || item['DeliveryProfile.CustomerKey'] || ''
       }));
     })();
 
@@ -1598,8 +1598,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
           CustomerKey: def.SendClassificationKey,
           Name: sendClass.Name || '',
           Description: sendClass.Description || '',
-          SenderProfileKey: sendClass['SenderProfile']?.CustomerKey || '',
-          DeliveryProfileKey: sendClass['DeliveryProfile']?.CustomerKey || ''
+          SenderProfileKey: sendClass['SenderProfile']?.CustomerKey || sendClass['SenderProfile.CustomerKey'] || '',
+          DeliveryProfileKey: sendClass['DeliveryProfile']?.CustomerKey || sendClass['DeliveryProfile.CustomerKey'] || ''
         },
         SenderProfile: {
           CustomerKey: def.SenderProfileKey,
