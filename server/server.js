@@ -1119,7 +1119,17 @@ app.get('/search/emailsenddefinition', async (req, res) => {
     return res.status(401).json([]);
   }
   try {
-    // Retrieve EmailSendDefinition rows (only basic properties)
+    // Retrieve EmailSendDefinition rows (all relevant properties)
+    const props = [
+      'Name',
+      'CustomerKey',
+      'CategoryID',
+      'ModifiedDate',
+      'SendClassification.CustomerKey',
+      'SenderProfile.CustomerKey',
+      'DeliveryProfile.CustomerKey'
+    ];
+    const propsXml = props.map(p => `<Properties>${p}</Properties>`).join('');
     const soapEnvelope = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -1131,15 +1141,14 @@ app.get('/search/emailsenddefinition', async (req, res) => {
           <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
             <RetrieveRequest>
               <ObjectType>EmailSendDefinition</ObjectType>
-              <Properties>Name</Properties>
-              <Properties>CustomerKey</Properties>
-              <Properties>CategoryID</Properties>
-              <Properties>ModifiedDate</Properties>
+              ${propsXml}
             </RetrieveRequest>
           </RetrieveRequestMsg>
         </soapenv:Body>
       </soapenv:Envelope>
     `;
+    // Log the full SOAP request for debugging
+    console.log("\n[SOAP REQUEST] /search/emailsenddefinition (FINAL):\n" + soapEnvelope);
     const response = await axios.post(
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
       soapEnvelope,
@@ -1165,7 +1174,10 @@ app.get('/search/emailsenddefinition', async (req, res) => {
           Name: item.Name || '',
           CustomerKey: item.CustomerKey || '',
           CategoryID: item.CategoryID || '',
-          ModifiedDate: item.ModifiedDate || ''
+          ModifiedDate: item.ModifiedDate || '',
+          SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
+          SenderProfileKey: item['SenderProfile']?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
+          DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || ''
         }));
         res.json(sendDefs);
       } catch (e) {
