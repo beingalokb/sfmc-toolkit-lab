@@ -1523,12 +1523,12 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
       ];
       const propsXml = props.map(p => `<Properties>${p}</Properties>`).join('');
       const soapEnvelope = `
-        <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">
+        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
           <soapenv:Header>
-            <fueloauth xmlns=\"http://exacttarget.com\">${accessToken}</fueloauth>
+            <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
           </soapenv:Header>
           <soapenv:Body>
-            <RetrieveRequestMsg xmlns=\"http://exacttarget.com/wsdl/partnerAPI\">
+            <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
               <RetrieveRequest>
                 <ObjectType>EmailSendDefinition</ObjectType>
                 ${propsXml}
@@ -1537,8 +1537,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
           </soapenv:Body>
         </soapenv:Envelope>
       `;
-      // Print the SOAP request envelope for debugging
-      console.log("\n[SOAP REQUEST] EmailSendDefinition Retrieve:\n" + soapEnvelope.replace(/\\"/g, '"'));
+      // Print the SOAP request envelope for debugging (no escaping)
+      console.log("\n[SOAP REQUEST] EmailSendDefinition Retrieve (FINAL):\n" + soapEnvelope);
       const response = await axios.post(
         `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
         soapEnvelope,
