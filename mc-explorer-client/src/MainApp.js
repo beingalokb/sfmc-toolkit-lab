@@ -669,39 +669,6 @@ export default function MainApp() {
                       </tbody>
                     </table>
                   </div>
-                  <table className="min-w-full text-sm">
-                  {/* ...existing EmailSendDefinition table... */}
-                  <thead>
-                    <tr>
-                      <th className="text-left p-2">Name</th>
-                      <th className="text-left p-2">CustomerKey</th>
-                      <th className="text-left p-2">SendClassificationKey</th>
-                      <th className="text-left p-2">SenderProfileKey</th>
-                      <th className="text-left p-2">DeliveryProfileKey</th>
-                      <th className="text-left p-2">ModifiedDate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {emailSendDefinitions.length === 0 ? (
-                      <tr>
-                        <td className="p-2" colSpan="6">
-                          <span className="text-gray-500">No data found.</span>
-                        </td>
-                      </tr>
-                    ) : (
-                      emailSendDefinitions.map((item, idx) => (
-                        <tr key={idx}>
-                          <td className="p-2">{item.Name}</td>
-                          <td className="p-2">{item.CustomerKey}</td>
-                          <td className="p-2">{item.SendClassificationKey}</td>
-                          <td className="p-2">{item.SenderProfileKey}</td>
-                          <td className="p-2">{item.DeliveryProfileKey}</td>
-                          <td className="p-2">{item.ModifiedDate}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
                 </>
               ) : (
                 <table className="min-w-full text-sm">
