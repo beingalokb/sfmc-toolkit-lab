@@ -736,9 +736,9 @@ export default function MainApp() {
                               View
                             </a>
                           )}
-                          {item._type === 'Journey' && item.ObjectID && (
+                          {item._type === 'Automation' && item.id && (
                             <a
-                              href={`https://mc.s4.exacttarget.com/cloud/#app/Journey%20Builder/${item.ObjectID}/3`}
+                              href={`https://mc.s4.exacttarget.com/cloud/#app/Automation%20Studio/AutomationStudioFuel3/%23Instance/${item.id}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-600 underline hover:text-blue-800 ml-2"
@@ -747,9 +747,9 @@ export default function MainApp() {
                               View
                             </a>
                           )}
-                          {item._type === 'Automation' && item.id && (
+                          {item._type === 'Journey' && item.ObjectID && (
                             <a
-                              href={`https://mc.s4.exacttarget.com/cloud/#app/AutomationStudio/Automation/${item.id}`}
+                              href={`https://mc.s4.exacttarget.com/cloud/#app/Journey%20Builder/${item.ObjectID}/3`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-600 underline hover:text-blue-800 ml-2"
