@@ -758,17 +758,9 @@ export default function MainApp() {
                   <div className="p-4 border-b">
                     <h3 className="font-bold mb-2 text-indigo-700">EmailSendDefinition details</h3>
                     {resolvedError && <div className="text-red-600 mb-2">{resolvedError}</div>}
-                    {/* Debug block to show activeTab, parentNav, and resolvedEmailSendDefs data */}
-                    {activeTab === 'emailsenddefinition' && (
-                      <div className="mb-2 p-2 bg-yellow-50 text-xs text-gray-700 border border-yellow-200 rounded">
-                        <div><b>DEBUG:</b> activeTab: {activeTab}, parentNav: {parentNav}</div>
-                        <div>resolvedEmailSendDefs: <pre style={{maxHeight: 200, overflow: 'auto'}}>{JSON.stringify(resolvedEmailSendDefs, null, 2)}</pre></div>
-                      </div>
-                    )}
                     <table className="min-w-full text-xs border">
                       <thead>
                         <tr>
-                          <th className="p-2 border"><input type="checkbox" checked={allSelected} onChange={toggleSelectAllESD} /></th>
                           <th className="p-2 border">Name</th>
                           <th className="p-2 border">CustomerKey</th>
                           <th className="p-2 border">SendClassification</th>
@@ -784,9 +776,6 @@ export default function MainApp() {
                         ) : (
                           resolvedEmailSendDefs.map((rel, idx) => (
                             <tr key={idx}>
-                              <td className="p-2 border text-center">
-                                <input type="checkbox" checked={selectedESDKeys.includes(rel.CustomerKey)} onChange={() => toggleSelectESD(rel.CustomerKey)} />
-                              </td>
                               <td className="p-2 border">{rel.Name}</td>
                               <td className="p-2 border">{rel.CustomerKey}</td>
                               <td className="p-2 border align-top">
