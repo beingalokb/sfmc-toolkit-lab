@@ -1084,67 +1084,52 @@ export default function MainApp() {
               </div>
             )}
 
-            {selectedESDKeys.length > 0 && (
-              <button
-                className="mb-2 px-4 py-2 bg-blue-700 text-white rounded font-semibold"
-                onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })}
-              >
-                Mass Edit Selected ({selectedESDKeys.length})
-              </button>
-            )}
-
-            {/* Modal for mass edit */}
-            {massEditModal.open && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-                <div className="bg-white rounded shadow-lg p-6 w-full max-w-md relative">
-                  <h2 className="text-lg font-bold mb-4">Mass Edit EmailSendDefinitions</h2>
-                  {massEditModal.error && <div className="text-red-600 mb-2">{massEditModal.error}</div>}
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">Send Classification</label>
-                    <select
-                      className="w-full border rounded p-2"
-                      value={massEditModal.sendClassification}
-                      onChange={e => setMassEditModal(prev => ({ ...prev, sendClassification: e.target.value }))}
-                    >
-                      <option value="">Select SendClassification</option>
-                      {sendClassifications.map(sc => (
-                        <option key={sc.CustomerKey} value={sc.CustomerKey}>{sc.Name || sc.CustomerKey}</option>
+            {/* EmailSendDefinition Table and Details Section */}
+            {activeTab === 'emailsenddefinition' && (
+              <div className="bg-white shadow rounded p-4 mt-4">
+                <h2 className="text-xl font-bold mb-4 text-indigo-700">EmailSendDefinition Details</h2>
+                {/* Table of EmailSendDefinitions (without checkboxes) */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr>
+                        {/* <th className="p-2"><input type="checkbox" checked={allSelected} onChange={toggleSelectAllESD} /></th> */}
+                        <th className="text-left p-2">Name</th>
+                        <th className="text-left p-2">SendClassification</th>
+                        <th className="text-left p-2">SenderProfile</th>
+                        <th className="text-left p-2">DeliveryProfile</th>
+                        <th className="text-left p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resolvedEmailSendDefs.map((esd, idx) => (
+                        <tr key={esd.CustomerKey} className="border-t">
+                          {/* <td className="p-2"><input type="checkbox" checked={selectedESDKeys.includes(esd.CustomerKey)} onChange={() => toggleSelectESD(esd.CustomerKey)} /></td> */}
+                          <td className="p-2 font-medium">{esd.Name}</td>
+                          <td className="p-2">{getProfileName(sendClassifications, esd.SendClassification?.CustomerKey)}</td>
+                          <td className="p-2">{getProfileName(senderProfiles, esd.SenderProfile?.CustomerKey)}</td>
+                          <td className="p-2">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
+                          <td className="p-2">
+                            <button className="text-blue-600 hover:underline mr-2" onClick={() => openEditESDModal(esd)}>
+                              <span role="img" aria-label="Edit">✏️</span>
+                            </button>
+                          </td>
+                        </tr>
                       ))}
-                    </select>
-                  </div>
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">Sender Profile</label>
-                    <select
-                      className="w-full border rounded p-2"
-                      value={massEditModal.senderProfile}
-                      onChange={e => setMassEditModal(prev => ({ ...prev, senderProfile: e.target.value }))}
-                    >
-                      <option value="">Select SenderProfile</option>
-                      {senderProfiles.map(sp => (
-                        <option key={sp.CustomerKey} value={sp.CustomerKey}>{sp.Name || sp.CustomerKey}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">Delivery Profile</label>
-                    <select
-                      className="w-full border rounded p-2"
-                      value={massEditModal.deliveryProfile}
-                      onChange={e => setMassEditModal(prev => ({ ...prev, deliveryProfile: e.target.value }))}
-                    >
-                      <option value="">Select DeliveryProfile</option>
-                      {deliveryProfiles.map(dp => (
-                        <option key={dp.CustomerKey} value={dp.CustomerKey}>{dp.Name || dp.CustomerKey}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <button onClick={() => setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-                    <button onClick={submitMassEditModal} className="px-4 py-2 bg-blue-600 text-white rounded" disabled={massEditModal.loading}>
-                      {massEditModal.loading ? 'Saving...' : 'Save'}
-                    </button>
-                  </div>
+                    </tbody>
+                  </table>
                 </div>
+                {/* Hide Mass Edit Button */}
+                {/* {selectedESDKeys.length > 0 && (
+                  <button
+                    className="mt-2 px-4 py-2 bg-blue-700 text-white rounded font-semibold"
+                    onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })}
+                  >
+                    Mass Edit Selected ({selectedESDKeys.length})
+                  </button>
+                )} */}
+                {/* Debug block and other details remain visible */}
+                {/* DEBUG block hidden as requested */}
               </div>
             )}
           </>
