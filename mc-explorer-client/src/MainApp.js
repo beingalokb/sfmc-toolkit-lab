@@ -747,6 +747,17 @@ export default function MainApp() {
                               View
                             </a>
                           )}
+                          {item._type === 'Automation' && item.id && (
+                            <a
+                              href={`https://mc.s4.exacttarget.com/cloud/#app/AutomationStudio/Automation/${item.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 underline hover:text-blue-800 ml-2"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              View
+                            </a>
+                          )}
                         </td>
                         {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
                           <td className="p-2">{item.status || 'N/A'}</td>
