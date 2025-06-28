@@ -487,9 +487,15 @@ export default function MainApp() {
   async function submitEditESDModal() {
     setEditESDModal(prev => ({ ...prev, loading: true, error: null }));
     try {
+      const accessToken = localStorage.getItem('accessToken');
+      const subdomain = localStorage.getItem('subdomain');
       const res = await fetch(`${baseURL}/update/emailsenddefinition`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'x-mc-subdomain': subdomain
+        },
         body: JSON.stringify({
           CustomerKey: editESDModal.esd.CustomerKey,
           SendClassification: editESDModal.sendClassification,
