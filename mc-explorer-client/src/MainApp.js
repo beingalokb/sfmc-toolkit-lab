@@ -35,6 +35,16 @@ export default function MainApp() {
   const [resolvedEmailSendDefs, setResolvedEmailSendDefs] = useState([]);
   const [resolvedError, setResolvedError] = useState('');
 
+  // Add new state for edit modal
+  const [editESDModal, setEditESDModal] = useState({ open: false, loading: false, error: null, esd: null, sendClassification: '', senderProfile: '', deliveryProfile: '' });
+
+  // State for mass selection
+  const [selectedESDKeys, setSelectedESDKeys] = useState([]);
+  const allSelected = resolvedEmailSendDefs.length > 0 && selectedESDKeys.length === resolvedEmailSendDefs.length;
+
+  // State for mass edit modal
+  const [massEditModal, setMassEditModal] = useState({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null });
+
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
     if (!key) return '';
@@ -450,6 +460,62 @@ export default function MainApp() {
     }
   };
 
+  // Handler to open edit modal
+  function openEditESDModal(esd) {
+    setEditESDModal({
+      open: true,
+      loading: false,
+      error: null,
+      esd,
+      sendClassification: esd.SendClassification.CustomerKey,
+      senderProfile: esd.SenderProfile.CustomerKey,
+      deliveryProfile: esd.DeliveryProfile.CustomerKey
+    });
+  }
+
+  // Handler to close edit modal
+  function closeEditESDModal() {
+    setEditESDModal({ open: false, loading: false, error: null, esd: null, sendClassification: '', senderProfile: '', deliveryProfile: '' });
+  }
+
+  // Handler for dropdown changes
+  function handleEditESDChange(field, value) {
+    setEditESDModal(prev => ({ ...prev, [field]: value }));
+  }
+
+  // Handler to submit update
+  async function submitEditESDModal() {
+    setEditESDModal(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const res = await fetch(`${baseURL}/update/emailsenddefinition`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          CustomerKey: editESDModal.esd.CustomerKey,
+          SendClassification: editESDModal.sendClassification,
+          SenderProfile: editESDModal.senderProfile,
+          DeliveryProfile: editESDModal.deliveryProfile
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'OK') {
+        setEditESDModal(prev => ({ ...prev, loading: false, open: false }));
+        // Show success toast/snackbar
+        alert('✅ Updated successfully');
+        // Refresh table
+        fetch(`${baseURL}/search/emailsenddefinition`, { credentials: 'include' })
+          .then(res => res.json())
+          .then(data => setResolvedEmailSendDefs(Array.isArray(data) ? data : []));
+      } else {
+        setEditESDModal(prev => ({ ...prev, loading: false, error: data.message || 'Update failed' }));
+        alert('❌ Update failed: ' + (data.message || 'Unknown error'));
+      }
+    } catch (err) {
+      setEditESDModal(prev => ({ ...prev, loading: false, error: err.message }));
+      alert('❌ Update failed: ' + err.message);
+    }
+  }
+
   // Handler for config upload
   const handleConfigFileChange = (e) => {
     const file = e.target.files[0];
@@ -504,6 +570,59 @@ export default function MainApp() {
         .catch(e => setResolvedError(e.toString()));
     }
   }, [activeTab, isAuthenticated]);
+
+  // State for mass selection
+  // (already declared at the top)
+
+  // Handlers for select all and individual selection
+  function toggleSelectAllESD() {
+    if (allSelected) setSelectedESDKeys([]);
+    else setSelectedESDKeys(resolvedEmailSendDefs.map(r => r.CustomerKey));
+  }
+  function toggleSelectESD(key) {
+    setSelectedESDKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  }
+
+  // State for mass edit modal
+  // (already declared at the top)
+
+  // Handler for dropdown changes in mass edit modal
+  function handleMassEditChange(field, value) {
+    setMassEditModal(prev => ({ ...prev, [field]: value }));
+  }
+
+  // Handler to submit mass update
+  async function submitMassEditModal() {
+    setMassEditModal(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const res = await fetch(`${baseURL}/update/emailsenddefinition-mass`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          CustomerKeys: selectedESDKeys,
+          SendClassification: massEditModal.sendClassification,
+          SenderProfile: massEditModal.senderProfile,
+          DeliveryProfile: massEditModal.deliveryProfile
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'OK') {
+        setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null });
+        setSelectedESDKeys([]);
+        alert('✅ Mass update successful');
+        // Refresh table
+        fetch(`${baseURL}/search/emailsenddefinition`, { credentials: 'include' })
+          .then(res => res.json())
+          .then(data => setResolvedEmailSendDefs(Array.isArray(data) ? data : []));
+      } else {
+        setMassEditModal(prev => ({ ...prev, loading: false, error: data.message || 'Update failed' }));
+        alert('❌ Mass update failed: ' + (data.message || 'Unknown error'));
+      }
+    } catch (err) {
+      setMassEditModal(prev => ({ ...prev, loading: false, error: err.message }));
+      alert('❌ Mass update failed: ' + err.message);
+    }
+  }
 
   if (loading) {
     return (
@@ -627,23 +746,35 @@ export default function MainApp() {
                   <div className="p-4 border-b">
                     <h3 className="font-bold mb-2 text-indigo-700">EmailSendDefinition details</h3>
                     {resolvedError && <div className="text-red-600 mb-2">{resolvedError}</div>}
+                    {/* Debug block to show activeTab, parentNav, and resolvedEmailSendDefs data */}
+                    {activeTab === 'emailsenddefinition' && (
+                      <div className="mb-2 p-2 bg-yellow-50 text-xs text-gray-700 border border-yellow-200 rounded">
+                        <div><b>DEBUG:</b> activeTab: {activeTab}, parentNav: {parentNav}</div>
+                        <div>resolvedEmailSendDefs: <pre style={{maxHeight: 200, overflow: 'auto'}}>{JSON.stringify(resolvedEmailSendDefs, null, 2)}</pre></div>
+                      </div>
+                    )}
                     <table className="min-w-full text-xs border">
                       <thead>
                         <tr>
+                          <th className="p-2 border"><input type="checkbox" checked={allSelected} onChange={toggleSelectAllESD} /></th>
                           <th className="p-2 border">Name</th>
                           <th className="p-2 border">CustomerKey</th>
                           <th className="p-2 border">SendClassification</th>
                           <th className="p-2 border">SenderProfile</th>
                           <th className="p-2 border">DeliveryProfile</th>
                           <th className="p-2 border">ModifiedDate</th>
+                          <th className="p-2 border">Edit</th>
                         </tr>
                       </thead>
                       <tbody>
                         {resolvedEmailSendDefs.length === 0 ? (
-                          <tr><td className="p-2 border text-gray-500" colSpan={6}>No data found.</td></tr>
+                          <tr><td className="p-2 border text-gray-500" colSpan={8}>No data found.</td></tr>
                         ) : (
                           resolvedEmailSendDefs.map((rel, idx) => (
                             <tr key={idx}>
+                              <td className="p-2 border text-center">
+                                <input type="checkbox" checked={selectedESDKeys.includes(rel.CustomerKey)} onChange={() => toggleSelectESD(rel.CustomerKey)} />
+                              </td>
                               <td className="p-2 border">{rel.Name}</td>
                               <td className="p-2 border">{rel.CustomerKey}</td>
                               <td className="p-2 border align-top">
@@ -680,6 +811,11 @@ export default function MainApp() {
                                 )}
                               </td>
                               <td className="p-2 border">{rel.ModifiedDate ? new Date(rel.ModifiedDate).toLocaleString() : ''}</td>
+                              <td className="p-2 border text-center">
+                                <button onClick={() => openEditESDModal(rel)} title="Edit" className="text-blue-600 hover:text-blue-900">
+                                  ✏️
+                                </button>
+                              </td>
                             </tr>
                           ))
                         )}
@@ -877,6 +1013,125 @@ export default function MainApp() {
                   >
                     Update
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Modal for editing EmailSendDefinition */}
+            {editESDModal.open && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+                <div className="bg-white rounded shadow-lg p-6 w-full max-w-md relative">
+                  <h2 className="text-lg font-bold mb-4">Edit EmailSendDefinition</h2>
+                  {editESDModal.error && <div className="text-red-600 mb-2">{editESDModal.error}</div>}
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Send Classification</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={editESDModal.sendClassification}
+                      onChange={e => handleEditESDChange('sendClassification', e.target.value)}
+                    >
+                      <option value="">Select SendClassification</option>
+                      {sendClassifications.map(sc => (
+                        <option key={sc.CustomerKey} value={sc.CustomerKey}>{sc.Name || sc.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Sender Profile</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={editESDModal.senderProfile}
+                      onChange={e => handleEditESDChange('senderProfile', e.target.value)}
+                    >
+                      <option value="">Select SenderProfile</option>
+                      {senderProfiles.map(sp => (
+                        <option key={sp.CustomerKey} value={sp.CustomerKey}>{sp.Name || sp.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Delivery Profile</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={editESDModal.deliveryProfile}
+                      onChange={e => handleEditESDChange('deliveryProfile', e.target.value)}
+                    >
+                      <option value="">Select DeliveryProfile</option>
+                      {deliveryProfiles.map(dp => (
+                        <option key={dp.CustomerKey} value={dp.CustomerKey}>{dp.Name || dp.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={closeEditESDModal} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                    <button onClick={submitEditESDModal} className="px-4 py-2 bg-blue-600 text-white rounded" disabled={editESDModal.loading}>
+                      {editESDModal.loading ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedESDKeys.length > 0 && (
+              <button
+                className="mb-2 px-4 py-2 bg-blue-700 text-white rounded font-semibold"
+                onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })}
+              >
+                Mass Edit Selected ({selectedESDKeys.length})
+              </button>
+            )}
+
+            {/* Modal for mass edit */}
+            {massEditModal.open && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+                <div className="bg-white rounded shadow-lg p-6 w-full max-w-md relative">
+                  <h2 className="text-lg font-bold mb-4">Mass Edit EmailSendDefinitions</h2>
+                  {massEditModal.error && <div className="text-red-600 mb-2">{massEditModal.error}</div>}
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Send Classification</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={massEditModal.sendClassification}
+                      onChange={e => setMassEditModal(prev => ({ ...prev, sendClassification: e.target.value }))}
+                    >
+                      <option value="">Select SendClassification</option>
+                      {sendClassifications.map(sc => (
+                        <option key={sc.CustomerKey} value={sc.CustomerKey}>{sc.Name || sc.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Sender Profile</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={massEditModal.senderProfile}
+                      onChange={e => setMassEditModal(prev => ({ ...prev, senderProfile: e.target.value }))}
+                    >
+                      <option value="">Select SenderProfile</option>
+                      {senderProfiles.map(sp => (
+                        <option key={sp.CustomerKey} value={sp.CustomerKey}>{sp.Name || sp.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Delivery Profile</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={massEditModal.deliveryProfile}
+                      onChange={e => setMassEditModal(prev => ({ ...prev, deliveryProfile: e.target.value }))}
+                    >
+                      <option value="">Select DeliveryProfile</option>
+                      {deliveryProfiles.map(dp => (
+                        <option key={dp.CustomerKey} value={dp.CustomerKey}>{dp.Name || dp.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                    <button onClick={submitMassEditModal} className="px-4 py-2 bg-blue-600 text-white rounded" disabled={massEditModal.loading}>
+                      {massEditModal.loading ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
