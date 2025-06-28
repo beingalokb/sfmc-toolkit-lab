@@ -1148,7 +1148,7 @@ app.get('/search/emailsenddefinition', async (req, res) => {
       </soapenv:Envelope>
     `;
     // Log the full SOAP request for debugging
-    console.log("\n[SOAP REQUEST] /search/emailsenddefinition (FINAL):\n" + soapEnvelope);
+    //console.log("\n[SOAP REQUEST] /search/emailsenddefinition (FINAL):\n" + soapEnvelope);
     const response = await axios.post(
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
       soapEnvelope,
@@ -1658,7 +1658,7 @@ app.get('/describe-soap-object', async (req, res) => {
     let props = objDef?.Properties?.PropertyDefinition || [];
     if (!Array.isArray(props)) props = [props];
     const retrievableProps = props.filter(p => p.IsRetrievable === 'true' || p.IsRetrievable === true);
-    console.log(`\n[SOAP Describe] Retrievable properties for ${objectType}:`);
+    //console.log(`\n[SOAP Describe] Retrievable properties for ${objectType}:`);
     retrievableProps.forEach(p => console.log(`- ${p.Name}`));
     res.json({
       objectType,

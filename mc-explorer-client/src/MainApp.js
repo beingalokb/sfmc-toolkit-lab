@@ -22,6 +22,7 @@ export default function MainApp() {
   const [deDetailModal, setDeDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
   const [automationDetailModal, setAutomationDetailModal] = useState({ open: false, loading: false, error: null, details: null, name: null });
   const [emailSendDefinitions, setEmailSendDefinitions] = useState([]);
+
   const [senderProfiles, setSenderProfiles] = useState([]);
   const [sendClassifications, setSendClassifications] = useState([]);
   const [deliveryProfiles, setDeliveryProfiles] = useState([]);
@@ -624,7 +625,7 @@ export default function MainApp() {
               {activeTab === 'emailsenddefinition' ? (
                 <>
                   <div className="p-4 border-b">
-                    <h3 className="font-bold mb-2 text-indigo-700">Resolved EmailSendDefinition Relationships</h3>
+                    <h3 className="font-bold mb-2 text-indigo-700">EmailSendDefinition details</h3>
                     {resolvedError && <div className="text-red-600 mb-2">{resolvedError}</div>}
                     <table className="min-w-full text-xs border">
                       <thead>
@@ -645,24 +646,40 @@ export default function MainApp() {
                             <tr key={idx}>
                               <td className="p-2 border">{rel.Name}</td>
                               <td className="p-2 border">{rel.CustomerKey}</td>
-                              <td className="p-2 border">
-                                <div><b>{rel.SendClassification.Name}</b></div>
-                                <div className="text-xs text-gray-500">Key: {rel.SendClassification.CustomerKey}</div>
-                                <div className="text-xs text-gray-500">Desc: {rel.SendClassification.Description}</div>
-                                <div className="text-xs text-gray-400">SenderProfileKey: {rel.SendClassification.SenderProfileKey}</div>
-                                <div className="text-xs text-gray-400">DeliveryProfileKey: {rel.SendClassification.DeliveryProfileKey}</div>
+                              <td className="p-2 border align-top">
+                                <div className="font-semibold text-indigo-800">{rel.SendClassification.Name || rel.SendClassification.CustomerKey}</div>
+                                {rel.SendClassification.CustomerKey && (
+                                  <div className="text-xs text-gray-500 mb-1">Key: <span className="font-bold">{rel.SendClassification.CustomerKey}</span></div>
+                                )}
+                                {rel.SendClassification.Description && (
+                                  <div className="text-xs text-gray-600 mb-1">{rel.SendClassification.Description}</div>
+                                )}
+                                {rel.SendClassification.SenderProfileKey && (
+                                  <div className="text-xs text-gray-400">SenderProfileKey: {rel.SendClassification.SenderProfileKey}</div>
+                                )}
+                                {rel.SendClassification.DeliveryProfileKey && (
+                                  <div className="text-xs text-gray-400">DeliveryProfileKey: {rel.SendClassification.DeliveryProfileKey}</div>
+                                )}
                               </td>
-                              <td className="p-2 border">
-                                <div><b>{rel.SenderProfile.Name}</b></div>
-                                <div className="text-xs text-gray-500">Key: {rel.SenderProfile.CustomerKey}</div>
-                                <div className="text-xs text-gray-500">Desc: {rel.SenderProfile.Description}</div>
+                              <td className="p-2 border align-top">
+                                <div className="font-semibold text-indigo-800">{rel.SenderProfile.Name || rel.SenderProfile.CustomerKey}</div>
+                                {rel.SenderProfile.CustomerKey && (
+                                  <div className="text-xs text-gray-500 mb-1">Key: <span className="font-bold">{rel.SenderProfile.CustomerKey}</span></div>
+                                )}
+                                {rel.SenderProfile.Description && (
+                                  <div className="text-xs text-gray-600 mb-1">{rel.SenderProfile.Description}</div>
+                                )}
                               </td>
-                              <td className="p-2 border">
-                                <div><b>{rel.DeliveryProfile.Name}</b></div>
-                                <div className="text-xs text-gray-500">Key: {rel.DeliveryProfile.CustomerKey}</div>
-                                <div className="text-xs text-gray-500">Desc: {rel.DeliveryProfile.Description}</div>
+                              <td className="p-2 border align-top">
+                                <div className="font-semibold text-indigo-800">{rel.DeliveryProfile.Name || rel.DeliveryProfile.CustomerKey}</div>
+                                {rel.DeliveryProfile.CustomerKey && (
+                                  <div className="text-xs text-gray-500 mb-1">Key: <span className="font-bold">{rel.DeliveryProfile.CustomerKey}</span></div>
+                                )}
+                                {rel.DeliveryProfile.Description && (
+                                  <div className="text-xs text-gray-600 mb-1">{rel.DeliveryProfile.Description}</div>
+                                )}
                               </td>
-                              <td className="p-2 border">{rel.ModifiedDate}</td>
+                              <td className="p-2 border">{rel.ModifiedDate ? new Date(rel.ModifiedDate).toLocaleString() : ''}</td>
                             </tr>
                           ))
                         )}
@@ -719,6 +736,17 @@ export default function MainApp() {
                               View
                             </a>
                           )}
+                          {item._type === 'Journey' && item.ObjectID && (
+                            <a
+                              href={`https://mc.s4.exacttarget.com/cloud/#app/Journey%20Builder/${item.ObjectID}/3`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 underline hover:text-blue-800 ml-2"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              View
+                            </a>
+                          )}
                         </td>
                         {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
                           <td className="p-2">{item.status || 'N/A'}</td>
@@ -736,7 +764,7 @@ export default function MainApp() {
               </div>
               <div className="flex gap-2">
                 <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
-                <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
+                <button disabled={currentPage === totalPages || totalPages <= 1} onClick={() => setCurrentPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
               </div>
             </div>
 
