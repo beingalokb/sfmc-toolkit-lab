@@ -695,7 +695,10 @@ export default function MainApp() {
                       <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
                       {/* Remove Created column for Automations */}
                       <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
-                      <th className="text-left p-2">View in folder</th>
+                      {/* Hide 'View in folder' column for Automation and Journey */}
+                      {!(activeTab === 'automation' || activeTab === 'journey') && (
+                        <th className="text-left p-2">View in folder</th>
+                      )}
                       {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
                         <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
                       ) : null}
@@ -713,52 +716,34 @@ export default function MainApp() {
                         <td className="p-2 font-medium">{item.name}</td>
                         {/* Remove Created column for Automations */}
                         <td className="p-2">{item.path || 'N/A'}</td>
-                        <td className="p-2">
-                          {item._type === 'Data Extension' && item.categoryId && item.id && (
-                            <a
-                              href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 underline hover:text-blue-800"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              View
-                            </a>
-                          )}
-                          {item._type === 'Data Filter' && item.id && (
-                            <a
-                              href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 underline hover:text-blue-800 ml-2"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              View
-                            </a>
-                          )}
-                          {item._type === 'Automation' && item.id && (
-                            <a
-                              href={`https://mc.s4.exacttarget.com/cloud/#app/Automation%20Studio/AutomationStudioFuel3/%23Instance/${item.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 underline hover:text-blue-800 ml-2"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              View
-                            </a>
-                          )}
-                          {item._type === 'Journey' && item.ObjectID && (
-                            <a
-                              href={`https://mc.s4.exacttarget.com/cloud/#app/Journey%20Builder/${item.ObjectID}/3`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 underline hover:text-blue-800 ml-2"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              View
-                            </a>
-                          )}
-                        </td>
+                        {/* Hide 'View in folder' cell for Automation and Journey */}
+                        {!(item._type === 'Automation' || item._type === 'Journey') && (
+                          <td className="p-2">
+                            {/* Existing View in folder links for DE and Data Filter */}
+                            {item._type === 'Data Extension' && item.categoryId && item.id && (
+                              <a
+                                href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 underline hover:text-blue-800"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                View
+                              </a>
+                            )}
+                            {item._type === 'Data Filter' && item.id && (
+                              <a
+                                href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 underline hover:text-blue-800 ml-2"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                View
+                              </a>
+                            )}
+                          </td>
+                        )}
                         {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
                           <td className="p-2">{item.status || 'N/A'}</td>
                         )}
