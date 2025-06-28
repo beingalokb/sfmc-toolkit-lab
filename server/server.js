@@ -1415,57 +1415,51 @@ app.post('/update/emailsenddefinition-senderprofile', async (req, res) => {
   }
 });
 
-// Mass update EmailSendDefinition (SOAP)
-app.post('/update/emailsenddefinition-mass', async (req, res) => {
-  const { CustomerKeys, SendClassification, SenderProfile, DeliveryProfile } = req.body;
+// Update EmailSendDefinition (single record, SOAP)
+app.post('/update/emailsenddefinition', async (req, res) => {
+  const { CustomerKey, SendClassification, SenderProfile, DeliveryProfile } = req.body;
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
   if (!accessToken || !subdomain) return res.status(401).json({ error: 'Unauthorized' });
-  if (!Array.isArray(CustomerKeys) || CustomerKeys.length === 0) return res.status(400).json({ error: 'No CustomerKeys provided' });
+  if (!CustomerKey) return res.status(400).json({ error: 'Missing CustomerKey' });
   try {
-    let results = [];
-    for (const customerKey of CustomerKeys) {
-      const soapEnvelope = `
-        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-          <soapenv:Header>
-            <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
-          </soapenv:Header>
-          <soapenv:Body>
-            <UpdateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
-              <Objects xsi:type="EmailSendDefinition">
-                <CustomerKey>${customerKey}</CustomerKey>
-                ${SendClassification ? `<SendClassification><CustomerKey>${SendClassification}</CustomerKey></SendClassification>` : ''}
-                ${SenderProfile ? `<SenderProfile><CustomerKey>${SenderProfile}</CustomerKey></SenderProfile>` : ''}
-                ${DeliveryProfile ? `<DeliveryProfile><CustomerKey>${DeliveryProfile}</CustomerKey></DeliveryProfile>` : ''}
-              </Objects>
-            </UpdateRequest>
-          </soapenv:Body>
-        </soapenv:Envelope>
-      `;
-      try {
-        const response = await axios.post(
-          `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-          soapEnvelope,
-          {
-            headers: {
-              'Content-Type': 'text/xml',
-              SOAPAction: 'Update',
-            },
-          }
-        );
-        const parser = new xml2js.Parser({ explicitArray: false });
-        const result = await parser.parseStringPromise(response.data);
-        const status = result?.['soap:Envelope']?.['soap:Body']?.['UpdateResponse']?.['OverallStatus'];
-        results.push({ customerKey, status });
-      } catch (err) {
-        results.push({ customerKey, error: err.message });
+    const soapEnvelope = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <UpdateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <Objects xsi:type="EmailSendDefinition">
+              <CustomerKey>${CustomerKey}</CustomerKey>
+              ${SendClassification ? `<SendClassification><CustomerKey>${SendClassification}</CustomerKey></SendClassification>` : ''}
+              ${SenderProfile ? `<SenderProfile><CustomerKey>${SenderProfile}</CustomerKey></SenderProfile>` : ''}
+              ${DeliveryProfile ? `<DeliveryProfile><CustomerKey>${DeliveryProfile}</CustomerKey></DeliveryProfile>` : ''}
+            </Objects>
+          </UpdateRequest>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Update',
+        },
       }
+    );
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
+    const status = result?.['soap:Envelope']?.['soap:Body']?.['UpdateResponse']?.['OverallStatus'];
+    if (status && status.toLowerCase().includes('ok')) {
+      res.json({ status: 'OK' });
+    } else {
+      res.status(500).json({ status: 'ERROR', message: status });
     }
-    // If all OK, return OK, else partial
-    const allOk = results.every(r => r.status && r.status.toLowerCase().includes('ok'));
-    res.json({ status: allOk ? 'OK' : 'PARTIAL', results });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ status: 'ERROR', message: e.message });
   }
 });
 
