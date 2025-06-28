@@ -1415,6 +1415,60 @@ app.post('/update/emailsenddefinition-senderprofile', async (req, res) => {
   }
 });
 
+// Mass update EmailSendDefinition (SOAP)
+app.post('/update/emailsenddefinition-mass', async (req, res) => {
+  const { CustomerKeys, SendClassification, SenderProfile, DeliveryProfile } = req.body;
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) return res.status(401).json({ error: 'Unauthorized' });
+  if (!Array.isArray(CustomerKeys) || CustomerKeys.length === 0) return res.status(400).json({ error: 'No CustomerKeys provided' });
+  try {
+    let results = [];
+    for (const customerKey of CustomerKeys) {
+      const soapEnvelope = `
+        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <soapenv:Header>
+            <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+          </soapenv:Header>
+          <soapenv:Body>
+            <UpdateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <Objects xsi:type="EmailSendDefinition">
+                <CustomerKey>${customerKey}</CustomerKey>
+                ${SendClassification ? `<SendClassification><CustomerKey>${SendClassification}</CustomerKey></SendClassification>` : ''}
+                ${SenderProfile ? `<SenderProfile><CustomerKey>${SenderProfile}</CustomerKey></SenderProfile>` : ''}
+                ${DeliveryProfile ? `<DeliveryProfile><CustomerKey>${DeliveryProfile}</CustomerKey></DeliveryProfile>` : ''}
+              </Objects>
+            </UpdateRequest>
+          </soapenv:Body>
+        </soapenv:Envelope>
+      `;
+      try {
+        const response = await axios.post(
+          `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+          soapEnvelope,
+          {
+            headers: {
+              'Content-Type': 'text/xml',
+              SOAPAction: 'Update',
+            },
+          }
+        );
+        const parser = new xml2js.Parser({ explicitArray: false });
+        const result = await parser.parseStringPromise(response.data);
+        const status = result?.['soap:Envelope']?.['soap:Body']?.['UpdateResponse']?.['OverallStatus'];
+        results.push({ customerKey, status });
+      } catch (err) {
+        results.push({ customerKey, error: err.message });
+      }
+    }
+    // If all OK, return OK, else partial
+    const allOk = results.every(r => r.status && r.status.toLowerCase().includes('ok'));
+    res.json({ status: allOk ? 'OK' : 'PARTIAL', results });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Parse EmailSendDefinition config and extract relationships
 app.post('/parse/emailsenddefinition-config', (req, res) => {
   const config = req.body;
