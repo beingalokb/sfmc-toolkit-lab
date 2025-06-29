@@ -508,8 +508,13 @@ export default function MainApp() {
         setEditESDModal(prev => ({ ...prev, loading: false, open: false }));
         // Show success toast/snackbar
         alert('✅ Updated successfully');
-        // Refresh table
-        fetch(`${baseURL}/search/emailsenddefinition`, { credentials: 'include' })
+        // Refresh table with resolved relationships
+        fetch(`${baseURL}/resolved/emailsenddefinition-relationships`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'x-mc-subdomain': subdomain
+          }
+        })
           .then(res => res.json())
           .then(data => setResolvedEmailSendDefs(Array.isArray(data) ? data : []));
       } else {
