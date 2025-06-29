@@ -754,7 +754,48 @@ export default function MainApp() {
 
             <div className="overflow-x-auto bg-white shadow rounded">
               {activeTab === 'emailsenddefinition' ? (
-                <></> // Removed duplicate EmailSendDefinition details section
+                <div className="bg-white shadow rounded p-4 mt-4">
+                  <h2 className="text-xl font-bold mb-4 text-indigo-700">EmailSendDefinition Details</h2>
+                  {/* Table of EmailSendDefinitions (without checkboxes) */}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr>
+                          <th className="text-left p-2">Name</th>
+                          <th className="text-left p-2">SendClassification</th>
+                          <th className="text-left p-2">SenderProfile</th>
+                          <th className="text-left p-2">DeliveryProfile</th>
+                          <th className="text-left p-2">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {resolvedEmailSendDefs.map((esd, idx) => (
+                          <tr key={esd.CustomerKey} className="border-t">
+                            <td className="p-2 font-medium">{esd.Name}</td>
+                            <td className="p-2">{getProfileName(sendClassifications, esd.SendClassification?.CustomerKey)}</td>
+                            <td className="p-2">{getProfileName(senderProfiles, esd.SenderProfile?.CustomerKey)}</td>
+                            <td className="p-2">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
+                            <td className="p-2">
+                              <button className="text-blue-600 hover:underline mr-2" onClick={() => openEditESDModal(esd)}>
+                                <span role="img" aria-label="Edit">✏️</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Hide Mass Edit Button */}
+                  {/* {selectedESDKeys.length > 0 && (
+                    <button
+                      className="mt-2 px-4 py-2 bg-blue-700 text-white rounded font-semibold"
+                      onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })}
+                    >
+                      Mass Edit Selected ({selectedESDKeys.length})
+                    </button>
+                  )} */}
+                  {/* Debug block and other details remain hidden */}
+                </div>
               ) : (
                 <table className="min-w-full text-sm">
                   <thead>
