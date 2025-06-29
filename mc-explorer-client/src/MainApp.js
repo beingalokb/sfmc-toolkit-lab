@@ -509,14 +509,7 @@ export default function MainApp() {
         // Show success toast/snackbar
         alert('✅ Updated successfully');
         // Refresh table with resolved relationships
-        fetch(`${baseURL}/resolved/emailsenddefinition-relationships`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'x-mc-subdomain': subdomain
-          }
-        })
-          .then(res => res.json())
-          .then(data => setResolvedEmailSendDefs(Array.isArray(data) ? data : []));
+        await refreshResolvedEmailSendDefs();
       } else {
         setEditESDModal(prev => ({ ...prev, loading: false, error: data.message || 'Update failed' }));
         alert('❌ Update failed: ' + (data.message || 'Unknown error'));
@@ -563,22 +556,31 @@ export default function MainApp() {
     }
   };
 
-  useEffect(() => {
-    if (activeTab === 'emailsenddefinition' && isAuthenticated) {
-      setResolvedError('');
-      setResolvedEmailSendDefs([]);
-      const accessToken = localStorage.getItem('accessToken');
-      const subdomain = localStorage.getItem('subdomain');
-      if (!accessToken || !subdomain) return;
-      fetch(`${baseURL}/resolved/emailsenddefinition-relationships`, {
+  // Helper to refresh resolved EmailSendDefinitions
+  async function refreshResolvedEmailSendDefs() {
+    const accessToken = localStorage.getItem('accessToken');
+    const subdomain = localStorage.getItem('subdomain');
+    if (!accessToken || !subdomain) return;
+    try {
+      const res = await fetch(`${baseURL}/resolved/emailsenddefinition-relationships`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'x-mc-subdomain': subdomain
         }
-      })
-        .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch resolved relationships'))
-        .then(data => setResolvedEmailSendDefs(Array.isArray(data) ? data : []))
-        .catch(e => setResolvedError(e.toString()));
+      });
+      if (!res.ok) throw new Error('Failed to fetch resolved relationships');
+      const data = await res.json();
+      setResolvedEmailSendDefs(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setResolvedError(e.toString());
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'emailsenddefinition' && isAuthenticated) {
+      setResolvedError('');
+      setResolvedEmailSendDefs([]);
+      refreshResolvedEmailSendDefs();
     }
   }, [activeTab, isAuthenticated]);
 
