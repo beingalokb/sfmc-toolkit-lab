@@ -245,12 +245,13 @@ export default function MainApp() {
 
     let filtered = [];
     if (term) {
-      // Search across all modules
+      // Search across all modules, including EmailSendDefinition
       filtered = [
         ...(dataExtensions || []).map(item => ({ ...item, _type: 'Data Extension' })),
         ...(automations || []).map(item => ({ ...item, _type: 'Automation' })),
         ...(dataFilters || []).map(item => ({ ...item, _type: 'Data Filter' })),
-        ...(journeys || []).map(item => ({ ...item, _type: 'Journey' }))
+        ...(journeys || []).map(item => ({ ...item, _type: 'Journey' })),
+        ...(resolvedEmailSendDefs || []).map(item => ({ ...item, _type: 'EmailSendDefinition' }))
       ].filter(matches);
     } else {
       // Only show active tab
@@ -258,6 +259,7 @@ export default function MainApp() {
       else if (activeTab === 'automation') filtered = (automations || []).map(item => ({ ...item, _type: 'Automation' }));
       else if (activeTab === 'datafilter') filtered = (dataFilters || []).map(item => ({ ...item, _type: 'Data Filter' }));
       else if (activeTab === 'journey') filtered = (journeys || []).map(item => ({ ...item, _type: 'Journey' }));
+      else if (activeTab === 'emailsenddefinition') filtered = (resolvedEmailSendDefs || []).map(item => ({ ...item, _type: 'EmailSendDefinition' }));
     }
     return sortData(filtered);
   };
