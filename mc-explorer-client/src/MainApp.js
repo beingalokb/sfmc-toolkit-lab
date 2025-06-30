@@ -759,54 +759,79 @@ export default function MainApp() {
             </div>
 
             <div className="overflow-x-auto bg-white shadow rounded">
-              {activeTab === 'emailsenddefinition' ? (
-                <div className="bg-white shadow rounded p-4 mt-4">
-                  <h2 className="text-xl font-bold mb-4 text-indigo-700">EmailSendDefinition Details</h2>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr>
-                          <th className="p-2">
-                            <input type="checkbox" checked={allSelected} onChange={toggleSelectAllESD} />
-                          </th>
-                          <th className="text-left p-2">Name</th>
-                          <th className="text-left p-2">SendClassification</th>
-                          <th className="text-left p-2">SenderProfile</th>
-                          <th className="text-left p-2">DeliveryProfile</th>
-                          <th className="text-left p-2">Actions</th>
+              {searchTerm ? (
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="text-left p-2">Type</th>
+                      <th className="text-left p-2">Name</th>
+                      <th className="text-left p-2">SendClassification</th>
+                      <th className="text-left p-2">SenderProfile</th>
+                      <th className="text-left p-2">DeliveryProfile</th>
+                      <th className="text-left p-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedData().map((item, idx) =>
+                      item._type === 'EmailSendDefinition' ? (
+                        <tr key={item.CustomerKey} className="border-t">
+                          <td className="p-2">EmailSendDefinition</td>
+                          <td className="p-2 font-medium">{item.Name}</td>
+                          <td className="p-2">{getProfileName(sendClassifications, item.SendClassification?.CustomerKey)}</td>
+                          <td className="p-2">{getProfileName(senderProfiles, item.SenderProfile?.CustomerKey)}</td>
+                          <td className="p-2">{getProfileName(deliveryProfiles, item.DeliveryProfile?.CustomerKey)}</td>
+                          <td className="p-2">
+                            <button className="text-blue-600 hover:underline mr-2" onClick={() => openEditESDModal(item)}>
+                              <span role="img" aria-label="Edit">✏️</span>
+                            </button>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {resolvedEmailSendDefs.map((esd, idx) => (
-                          <tr key={esd.CustomerKey} className="border-t">
+                      ) : (
+                        <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
+                          onClick={() => {
+                            if (item._type === 'Data Extension') fetchDeDetails(item.name);
+                            if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
+                          }}
+                        >
+                          <td className="p-2">{item._type}</td>
+                          <td className="p-2 font-medium">{item.name}</td>
+                          <td className="p-2">{item.path || 'N/A'}</td>
+                          {!(item._type === 'Automation' || item._type === 'Journey') && (
                             <td className="p-2">
-                              <input type="checkbox" checked={selectedESDKeys.includes(esd.CustomerKey)} onChange={() => toggleSelectESD(esd.CustomerKey)} />
+                              {item._type === 'Data Extension' && item.categoryId && item.id && (
+                                <a
+                                  href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 underline hover:text-blue-800"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  View
+                                </a>
+                              )}
+                              {item._type === 'Data Filter' && item.id && (
+                                <a
+                                  href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 underline hover:text-blue-800 ml-2"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  View
+                                </a>
+                              )}
                             </td>
-                            <td className="p-2 font-medium">{esd.Name}</td>
-                            <td className="p-2">{getProfileName(sendClassifications, esd.SendClassification?.CustomerKey)}</td>
-                            <td className="p-2">{getProfileName(senderProfiles, esd.SenderProfile?.CustomerKey)}</td>
-                            <td className="p-2">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
-                            <td className="p-2">
-                              <button className="text-blue-600 hover:underline mr-2" onClick={() => openEditESDModal(esd)}>
-                                <span role="img" aria-label="Edit">✏️</span>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {selectedESDKeys.length > 0 && (
-                    <button
-                      className="mt-2 px-4 py-2 bg-blue-700 text-white rounded font-semibold"
-                      onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })}
-                    >
-                      Bulk Edit Selected ({selectedESDKeys.length})
-                    </button>
-                  )}
-                  {/* Debug block and other details remain hidden */}
-                </div>
+                          )}
+                          {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
+                            <td className="p-2">{item.status || 'N/A'}</td>
+                          )}
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
               ) : (
+                // ...existing code for tab-specific rendering...
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr>
