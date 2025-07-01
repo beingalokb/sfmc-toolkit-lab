@@ -853,17 +853,17 @@ export default function MainApp() {
                       </thead>
                       <tbody>
                         {(searchTerm ? getFilteredData().filter(item => item._type === 'Publication') : publications).map((pub, idx) => (
-                          <tr key={pub.ID || idx} className="border-t">
-                            <td className="p-2">{pub.ID}</td>
-                            <td className="p-2 font-medium">{pub.Name}</td>
-                            <td className="p-2">{pub.CustomerKey}</td>
-                            <td className="p-2">{pub.IsActive ? 'Yes' : 'No'}</td>
-                            <td className="p-2">{formatDate(pub.CreatedDate)}</td>
-                            <td className="p-2">{formatDate(pub.ModifiedDate)}</td>
-                            <td className="p-2">{pub.Category?.Name || pub.Category || 'N/A'}</td>
-                            <td className="p-2">{pub.SendClassification?.Name || pub.SendClassification || 'N/A'}</td>
-                            <td className="p-2">{Array.isArray(pub.Subscribers) ? pub.Subscribers.length : (pub.Subscribers || 'N/A')}</td>
-                            <td className="p-2">{pub.Client?.Name || pub.Client || 'N/A'}</td>
+                          <tr key={pub.id || idx} className="border-t">
+                            <td className="p-2">{pub.id}</td>
+                            <td className="p-2 font-medium">{pub.name}</td>
+                            <td className="p-2">{pub.customerKey}</td>
+                            <td className="p-2">{pub.isActive ? 'Yes' : 'No'}</td>
+                            <td className="p-2">{formatDate(pub.createdDate)}</td>
+                            <td className="p-2">{formatDate(pub.modifiedDate)}</td>
+                            <td className="p-2">{pub.category?.Name || pub.category || 'N/A'}</td>
+                            <td className="p-2">{pub.sendClassification?.Name || pub.sendClassification || 'N/A'}</td>
+                            <td className="p-2">{Array.isArray(pub.subscribers) ? pub.subscribers.length : (pub.subscribers || 'N/A')}</td>
+                            <td className="p-2">{pub.client?.Name || pub.client || 'N/A'}</td>
                           </tr>
                         ))}
                       </tbody>
