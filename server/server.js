@@ -99,6 +99,19 @@ function getAccessTokenFromRequest(req) {
   return null;
 }
 
+// Helper to get subdomain from request
+function getSubdomainFromRequest(req) {
+  // Try to get subdomain from custom header (used by frontend)
+  if (req.headers['x-mc-subdomain']) {
+    return req.headers['x-mc-subdomain'];
+  }
+  // Or from session credentials
+  if (req.session && req.session.mcCreds && req.session.mcCreds.subdomain) {
+    return req.session.mcCreds.subdomain;
+  }
+  return null;
+}
+
 // Endpoint to check if backend has credentials (per session)
 app.get('/has-credentials', (req, res) => {
   const creds = req.session.mcCreds || {};
