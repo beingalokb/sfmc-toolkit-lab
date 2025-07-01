@@ -1828,12 +1828,6 @@ app.get('/has-credentials', (req, res) => {
   res.json({ hasCreds });
 });
 
-// Serve React frontend
-app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
-app.get(/(.*)/, (req, res) => {
-  res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
-});
-
 // Publication Search (SOAP)
 app.get('/search/publication', async (req, res) => {
   const accessToken = req.session.accessToken;
@@ -1906,3 +1900,9 @@ app.get('/search/publication', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+// Serve React frontend (must be last)
+app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
+app.get(/(.*)/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
+});
