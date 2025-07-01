@@ -56,6 +56,35 @@ app.get('/auth/login', (req, res) => {
   res.redirect(loginUrl);
 });
 
+// Handle OAuth callback: exchange code for access token
+app.post('/auth/callback', async (req, res) => {
+  const code = req.body.code;
+  const creds = req.session.mcCreds;
+  if (!creds || !creds.subdomain || !creds.clientId || !creds.clientSecret) {
+    return res.status(400).json({ success: false, error: 'Missing credentials' });
+  }
+  try {
+    const tokenResponse = await axios.post(
+      `https://${creds.subdomain}.auth.marketingcloudapis.com/v2/token`,
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
+        redirect_uri: 'https://mc-explorer.onrender.com/auth/callback'
+      }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    const accessToken = tokenResponse.data.access_token;
+    const refreshToken = tokenResponse.data.refresh_token;
+    req.session.accessToken = accessToken;
+    res.json({ success: true, accessToken, refreshToken, subdomain: creds.subdomain });
+  } catch (err) {
+    console.error('❌ OAuth callback error:', err.response?.data || err.message);
+    res.status(500).json({ success: false, error: err.response?.data || err.message });
+  }
+});
+
 // Endpoint to check if backend has credentials (per session)
 app.get('/has-credentials', (req, res) => {
   const creds = req.session.mcCreds || {};
