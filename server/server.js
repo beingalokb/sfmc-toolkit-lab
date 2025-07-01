@@ -1837,28 +1837,23 @@ app.get('/search/publication', async (req, res) => {
   }
   try {
     const soapEnvelope = `
-      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-        <s:Header>
-          <fueloauth>${accessToken}</fueloauth>
-        </s:Header>
-        <s:Body>
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
           <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
             <RetrieveRequest>
               <ObjectType>Publication</ObjectType>
-              <Properties>Category</Properties>
-              <Properties>Client</Properties>
-              <Properties>Name</Properties>
-              <Properties>CreatedDate</Properties>
-              <Properties>CustomerKey</Properties>
               <Properties>ID</Properties>
-              <Properties>IsActive</Properties>
-              <Properties>ModifiedDate</Properties>
-              <Properties>SendClassification</Properties>
-              <Properties>Subscribers</Properties>
+              <Properties>Name</Properties>
+              <Properties>Category</Properties>
             </RetrieveRequest>
           </RetrieveRequestMsg>
-        </s:Body>
-      </s:Envelope>
+        </soapenv:Body>
+      </soapenv:Envelope>
     `;
     const response = await axios.post(
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
@@ -1880,14 +1875,7 @@ app.get('/search/publication', async (req, res) => {
         const pubs = resultArray.map(pub => ({
           id: pub.ID || '',
           name: pub.Name || '',
-          customerKey: pub.CustomerKey || '',
-          isActive: pub.IsActive || '',
-          createdDate: pub.CreatedDate || '',
-          modifiedDate: pub.ModifiedDate || '',
-          category: pub.Category || '',
-          sendClassification: pub.SendClassification || '',
-          subscribers: pub.Subscribers || '',
-          client: pub.Client || ''
+          category: pub.Category || ''
         }));
         res.json(pubs);
       } catch (e) {
