@@ -1696,7 +1696,7 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         CustomerKey: item.CustomerKey,
         CategoryID: item.CategoryID,
         ModifiedDate: item.ModifiedDate,
-        SendClassificationKey: item.SendClassification?.CustomerKey || item['SendClassification.CustomerKey'] || '',
+        SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
         SenderProfileKey: item.SenderProfile?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
         DeliveryProfileKey: item.DeliveryProfile?.CustomerKey || item['DeliveryProfile.CustomerKey'] || ''
       }));
@@ -1811,6 +1811,12 @@ app.get('/describe-soap-object', async (req, res) => {
 app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
 app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
+});
+
+// Endpoint to check if backend has credentials
+app.get('/has-credentials', (req, res) => {
+  const hasCreds = !!(dynamicCreds.subdomain && dynamicCreds.clientId && dynamicCreds.clientSecret);
+  res.json({ hasCreds });
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

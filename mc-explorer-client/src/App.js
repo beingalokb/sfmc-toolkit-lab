@@ -8,6 +8,7 @@ import CredentialSetup from './CredentialSetup';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem('isAuthenticated') === 'true');
+  const [backendHasCreds, setBackendHasCreds] = useState(null); // null = loading, true/false = checked
 
   useEffect(() => {
     const handleStorage = () => {
@@ -28,9 +29,16 @@ function App() {
     return () => window.removeEventListener('focus', checkAuth);
   }, []);
 
-  // Check for credentials in localStorage
-  const hasCreds = !!(localStorage.getItem('mc_subdomain') && localStorage.getItem('mc_clientId') && localStorage.getItem('mc_clientSecret'));
-  if (!hasCreds) return <CredentialSetup />;
+  // Check with backend for credential presence
+  useEffect(() => {
+    fetch('/has-credentials')
+      .then(res => res.json())
+      .then(data => setBackendHasCreds(!!data.hasCreds))
+      .catch(() => setBackendHasCreds(false));
+  }, []);
+
+  if (backendHasCreds === null) return <div>Loading...</div>;
+  if (!backendHasCreds) return <CredentialSetup />;
 
   console.log('🔐 Local auth status:', isAuthenticated);
 
