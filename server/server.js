@@ -62,9 +62,10 @@ loadCredsFromFile();
 
 app.post('/save-credentials', (req, res) => {
   const { subdomain, clientId, clientSecret, accountId } = req.body;
+  console.log('🔔 /save-credentials received:', { subdomain, clientId, clientSecret, accountId });
   dynamicCreds = { subdomain, clientId, clientSecret, accountId };
   saveCredsToFile();
-
+  console.log('💾 dynamicCreds after save:', dynamicCreds);
   // Use the provided subdomain for the login URL
   const redirectUri = 'https://mc-explorer.onrender.com/auth/callback';
   const loginUrl = `https://${subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
@@ -1815,6 +1816,7 @@ app.get(/(.*)/, (req, res) => {
 
 // Endpoint to check if backend has credentials
 app.get('/has-credentials', (req, res) => {
+  console.log('🟢 /has-credentials check:', dynamicCreds);
   const hasCreds = !!(dynamicCreds.subdomain && dynamicCreds.clientId && dynamicCreds.clientSecret);
   res.json({ hasCreds });
 });
