@@ -4,6 +4,7 @@ export default function CredentialSetup({ onSetup }) {
   const [subdomain, setSubdomain] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [accountId, setAccountId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,11 +17,12 @@ export default function CredentialSetup({ onSetup }) {
       localStorage.setItem('mc_subdomain', subdomain);
       localStorage.setItem('mc_clientId', clientId);
       localStorage.setItem('mc_clientSecret', clientSecret);
+      localStorage.setItem('mc_accountId', accountId);
       // Call backend
       const res = await fetch('/save-credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain, clientId, clientSecret })
+        body: JSON.stringify({ subdomain, clientId, clientSecret, accountId })
       });
       if (!res.ok) throw new Error('Failed to save credentials');
       // Redirect to login
@@ -43,7 +45,9 @@ export default function CredentialSetup({ onSetup }) {
         <label className="block mb-2 font-semibold">Client ID</label>
         <input type="text" className="border rounded px-3 py-2 w-full mb-4" value={clientId} onChange={e => setClientId(e.target.value)} required />
         <label className="block mb-2 font-semibold">Client Secret</label>
-        <input type="password" className="border rounded px-3 py-2 w-full mb-6" value={clientSecret} onChange={e => setClientSecret(e.target.value)} required />
+        <input type="password" className="border rounded px-3 py-2 w-full mb-4" value={clientSecret} onChange={e => setClientSecret(e.target.value)} required />
+        <label className="block mb-2 font-semibold">Account ID (optional)</label>
+        <input type="text" className="border rounded px-3 py-2 w-full mb-6" value={accountId} onChange={e => setAccountId(e.target.value)} placeholder="e.g. 123456789" />
         <button type="submit" className="w-full bg-indigo-600 text-white py-2 rounded font-semibold" disabled={loading}>
           {loading ? 'Saving...' : 'Save & Login'}
         </button>
