@@ -40,7 +40,7 @@ app.post('/save-credentials', (req, res) => {
   dynamicCreds = { subdomain, clientId, clientSecret, accountId };
 
   // Use the provided subdomain for the login URL
-  const redirectUri = `/auth/callback`;
+  const redirectUri = 'https://mc-explorer.onrender.com/auth/callback';
   const loginUrl = `https://${subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
   console.log('🔐 Generated Login URL:', loginUrl);
   res.json({ redirectUrl: loginUrl });
@@ -51,7 +51,8 @@ app.get('/auth/login', (req, res) => {
   if (!creds.subdomain || !creds.clientId) {
     return res.status(400).send('Missing credentials. Please set up credentials first.');
   }
-  const loginUrl = `https://${creds.subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${creds.clientId}&redirect_uri=${encodeURIComponent('/auth/callback')}&response_type=code`;
+  const redirectUri = 'https://mc-explorer.onrender.com/auth/callback';
+  const loginUrl = `https://${creds.subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${creds.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
   console.log('🔐 Redirecting to login URL:', loginUrl);
   res.redirect(loginUrl);
 });
@@ -75,7 +76,7 @@ app.post('/auth/callback', async (req, res) => {
         code,
         client_id: creds.clientId,
         client_secret: creds.clientSecret,
-        redirect_uri: '/auth/callback'
+        redirect_uri: 'https://mc-explorer.onrender.com/auth/callback'
       }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
