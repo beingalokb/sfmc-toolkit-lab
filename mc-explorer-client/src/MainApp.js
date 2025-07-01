@@ -45,6 +45,9 @@ export default function MainApp() {
   // State for mass edit modal
   const [massEditModal, setMassEditModal] = useState({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null });
 
+  // Publications state
+  const [publications, setPublications] = useState([]);
+
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
     if (!key) return '';
@@ -130,7 +133,7 @@ export default function MainApp() {
     }
 
     setLoading(true);
-    setPendingFetches(5); // 5 fetches: DE, Automation, DataFilter, Journey, Folders
+    setPendingFetches(6); // 6 fetches: DE, Automation, DataFilter, Journey, Folders, Publications
 
     const fetchWithLogging = async (path, setter, label) => {
       try {
@@ -165,6 +168,7 @@ export default function MainApp() {
       (folders || []).forEach(f => map[f.ID] = f);
       setFolderMap(map);
     }, 'Folders');
+    fetchWithLogging('/search/publication', setPublications, 'Publications');
   }, [isAuthenticated]);
 
   // Fetch data for the selected tab when activeTab changes
@@ -209,6 +213,7 @@ export default function MainApp() {
       fetchWithLogging('/search/sendclassification', setSendClassifications, 'SendClassifications');
       fetchWithLogging('/search/deliveryprofile', setDeliveryProfiles, 'DeliveryProfiles');
     }
+    if (activeTab === 'publication') fetchWithLogging('/search/publication', setPublications, 'Publications');
   }, [activeTab, isAuthenticated]);
 
   useEffect(() => {
@@ -264,7 +269,8 @@ export default function MainApp() {
         ...(automations || []).map(item => ({ ...item, _type: 'Automation' })),
         ...(dataFilters || []).map(item => ({ ...item, _type: 'Data Filter' })),
         ...(journeys || []).map(item => ({ ...item, _type: 'Journey' })),
-        ...(resolvedEmailSendDefs || []).map(item => ({ ...item, _type: 'EmailSendDefinition' }))
+        ...(resolvedEmailSendDefs || []).map(item => ({ ...item, _type: 'EmailSendDefinition' })),
+        ...(publications || []).map(item => ({ ...item, _type: 'Publication' }))
       ].filter(matches);
     } else {
       // Only show active tab
@@ -273,6 +279,7 @@ export default function MainApp() {
       else if (activeTab === 'datafilter') filtered = (dataFilters || []).map(item => ({ ...item, _type: 'Data Filter' }));
       else if (activeTab === 'journey') filtered = (journeys || []).map(item => ({ ...item, _type: 'Journey' }));
       else if (activeTab === 'emailsenddefinition') filtered = (resolvedEmailSendDefs || []).map(item => ({ ...item, _type: 'EmailSendDefinition' }));
+      else if (activeTab === 'publication') filtered = (publications || []).map(item => ({ ...item, _type: 'Publication' }));
     }
     return sortData(filtered);
   };
@@ -329,6 +336,7 @@ export default function MainApp() {
   const autoGroups = getDateGroups(automations);
   const dfGroups = getDateGroups(dataFilters);
   const journeyGroups = getDateGroups(journeys);
+  const pubGroups = getDateGroups(publications);
 
   // Fetch DE details on demand
   const fetchDeDetails = async (name) => {
@@ -744,10 +752,15 @@ export default function MainApp() {
                 <div className="text-2xl font-bold">{journeys.length}</div>
                 <div className="text-xs text-gray-500 mt-2">Last 7d: {journeyGroups.last7} | 30d: {journeyGroups.last30} | 6mo: {journeyGroups.last180} | 1yr: {journeyGroups.last365}</div>
               </div>
+              <div className="bg-white rounded shadow p-4">
+                <div className="text-lg font-bold text-indigo-700">Publications</div>
+                <div className="text-2xl font-bold">{publications.length}</div>
+                <div className="text-xs text-gray-500 mt-2">Last 7d: {pubGroups.last7} | 30d: {pubGroups.last30} | 6mo: {pubGroups.last180} | 1yr: {pubGroups.last365}</div>
+              </div>
             </div>
 
             <div className="flex gap-4 mb-4">
-              {['de', 'automation', 'datafilter', 'journey', 'emailsenddefinition'].map(tab => (
+              {['de', 'automation', 'datafilter', 'journey', 'emailsenddefinition', 'publication'].map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -818,6 +831,44 @@ export default function MainApp() {
                     </button>
                   )}
                   {/* Debug block and other details remain hidden */}
+                </div>
+              ) : activeTab === 'publication' ? (
+                <div className="bg-white shadow rounded p-4 mt-4">
+                  <h2 className="text-xl font-bold mb-4 text-indigo-700">Publication Details</h2>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr>
+                          <th className="text-left p-2">ID</th>
+                          <th className="text-left p-2">Name</th>
+                          <th className="text-left p-2">CustomerKey</th>
+                          <th className="text-left p-2">IsActive</th>
+                          <th className="text-left p-2">CreatedDate</th>
+                          <th className="text-left p-2">ModifiedDate</th>
+                          <th className="text-left p-2">Category</th>
+                          <th className="text-left p-2">SendClassification</th>
+                          <th className="text-left p-2">Subscribers</th>
+                          <th className="text-left p-2">Client</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(searchTerm ? getFilteredData().filter(item => item._type === 'Publication') : publications).map((pub, idx) => (
+                          <tr key={pub.ID || idx} className="border-t">
+                            <td className="p-2">{pub.ID}</td>
+                            <td className="p-2 font-medium">{pub.Name}</td>
+                            <td className="p-2">{pub.CustomerKey}</td>
+                            <td className="p-2">{pub.IsActive ? 'Yes' : 'No'}</td>
+                            <td className="p-2">{formatDate(pub.CreatedDate)}</td>
+                            <td className="p-2">{formatDate(pub.ModifiedDate)}</td>
+                            <td className="p-2">{pub.Category?.Name || pub.Category || 'N/A'}</td>
+                            <td className="p-2">{pub.SendClassification?.Name || pub.SendClassification || 'N/A'}</td>
+                            <td className="p-2">{Array.isArray(pub.Subscribers) ? pub.Subscribers.length : (pub.Subscribers || 'N/A')}</td>
+                            <td className="p-2">{pub.Client?.Name || pub.Client || 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ) : (
                 // ...existing code for other tabs and search...

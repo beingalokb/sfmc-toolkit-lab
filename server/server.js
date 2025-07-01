@@ -1834,4 +1834,75 @@ app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
 });
 
+// Publication Search (SOAP)
+app.get('/search/publication', async (req, res) => {
+  const accessToken = req.session.accessToken;
+  const subdomain = req.session.mcCreds && req.session.mcCreds.subdomain;
+  if (!accessToken || !subdomain) {
+    return res.status(401).json([]);
+  }
+  try {
+    const soapEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+        <s:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>Publication</ObjectType>
+              <Properties>Category</Properties>
+              <Properties>Client</Properties>
+              <Properties>Name</Properties>
+              <Properties>CreatedDate</Properties>
+              <Properties>CustomerKey</Properties>
+              <Properties>ID</Properties>
+              <Properties>IsActive</Properties>
+              <Properties>ModifiedDate</Properties>
+              <Properties>SendClassification</Properties>
+              <Properties>Subscribers</Properties>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>
+    `;
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Retrieve',
+        },
+      }
+    );
+    const parser = new xml2js.Parser({ explicitArray: false });
+    parser.parseString(response.data, (err, result) => {
+      if (err) return res.status(500).json({ error: 'Failed to parse XML' });
+      try {
+        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        if (!results) return res.status(200).json([]);
+        const resultArray = Array.isArray(results) ? results : [results];
+        const pubs = resultArray.map(pub => ({
+          id: pub.ID || '',
+          name: pub.Name || '',
+          customerKey: pub.CustomerKey || '',
+          isActive: pub.IsActive || '',
+          createdDate: pub.CreatedDate || '',
+          modifiedDate: pub.ModifiedDate || '',
+          category: pub.Category || '',
+          sendClassification: pub.SendClassification || '',
+          subscribers: pub.Subscribers || '',
+          client: pub.Client || ''
+        }));
+        res.json(pubs);
+      } catch (e) {
+        res.status(500).json({ error: 'Unexpected Publication format' });
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch Publications' });
+  }
+});
+
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
