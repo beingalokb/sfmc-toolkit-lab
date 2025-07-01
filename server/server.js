@@ -85,6 +85,20 @@ app.post('/auth/callback', async (req, res) => {
   }
 });
 
+// Helper to get access token from request
+function getAccessTokenFromRequest(req) {
+  // Try to get access token from Authorization header (Bearer ...)
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  // Or from session (if you stored it there)
+  if (req.session && req.session.accessToken) {
+    return req.session.accessToken;
+  }
+  return null;
+}
+
 // Endpoint to check if backend has credentials (per session)
 app.get('/has-credentials', (req, res) => {
   const creds = req.session.mcCreds || {};
