@@ -39,14 +39,19 @@ app.post('/save-credentials', (req, res) => {
   const { subdomain, clientId, clientSecret, accountId } = req.body;
   dynamicCreds = { subdomain, clientId, clientSecret, accountId };
 
-  const redirectUri = `${process.env.BASE_URL}/auth/callback`;
+  // Use the provided subdomain for the login URL
+  const redirectUri = `/auth/callback`;
   const loginUrl = `https://${subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
   console.log('🔐 Generated Login URL:', loginUrl);
   res.json({ redirectUrl: loginUrl });
 });
 
 app.get('/auth/login', (req, res) => {
-  const loginUrl = `https://${process.env.AUTH_DOMAIN}/v2/authorize?client_id=${process.env.CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.REDIRECT_URI)}&response_type=code`;
+  const creds = getDynamicCreds();
+  if (!creds.subdomain || !creds.clientId) {
+    return res.status(400).send('Missing credentials. Please set up credentials first.');
+  }
+  const loginUrl = `https://${creds.subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${creds.clientId}&redirect_uri=${encodeURIComponent('/auth/callback')}&response_type=code`;
   console.log('🔐 Redirecting to login URL:', loginUrl);
   res.redirect(loginUrl);
 });
@@ -58,33 +63,26 @@ app.get('/auth/callback', (req, res) => {
 
 app.post('/auth/callback', async (req, res) => {
   const code = req.body.code;
-  console.log('🔔 POST /auth/callback called with code:', code);
-  if (!code) {
-    console.error('❌ No code provided in POST /auth/callback');
-    return res.status(400).json({ success: false, error: 'Missing authorization code' });
+  const creds = getDynamicCreds();
+  if (!creds.subdomain || !creds.clientId || !creds.clientSecret) {
+    return res.status(400).json({ success: false, error: 'Missing credentials' });
   }
   try {
-    console.log('🔗 Requesting token from:', `https://${process.env.AUTH_DOMAIN}/v2/token`);
     const tokenResponse = await axios.post(
-      `https://${process.env.AUTH_DOMAIN}/v2/token`,
+      `https://${creds.subdomain}.auth.marketingcloudapis.com/v2/token`,
       new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        client_id: process.env.CLIENT_ID,
-        client_secret: process.env.CLIENT_SECRET,
-        redirect_uri: process.env.REDIRECT_URI
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
+        redirect_uri: '/auth/callback'
       }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     const accessToken = tokenResponse.data.access_token;
     const refreshToken = tokenResponse.data.refresh_token;
-    // Extract subdomain from AUTH_DOMAIN
-    const match = process.env.AUTH_DOMAIN.match(/^([^.]+)\./);
-    const subdomain = match ? match[1] : null;
-    console.log('✅ Token response:', tokenResponse.data);
-    res.json({ success: true, accessToken, refreshToken, subdomain });
+    res.json({ success: true, accessToken, refreshToken, subdomain: creds.subdomain });
   } catch (err) {
-    console.error('❌ OAuth Token Exchange Error (POST):', err.response?.data || err.message);
     res.status(500).json({ success: false, error: err.response?.data || err.message });
   }
 });
@@ -98,6 +96,11 @@ function getAccessTokenFromRequest(req) {
 }
 function getSubdomainFromRequest(req) {
   return req.headers['x-mc-subdomain'] || null;
+}
+
+// Use dynamicCreds for OAuth and API calls
+function getDynamicCreds() {
+  return dynamicCreds;
 }
 
 // Helper to build folder path from folderMap

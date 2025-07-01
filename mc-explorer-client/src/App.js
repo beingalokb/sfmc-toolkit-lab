@@ -4,6 +4,7 @@ import SetupForm from './SetupForm';
 import MainApp from './MainApp';
 import LoginPage from './LoginPage';
 import AuthCallback from './AuthCallback';
+import CredentialSetup from './CredentialSetup';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem('isAuthenticated') === 'true');
@@ -26,6 +27,10 @@ function App() {
     window.addEventListener('focus', checkAuth);
     return () => window.removeEventListener('focus', checkAuth);
   }, []);
+
+  // Check for credentials in localStorage
+  const hasCreds = !!(localStorage.getItem('mc_subdomain') && localStorage.getItem('mc_clientId') && localStorage.getItem('mc_clientSecret'));
+  if (!hasCreds) return <CredentialSetup />;
 
   console.log('🔐 Local auth status:', isAuthenticated);
 
