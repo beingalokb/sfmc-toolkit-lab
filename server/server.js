@@ -15,6 +15,7 @@ const axios = require('axios');
 const xml2js = require('xml2js');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 app.use(express.json());
@@ -27,6 +28,7 @@ let dynamicCreds = {
   clientSecret: '',
   accountId: ''
 };
+const CRED_FILE = path.join(__dirname, 'credentials.json');
 
 console.log("✅ Env loaded:", {
   CLIENT_ID: process.env.CLIENT_ID,
@@ -35,9 +37,33 @@ console.log("✅ Env loaded:", {
   REDIRECT_URI: process.env.REDIRECT_URI
 });
 
+// Load credentials from file on startup
+function loadCredsFromFile() {
+  try {
+    const data = fs.readFileSync(CRED_FILE, 'utf8');
+    dynamicCreds = JSON.parse(data);
+    console.log('🔑 Loaded credentials from file.');
+  } catch (e) {
+    console.log('⚠️ No credentials file found or invalid.');
+  }
+}
+
+// Save credentials to file
+function saveCredsToFile() {
+  try {
+    fs.writeFileSync(CRED_FILE, JSON.stringify(dynamicCreds, null, 2), 'utf8');
+    console.log('💾 Credentials saved to file.');
+  } catch (e) {
+    console.error('❌ Failed to save credentials:', e);
+  }
+}
+
+loadCredsFromFile();
+
 app.post('/save-credentials', (req, res) => {
   const { subdomain, clientId, clientSecret, accountId } = req.body;
   dynamicCreds = { subdomain, clientId, clientSecret, accountId };
+  saveCredsToFile();
 
   // Use the provided subdomain for the login URL
   const redirectUri = 'https://mc-explorer.onrender.com/auth/callback';
