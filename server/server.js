@@ -45,6 +45,17 @@ app.post('/save-credentials', (req, res) => {
   res.json({ success: true });
 });
 
+// Initiate Marketing Cloud OAuth login
+app.get('/auth/login', (req, res) => {
+  const creds = req.session.mcCreds;
+  if (!creds || !creds.subdomain || !creds.clientId) {
+    return res.redirect('/setup');
+  }
+  const redirectUri = 'https://mc-explorer.onrender.com/auth/callback';
+  const loginUrl = `https://${creds.subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${creds.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+  res.redirect(loginUrl);
+});
+
 // Endpoint to check if backend has credentials (per session)
 app.get('/has-credentials', (req, res) => {
   const creds = req.session.mcCreds || {};
