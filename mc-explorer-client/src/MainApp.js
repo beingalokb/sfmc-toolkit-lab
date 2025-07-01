@@ -62,9 +62,22 @@ export default function MainApp() {
   const [previewResult, setPreviewResult] = useState(null);
   const [guidedPrefOption, setGuidedPrefOption] = useState('');
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Clear local/session storage
     localStorage.removeItem('isAuthenticated');
-    window.location.href = '/';
+    localStorage.removeItem('mc_subdomain');
+    localStorage.removeItem('mc_clientId');
+    localStorage.removeItem('mc_clientSecret');
+    localStorage.removeItem('mc_accountId');
+    sessionStorage.clear();
+    // Call backend to clear session
+    try {
+      await fetch('/logout', { method: 'POST', credentials: 'include' });
+    } catch (e) {
+      // Ignore errors
+    }
+    // Redirect to setup
+    window.location.href = '/setup';
   };
 
  useEffect(() => {
