@@ -1808,17 +1808,17 @@ app.get('/describe-soap-object', async (req, res) => {
   }
 });
 
-// Serve React frontend
-app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
-app.get(/(.*)/, (req, res) => {
-  res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
-});
-
-// Endpoint to check if backend has credentials
+// Endpoint to check if backend has credentials (must be before static serving and catch-all)
 app.get('/has-credentials', (req, res) => {
   console.log('🟢 /has-credentials check:', dynamicCreds);
   const hasCreds = !!(dynamicCreds.subdomain && dynamicCreds.clientId && dynamicCreds.clientSecret);
   res.json({ hasCreds });
+});
+
+// Serve React frontend
+app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
+app.get(/(.*)/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
