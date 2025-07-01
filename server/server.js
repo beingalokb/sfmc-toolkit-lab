@@ -15,121 +15,66 @@ const axios = require('axios');
 const xml2js = require('xml2js');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
+const session = require('express-session');
 
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: true, credentials: true }));
+app.use(session({
+  secret: 'your-very-secret-key', // use a strong secret in production!
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // set to true if using HTTPS
+}));
 
 const PORT = process.env.PORT || 3001;
-let dynamicCreds = {
-  subdomain: '',
-  clientId: '',
-  clientSecret: '',
-  accountId: ''
-};
-const CRED_FILE = path.join(__dirname, 'credentials.json');
 
-console.log("✅ Env loaded:", {
-  CLIENT_ID: process.env.CLIENT_ID,
-  CLIENT_SECRET: process.env.CLIENT_SECRET,
-  AUTH_DOMAIN: process.env.AUTH_DOMAIN,
-  REDIRECT_URI: process.env.REDIRECT_URI
-});
-
-// Load credentials from file on startup
-function loadCredsFromFile() {
-  try {
-    const data = fs.readFileSync(CRED_FILE, 'utf8');
-    dynamicCreds = JSON.parse(data);
-    console.log('🔑 Loaded credentials from file.');
-  } catch (e) {
-    console.log('⚠️ No credentials file found or invalid.');
+// Middleware to check for MC credentials in session
+function requireMCCreds(req, res, next) {
+  if (req.session.mcCreds && req.session.mcCreds.subdomain && req.session.mcCreds.clientId && req.session.mcCreds.clientSecret) {
+    return next();
   }
+  res.redirect('/setup');
 }
 
-// Save credentials to file
-function saveCredsToFile() {
-  try {
-    fs.writeFileSync(CRED_FILE, JSON.stringify(dynamicCreds, null, 2), 'utf8');
-    console.log('💾 Credentials saved to file.');
-  } catch (e) {
-    console.error('❌ Failed to save credentials:', e);
-  }
-}
-
-loadCredsFromFile();
-
+// Save credentials to session (per user)
 app.post('/save-credentials', (req, res) => {
   const { subdomain, clientId, clientSecret, accountId } = req.body;
-  console.log('🔔 /save-credentials received:', { subdomain, clientId, clientSecret, accountId });
-  dynamicCreds = { subdomain, clientId, clientSecret, accountId };
-  saveCredsToFile();
-  console.log('💾 dynamicCreds after save:', dynamicCreds);
-  // Use the provided subdomain for the login URL
-  const redirectUri = 'https://mc-explorer.onrender.com/auth/callback';
-  const loginUrl = `https://${subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-  console.log('🔐 Generated Login URL:', loginUrl);
-  res.json({ redirectUrl: loginUrl });
+  req.session.mcCreds = { subdomain, clientId, clientSecret, accountId };
+  console.log('🔔 /save-credentials (session) received:', req.session.mcCreds);
+  res.json({ success: true });
 });
 
-app.get('/auth/login', (req, res) => {
-  const creds = getDynamicCreds();
-  if (!creds.subdomain || !creds.clientId) {
-    return res.status(400).send('Missing credentials. Please set up credentials first.');
-  }
-  const redirectUri = 'https://mc-explorer.onrender.com/auth/callback';
-  const loginUrl = `https://${creds.subdomain}.auth.marketingcloudapis.com/v2/authorize?client_id=${creds.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-  console.log('🔐 Redirecting to login URL:', loginUrl);
-  res.redirect(loginUrl);
+// Endpoint to check if backend has credentials (per session)
+app.get('/has-credentials', (req, res) => {
+  const creds = req.session.mcCreds || {};
+  console.log('🟢 /has-credentials (session) check:', creds);
+  const hasCreds = !!(creds.subdomain && creds.clientId && creds.clientSecret);
+  res.json({ hasCreds });
 });
 
-app.get('/auth/callback', (req, res) => {
-  // Serve the React app for SPA routing; do NOT handle code exchange here
-  res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
+// Logout route to clear session
+app.post('/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) return res.status(500).json({ success: false });
+    res.clearCookie('connect.sid');
+    res.json({ success: true });
+  });
 });
 
-app.post('/auth/callback', async (req, res) => {
-  const code = req.body.code;
-  const creds = getDynamicCreds();
-  if (!creds.subdomain || !creds.clientId || !creds.clientSecret) {
-    return res.status(400).json({ success: false, error: 'Missing credentials' });
-  }
-  try {
-    const tokenResponse = await axios.post(
-      `https://${creds.subdomain}.auth.marketingcloudapis.com/v2/token`,
-      new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        client_id: creds.clientId,
-        client_secret: creds.clientSecret,
-        redirect_uri: 'https://mc-explorer.onrender.com/auth/callback'
-      }),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-    );
-    const accessToken = tokenResponse.data.access_token;
-    const refreshToken = tokenResponse.data.refresh_token;
-    res.json({ success: true, accessToken, refreshToken, subdomain: creds.subdomain });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.response?.data || err.message });
-  }
-});
+// Example: protect dashboard route
+// app.get('/dashboard', requireMCCreds, (req, res) => {
+//   // ...serve dashboard or API logic
+// });
 
-function getAccessTokenFromRequest(req) {
-  const authHeader = req.headers['authorization'];
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7);
-  }
-  return null;
-}
-function getSubdomainFromRequest(req) {
-  return req.headers['x-mc-subdomain'] || null;
+// Use req.session.mcCreds for all MC API calls
+function getMCCreds(req) {
+  return req.session.mcCreds;
 }
 
-// Use dynamicCreds for OAuth and API calls
-function getDynamicCreds() {
-  return dynamicCreds;
-}
+// =========================
+// MC-Explorer: Search Assets Module (continued)
+// =========================
 
 // Helper to build folder path from folderMap
 function buildFolderPath(folderId, folderMap) {
@@ -1808,10 +1753,11 @@ app.get('/describe-soap-object', async (req, res) => {
   }
 });
 
-// Endpoint to check if backend has credentials (must be before static serving and catch-all)
+// Endpoint to check if backend has credentials (per session)
 app.get('/has-credentials', (req, res) => {
-  console.log('🟢 /has-credentials check:', dynamicCreds);
-  const hasCreds = !!(dynamicCreds.subdomain && dynamicCreds.clientId && dynamicCreds.clientSecret);
+  const creds = req.session.mcCreds || {};
+  console.log('🟢 /has-credentials (session) check:', creds);
+  const hasCreds = !!(creds.subdomain && creds.clientId && creds.clientSecret);
   res.json({ hasCreds });
 });
 
