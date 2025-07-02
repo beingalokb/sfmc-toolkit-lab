@@ -1284,32 +1284,36 @@ export default function MainApp() {
                 {dmStatus && (
                   <div className="mt-4 text-sm text-gray-700">{dmStatus}</div>
                 )}
-                {dmDEPath && (() => {
-                  // Extract DE name from the path (format: Folder/DEName)
-                  const parts = dmDEPath.split('/');
-                  const deName = parts[parts.length - 1];
-                  const deFolder = parts.slice(0, -1).join(' / ');
-                  return (
-                    <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
-                      <div className="text-green-800 font-bold mb-2">Data Extension created!</div>
-                      <div className="mb-2 text-gray-800">
-                        <span className="font-semibold">Your data extension name is:</span> <span className="font-mono text-blue-900">{deName}</span>
+                {dmStatus === 'Data Extension created!' && (
+                  (() => {
+                    // Try to extract DE name from dmDEPath, fallback to status if not available
+                    let deName = '';
+                    if (dmDEPath) {
+                      const parts = dmDEPath.split('/');
+                      deName = parts[parts.length - 1];
+                    }
+                    return (
+                      <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+                        <div className="text-green-800 font-bold mb-2">Data Extension created!</div>
+                        <div className="mb-2 text-gray-800">
+                          <span className="font-semibold">Your data extension name is:</span> <span className="font-mono text-blue-900">{deName || 'N/A'}</span>
+                        </div>
+                        <div className="mb-2 text-gray-800">
+                          <span className="font-semibold">The data extension path is:</span> <span className="font-mono text-blue-900">Data Extensions &gt; {deName || 'N/A'}</span>
+                        </div>
+                        <div className="mb-2 text-gray-800">
+                          <span className="font-semibold">Update the below attributes in the data extension:</span>
+                          <ul className="list-disc ml-6 mt-1">
+                            <li><span className="font-semibold">USED FOR SENDING</span></li>
+                            <li><span className="font-semibold">USED FOR TESTING</span></li>
+                            <li><span className="font-semibold">SUBSCRIBER RELATIONSHIP</span></li>
+                          </ul>
+                        </div>
+                        <div className="mt-3 text-indigo-800 font-semibold">Now you are ready to create the Journey.</div>
                       </div>
-                      <div className="mb-2 text-gray-800">
-                        <span className="font-semibold">The data extension path is:</span> <span className="font-mono text-blue-900">/{deFolder}</span>
-                      </div>
-                      <div className="mb-2 text-gray-800">
-                        <span className="font-semibold">Update the below attributes in the data extension:</span>
-                        <ul className="list-disc ml-6 mt-1">
-                          <li><span className="font-semibold">USED FOR SENDING</span></li>
-                          <li><span className="font-semibold">USED FOR TESTING</span></li>
-                          <li><span className="font-semibold">SUBSCRIBER RELATIONSHIP</span></li>
-                        </ul>
-                      </div>
-                      <div className="mt-3 text-indigo-800 font-semibold">Now you are ready to create the Journey.</div>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()
+                )}
               </div>
             )}
             {dmStep === 2 && (
