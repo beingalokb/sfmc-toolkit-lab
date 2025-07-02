@@ -48,6 +48,12 @@ export default function MainApp() {
   // Publications state
   const [publications, setPublications] = useState([]);
 
+  // Add new top-level tab for Distributed Marketing
+  const [dmStep, setDMStep] = useState(1);
+  const [dmDEPath, setDMDEPath] = useState('');
+  const [dmJourneyPath, setDMJourneyPath] = useState('');
+  const [dmStatus, setDMStatus] = useState('');
+
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
     if (!key) return '';
@@ -738,6 +744,12 @@ export default function MainApp() {
           >
             Guided Preference Center
           </button>
+          <button
+            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'distributedMarketing' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+            onClick={() => setParentNav('distributedMarketing')}
+          >
+            Distributed Marketing
+          </button>
         </div>
         {/* Render content based on parentNav */}
         {parentNav === 'search' ? (
@@ -1241,6 +1253,58 @@ export default function MainApp() {
               <div className="mt-6 text-left text-gray-600">
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
                   <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core consent model is in development.
+                </div>
+              </div>
+            )}
+          </div>
+        ) : parentNav === 'distributedMarketing' ? (
+          <div className="bg-white shadow rounded p-6 max-w-xl mx-auto">
+            <h2 className="text-2xl font-bold mb-4 text-indigo-700">Distributed Marketing Journey Setup</h2>
+            <ol className="mb-6 flex gap-4">
+              <li className={`font-semibold ${dmStep === 1 ? 'text-blue-700' : 'text-gray-500'}`}>1. Create Data Extension</li>
+              <li className={`font-semibold ${dmStep === 2 ? 'text-blue-700' : 'text-gray-500'}`}>2. Create Journey</li>
+            </ol>
+            {dmStep === 1 && (
+              <div>
+                <button
+                  className="bg-blue-700 text-white px-4 py-2 rounded font-semibold"
+                  onClick={async () => {
+                    setDMStatus('Creating Data Extension...');
+                    const res = await fetch('/create/dm-dataextension', { method: 'POST' });
+                    const data = await res.json();
+                    if (data.status === 'OK') {
+                      setDMDEPath(data.path);
+                      setDMStatus('Data Extension created!');
+                      setDMStep(2);
+                    } else {
+                      setDMStatus('Failed to create Data Extension: ' + (data.message || 'Unknown error'));
+                    }
+                  }}
+                >Create Data Extension</button>
+                {dmStatus && <div className="mt-4 text-sm text-gray-700">{dmStatus}</div>}
+                {dmDEPath && <div className="mt-2 text-green-700">Data Extension Path: {dmDEPath}</div>}
+              </div>
+            )}
+            {dmStep === 2 && (
+              <div>
+                <button
+                  className="bg-green-700 text-white px-4 py-2 rounded font-semibold"
+                  onClick={async () => {
+                    setDMStatus('Creating Journey...');
+                    const res = await fetch('/create/dm-journey', { method: 'POST' });
+                    const data = await res.json();
+                    if (data.status === 'OK') {
+                      setDMJourneyPath(data.path);
+                      setDMStatus('Journey created!');
+                    } else {
+                      setDMStatus('Failed to create Journey: ' + (data.message || 'Unknown error'));
+                    }
+                  }}
+                >Create Journey</button>
+                {dmStatus && <div className="mt-4 text-sm text-gray-700">{dmStatus}</div>}
+                {dmJourneyPath && <div className="mt-2 text-green-700">Journey Path: {dmJourneyPath}</div>}
+                <div className="mt-4 text-blue-800 text-sm">
+                  Your journey is ready for quick send. Feel free to edit your journey, add your emails to the Journey and also if needed update the data extension or move it to your desired path.
                 </div>
               </div>
             )}
