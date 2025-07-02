@@ -1866,8 +1866,6 @@ app.get('/search/publication', async (req, res) => {
               <Properties>ID</Properties>
               <Properties>Name</Properties>
               <Properties>Category</Properties>
-              <Properties>CustomerKey</Properties>
-              <Properties>BusinessUnit</Properties>
             </RetrieveRequest>
           </RetrieveRequestMsg>
         </s:Body>
@@ -1875,41 +1873,49 @@ app.get('/search/publication', async (req, res) => {
     `;
     // Log the SOAP envelope for debugging
     console.log('🔵 [Publication] SOAP Envelope:', soapEnvelope);
-    const response = await axios.post(
-      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-      soapEnvelope,
-      {
-        headers: {
-          'Content-Type': 'text/xml',
-          SOAPAction: 'Retrieve',
-        },
+    try {
+      const response = await axios.post(
+        `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+        soapEnvelope,
+        {
+          headers: {
+            'Content-Type': 'text/xml',
+            SOAPAction: 'Retrieve',
+          },
+        }
+      );
+      // Log the raw SOAP response
+      console.log('🔵 [Publication] SOAP Response:', response.data);
+      const parser = new xml2js.Parser({ explicitArray: false });
+      parser.parseString(response.data, (err, result) => {
+        if (err) {
+          console.error('❌ [Publication] Failed to parse XML:', err);
+          return res.status(500).json({ error: 'Failed to parse XML' });
+        }
+        try {
+          const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+          if (!results) return res.status(200).json([]);
+          const resultArray = Array.isArray(results) ? results : [results];
+          const pubs = resultArray.map(pub => ({
+            id: pub.ID || '',
+            name: pub.Name || '',
+            category: pub.Category || ''
+          }));
+          res.json(pubs);
+        } catch (e) {
+          console.error('❌ [Publication] Unexpected format:', e);
+          res.status(500).json({ error: 'Unexpected Publication format' });
+        }
+      });
+    } catch (err) {
+      // Log the error response body if available
+      if (err.response && err.response.data) {
+        console.error('❌ [Publication] SOAP Error Response:', err.response.data);
+      } else {
+        console.error('❌ [Publication] Request Error:', err.message);
       }
-    );
-    // Log the raw SOAP response
-    console.log('🔵 [Publication] SOAP Response:', response.data);
-    const parser = new xml2js.Parser({ explicitArray: false });
-    parser.parseString(response.data, (err, result) => {
-      if (err) {
-        console.error('❌ [Publication] Failed to parse XML:', err);
-        return res.status(500).json({ error: 'Failed to parse XML' });
-      }
-      try {
-        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-        if (!results) return res.status(200).json([]);
-        const resultArray = Array.isArray(results) ? results : [results];
-        const pubs = resultArray.map(pub => ({
-          id: pub.ID || '',
-          name: pub.Name || '',
-          category: pub.Category || '',
-          customerKey: pub.CustomerKey || '',
-          businessUnit: pub.BusinessUnit || ''
-        }));
-        res.json(pubs);
-      } catch (e) {
-        console.error('❌ [Publication] Unexpected format:', e);
-        res.status(500).json({ error: 'Unexpected Publication format' });
-      }
-    });
+      res.status(500).json({ error: 'Failed to fetch Publications' });
+    }
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch Publications' });
   }
