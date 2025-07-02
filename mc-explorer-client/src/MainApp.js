@@ -841,14 +841,9 @@ export default function MainApp() {
                         <tr>
                           <th className="text-left p-2">ID</th>
                           <th className="text-left p-2">Name</th>
-                          <th className="text-left p-2">CustomerKey</th>
-                          <th className="text-left p-2">IsActive</th>
-                          <th className="text-left p-2">CreatedDate</th>
-                          <th className="text-left p-2">ModifiedDate</th>
                           <th className="text-left p-2">Category</th>
-                          <th className="text-left p-2">SendClassification</th>
-                          <th className="text-left p-2">Subscribers</th>
-                          <th className="text-left p-2">Client</th>
+                          <th className="text-left p-2">CustomerKey</th>
+                          <th className="text-left p-2">BusinessUnit</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -856,14 +851,9 @@ export default function MainApp() {
                           <tr key={pub.id || idx} className="border-t">
                             <td className="p-2">{pub.id}</td>
                             <td className="p-2 font-medium">{pub.name}</td>
-                            <td className="p-2">{pub.customerKey}</td>
-                            <td className="p-2">{pub.isActive ? 'Yes' : 'No'}</td>
-                            <td className="p-2">{formatDate(pub.createdDate)}</td>
-                            <td className="p-2">{formatDate(pub.modifiedDate)}</td>
-                            <td className="p-2">{pub.category?.Name || pub.category || 'N/A'}</td>
-                            <td className="p-2">{pub.sendClassification?.Name || pub.sendClassification || 'N/A'}</td>
-                            <td className="p-2">{Array.isArray(pub.subscribers) ? pub.subscribers.length : (pub.subscribers || 'N/A')}</td>
-                            <td className="p-2">{pub.client?.Name || pub.client || 'N/A'}</td>
+                            <td className="p-2">{pub.category}</td>
+                            <td className="p-2">{pub.customerKey || ''}</td>
+                            <td className="p-2">{pub.businessUnit || ''}</td>
                           </tr>
                         ))}
                       </tbody>
