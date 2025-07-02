@@ -2004,7 +2004,7 @@ app.post('/create/dm-dataextension', async (req, res) => {
     const deSoap = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <soapenv:Header>
-          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+          <fueloauth>${accessToken}</fueloauth>
         </soapenv:Header>
         <soapenv:Body>
           <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
@@ -2025,9 +2025,10 @@ app.post('/create/dm-dataextension', async (req, res) => {
                 <Field><Name>sendFromEmail</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>firstName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>lastName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
-                <Field><Name>sfUserId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired></Field>
-                <Field><Name>journeyID</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired></Field>
-                <Field><Name>sfOrgId</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired></Field>
+                <Field><Name>sfUserId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>journeyID</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>sfOrgId</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>DateEntered</Name><FieldType>Date</FieldType><IsRequired>false</IsRequired><DefaultValue>GETDATE()</DefaultValue></Field>
                 <Field><Name>smsValue</Name><FieldType>Text</FieldType><MaxLength>160</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>mobilePhone</Name><FieldType>Phone</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>EntryObjectId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
