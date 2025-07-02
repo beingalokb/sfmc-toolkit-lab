@@ -1281,8 +1281,19 @@ export default function MainApp() {
                     }
                   }}
                 >Create Data Extension</button>
-                {dmStatus && <div className="mt-4 text-sm text-gray-700">{dmStatus}</div>}
-                {dmDEPath && <div className="mt-2 text-green-700">Data Extension Path: {dmDEPath}</div>}
+                {dmStatus && (
+                  <div className="mt-4 text-sm text-gray-700">{dmStatus}</div>
+                )}
+                {dmDEPath && (
+                  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+                    <div className="text-green-800 font-semibold mb-1">Data Extension created!</div>
+                    <div className="text-green-700 mb-2">Path: <span className="font-mono">{dmDEPath}</span></div>
+                    <div className="text-gray-700 text-sm mt-2">
+                      <span className="font-semibold">Note:</span> Feel free to update <span className="font-semibold">USED FOR SENDING</span> and <span className="font-semibold">USED FOR TESTING</span> to <span className="text-green-800 font-semibold">Yes</span> if you want to use this DE for sending and testing.<br/>
+                      Also update the <span className="font-semibold">SUBSCRIBER RELATIONSHIP</span> (e.g., <span className="font-mono">id</span> relates to Subscribers on <span className="font-mono">Subscriber Key</span>) if you want to use <span className="font-mono">id</span> as the Subscriber Key.
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {dmStep === 2 && (
