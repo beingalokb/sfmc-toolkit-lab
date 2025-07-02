@@ -506,12 +506,26 @@ export default function MainApp() {
     setEditESDModal(prev => ({ ...prev, [field]: value }));
   }
 
+  // Helper to get CustomerKey from name or key
+  function getCustomerKey(profiles, value) {
+    if (!value) return '';
+    // If value matches a CustomerKey, return it
+    if (profiles.some(p => p.CustomerKey === value)) return value;
+    // Otherwise, try to find by Name
+    const found = profiles.find(p => p.Name === value);
+    return found ? found.CustomerKey : value;
+  }
+
   // Handler to submit update
   async function submitEditESDModal() {
     setEditESDModal(prev => ({ ...prev, loading: true, error: null }));
     try {
       const accessToken = localStorage.getItem('accessToken');
       const subdomain = localStorage.getItem('subdomain');
+      // Always use CustomerKey for these fields
+      const sendClassificationKey = getCustomerKey(sendClassifications, editESDModal.sendClassification);
+      const senderProfileKey = getCustomerKey(senderProfiles, editESDModal.senderProfile);
+      const deliveryProfileKey = getCustomerKey(deliveryProfiles, editESDModal.deliveryProfile);
       const res = await fetch(`${baseURL}/update/emailsenddefinition`, {
         method: 'POST',
         headers: {
@@ -521,9 +535,9 @@ export default function MainApp() {
         },
         body: JSON.stringify({
           CustomerKey: editESDModal.esd.CustomerKey,
-          SendClassification: editESDModal.sendClassification,
-          SenderProfile: editESDModal.senderProfile,
-          DeliveryProfile: editESDModal.deliveryProfile
+          SendClassification: sendClassificationKey,
+          SenderProfile: senderProfileKey,
+          DeliveryProfile: deliveryProfileKey
         })
       });
       const data = await res.json();
@@ -633,6 +647,10 @@ export default function MainApp() {
     try {
       const accessToken = localStorage.getItem('accessToken');
       const subdomain = localStorage.getItem('subdomain');
+      // Always use CustomerKey for these fields
+      const sendClassificationKey = getCustomerKey(sendClassifications, massEditModal.sendClassification);
+      const senderProfileKey = getCustomerKey(senderProfiles, massEditModal.senderProfile);
+      const deliveryProfileKey = getCustomerKey(deliveryProfiles, massEditModal.deliveryProfile);
       const res = await fetch(`${baseURL}/update/emailsenddefinition-mass`, {
         method: 'POST',
         headers: {
@@ -642,9 +660,9 @@ export default function MainApp() {
         },
         body: JSON.stringify({
           CustomerKeys: selectedESDKeys,
-          SendClassification: massEditModal.sendClassification,
-          SenderProfile: massEditModal.senderProfile,
-          DeliveryProfile: massEditModal.deliveryProfile
+          SendClassification: sendClassificationKey,
+          SenderProfile: senderProfileKey,
+          DeliveryProfile: deliveryProfileKey
         })
       });
       const data = await res.json();
@@ -759,7 +777,19 @@ export default function MainApp() {
               </div>
             </div>
 
-            <div className="flex gap-4 mb-4">
+            {/* Responsive search bar row */}
+            <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-2">
+              <input
+                type="text"
+                placeholder="Search..."
+                className="border px-3 py-2 rounded w-full sm:w-64"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{ maxWidth: 320 }}
+              />
+            </div>
+            {/* Tab buttons and CSV download */}
+            <div className="flex flex-wrap gap-2 mb-4 items-center">
               {['de', 'automation', 'datafilter', 'journey', 'emailsenddefinition', 'publication'].map(tab => (
                 <button
                   key={tab}
@@ -775,13 +805,6 @@ export default function MainApp() {
               >
                 Download CSV
               </button>
-              <input
-                type="text"
-                placeholder="Search..."
-                className="ml-auto border px-3 py-1 rounded"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
             </div>
 
             <div className="overflow-x-auto bg-white shadow rounded">
