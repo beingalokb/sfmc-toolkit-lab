@@ -1921,6 +1921,132 @@ app.get('/search/publication', async (req, res) => {
   }
 });
 
+// Create Distributed Marketing Data Extension and folder
+app.post('/create/dm-dataextension', async (req, res) => {
+  const accessToken = req.session.accessToken;
+  const subdomain = req.session.mcCreds && req.session.mcCreds.subdomain;
+  if (!accessToken || !subdomain) return res.status(401).json({ status: 'ERROR', message: 'Unauthorized' });
+  try {
+    // 1. Create folder DM_MC_explorer (if not exists)
+    const folderName = 'DM_MC_explorer';
+    let folderId = null;
+    // Try to find folder first
+    const folderSoap = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataFolder</ObjectType>
+              <Properties>ID</Properties>
+              <Properties>Name</Properties>
+              <Properties>ContentType</Properties>
+              <Filter>
+                <Property>Name</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>${folderName}</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+    const folderResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      folderSoap,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+    const folderParser = new xml2js.Parser({ explicitArray: false });
+    const folderResult = await folderParser.parseStringPromise(folderResp.data);
+    const folderResults = folderResult?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+    if (folderResults && folderResults.ID) {
+      folderId = folderResults.ID;
+    } else if (Array.isArray(folderResults) && folderResults.length > 0) {
+      folderId = folderResults[0].ID;
+    }
+    // If not found, create folder
+    if (!folderId) {
+      const createFolderSoap = `
+        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <soapenv:Header>
+            <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+          </soapenv:Header>
+          <soapenv:Body>
+            <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <Objects xsi:type="DataFolder">
+                <Name>${folderName}</Name>
+                <ContentType>dataextension</ContentType>
+                <IsActive>true</IsActive>
+                <IsEditable>true</IsEditable>
+                <AllowChildren>true</AllowChildren>
+              </Objects>
+            </CreateRequest>
+          </soapenv:Body>
+        </soapenv:Envelope>
+      `;
+      const createFolderResp = await axios.post(
+        `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+        createFolderSoap,
+        { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
+      );
+      const createFolderResult = await folderParser.parseStringPromise(createFolderResp.data);
+      folderId = createFolderResult?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['Results']?.['NewID'];
+    }
+    if (!folderId) return res.status(500).json({ status: 'ERROR', message: 'Failed to create or find folder' });
+
+    // 2. Create Data Extension
+    const now = new Date();
+    const pad = n => n.toString().padStart(2, '0');
+    const dtStr = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const deName = `DM_MC_explorer_${dtStr}`;
+    const deSoap = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <Options />
+            <Objects xsi:type="DataExtension">
+              <Name>${deName}</Name>
+              <CustomerKey>${deName}</CustomerKey>
+              <CategoryID>${folderId}</CategoryID>
+              <IsSendable>false</IsSendable>
+              <Fields>
+                <Field><Name>EmailAddress_type</Name><FieldType>EmailAddress</FieldType><IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired></Field>
+                <Field><Name>Text_type</Name><FieldType>Text</FieldType><IsRequired>false</IsRequired></Field>
+                <Field><Name>Date_type</Name><FieldType>Date</FieldType><DefaultValue>getdate()</DefaultValue><IsRequired>true</IsRequired></Field>
+                <Field><Name>Decimal_type</Name><FieldType>Decimal</FieldType><IsRequired>true</IsRequired><Precision>10</Precision><Scale>2</Scale></Field>
+                <Field><Name>Boolean_type</Name><FieldType>Boolean</FieldType><DefaultValue>true</DefaultValue><IsRequired>true</IsRequired></Field>
+                <Field><Name>Number_type</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
+                <Field><Name>Phone_type</Name><FieldType>Phone</FieldType><IsRequired>false</IsRequired></Field>
+                <Field><Name>Locale_type</Name><FieldType>Locale</FieldType><IsRequired>false</IsRequired></Field>
+              </Fields>
+            </Objects>
+          </CreateRequest>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+    const deResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      deSoap,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
+    );
+    const deResult = await folderParser.parseStringPromise(deResp.data);
+    const status = deResult?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['OverallStatus'];
+    if (status && status.toLowerCase().includes('ok')) {
+      return res.json({ status: 'OK', path: `${folderName}/${deName}` });
+    } else {
+      return res.status(500).json({ status: 'ERROR', message: status });
+    }
+  } catch (e) {
+    console.error('❌ [DM DataExtension] Error:', e.response?.data || e.message);
+    res.status(500).json({ status: 'ERROR', message: e.message });
+  }
+});
+
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
 // Serve React frontend (must be last)
