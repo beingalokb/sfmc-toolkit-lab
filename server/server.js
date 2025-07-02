@@ -1927,8 +1927,8 @@ app.post('/create/dm-dataextension', async (req, res) => {
   const subdomain = req.session.mcCreds && req.session.mcCreds.subdomain;
   if (!accessToken || !subdomain) return res.status(401).json({ status: 'ERROR', message: 'Unauthorized' });
   try {
-    // 1. Create folder DM_MC_explorer (if not exists)
-    const folderName = 'DM_MC_explorer';
+    // 1. Create/find folder MC-Explorer-Distributed Marketing
+    const folderName = 'MC-Explorer-Distributed Marketing';
     let folderId = null;
     // Try to find folder first
     const folderSoap = `
@@ -1996,7 +1996,7 @@ app.post('/create/dm-dataextension', async (req, res) => {
     }
     if (!folderId) return res.status(500).json({ status: 'ERROR', message: 'Failed to create or find folder' });
 
-    // 2. Create Data Extension
+    // 2. Create Data Extension with correct fields
     const now = new Date();
     const pad = n => n.toString().padStart(2, '0');
     const dtStr = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
@@ -2015,14 +2015,22 @@ app.post('/create/dm-dataextension', async (req, res) => {
               <CategoryID>${folderId}</CategoryID>
               <IsSendable>false</IsSendable>
               <Fields>
-                <Field><Name>EmailAddress_type</Name><FieldType>EmailAddress</FieldType><IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired></Field>
-                <Field><Name>Text_type</Name><FieldType>Text</FieldType><IsRequired>false</IsRequired></Field>
-                <Field><Name>Date_type</Name><FieldType>Date</FieldType><DefaultValue>getdate()</DefaultValue><IsRequired>true</IsRequired></Field>
-                <Field><Name>Decimal_type</Name><FieldType>Decimal</FieldType><IsRequired>true</IsRequired><Precision>10</Precision><Scale>2</Scale></Field>
-                <Field><Name>Boolean_type</Name><FieldType>Boolean</FieldType><DefaultValue>true</DefaultValue><IsRequired>true</IsRequired></Field>
-                <Field><Name>Number_type</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
-                <Field><Name>Phone_type</Name><FieldType>Phone</FieldType><IsRequired>false</IsRequired></Field>
-                <Field><Name>Locale_type</Name><FieldType>Locale</FieldType><IsRequired>false</IsRequired></Field>
+                <Field><Name>greeting</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>id</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired></Field>
+                <Field><Name>email</Name><FieldType>EmailAddress</FieldType><MaxLength>254</MaxLength><IsPrimaryKey>false</IsPrimaryKey><IsRequired>false</IsRequired></Field>
+                <Field><Name>sfCampaignId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>sfCampaignMemberId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>sfQuickSendId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>sendFromName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>sendFromEmail</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>firstName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>lastName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>sfUserId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired></Field>
+                <Field><Name>journeyID</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired></Field>
+                <Field><Name>sfOrgId</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired></Field>
+                <Field><Name>smsValue</Name><FieldType>Text</FieldType><MaxLength>160</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>mobilePhone</Name><FieldType>Phone</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>EntryObjectId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
               </Fields>
             </Objects>
           </CreateRequest>
