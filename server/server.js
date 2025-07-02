@@ -1868,8 +1868,8 @@ app.get('/search/publication', async (req, res) => {
               <Properties>Category</Properties>
             </RetrieveRequest>
           </RetrieveRequestMsg>
-        </s:Body>
-      </s:Envelope>
+        </soapenv:Body>
+      </soapenv:Envelope>
     `;
     // Log the SOAP envelope for debugging
     console.log('🔵 [Publication] SOAP Envelope:', soapEnvelope);
