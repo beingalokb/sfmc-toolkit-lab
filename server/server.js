@@ -1466,6 +1466,8 @@ app.post('/update/emailsenddefinition', async (req, res) => {
   if (!accessToken || !subdomain) return res.status(401).json({ error: 'Unauthorized' });
   if (!CustomerKey) return res.status(400).json({ error: 'Missing CustomerKey' });
   try {
+    // Log the incoming payload for debugging
+    console.log('🔵 [Update ESD] Payload:', req.body);
     const soapEnvelope = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <soapenv:Header>
@@ -1483,6 +1485,8 @@ app.post('/update/emailsenddefinition', async (req, res) => {
         </soapenv:Body>
       </soapenv:Envelope>
     `;
+    // Log the SOAP envelope for debugging
+    console.log('🔵 [Update ESD] SOAP Envelope:', soapEnvelope);
     const response = await axios.post(
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
       soapEnvelope,
@@ -1493,15 +1497,19 @@ app.post('/update/emailsenddefinition', async (req, res) => {
         },
       }
     );
+    // Log the raw SOAP response
+    console.log('🔵 [Update ESD] SOAP Response:', response.data);
     const parser = new xml2js.Parser({ explicitArray: false });
     const result = await parser.parseStringPromise(response.data);
     const status = result?.['soap:Envelope']?.['soap:Body']?.['UpdateResponse']?.['OverallStatus'];
     if (status && status.toLowerCase().includes('ok')) {
       res.json({ status: 'OK' });
     } else {
+      console.error('❌ [Update ESD] SOAP Error:', status, result);
       res.status(500).json({ status: 'ERROR', message: status });
     }
   } catch (e) {
+    console.error('❌ [Update ESD] Exception:', e.response?.data || e.message, e.stack);
     res.status(500).json({ status: 'ERROR', message: e.message });
   }
 });
