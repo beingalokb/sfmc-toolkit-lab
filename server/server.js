@@ -1502,11 +1502,19 @@ app.post('/update/emailsenddefinition', async (req, res) => {
     const parser = new xml2js.Parser({ explicitArray: false });
     const result = await parser.parseStringPromise(response.data);
     const status = result?.['soap:Envelope']?.['soap:Body']?.['UpdateResponse']?.['OverallStatus'];
+    const statusMessage = result?.['soap:Envelope']?.['soap:Body']?.['UpdateResponse']?.['Results']?.['StatusMessage'];
     if (status && status.toLowerCase().includes('ok')) {
       res.json({ status: 'OK' });
     } else {
+      // User-friendly error for V5 Customers restriction
+      if (statusMessage && statusMessage.includes('V5 Customers cannot update User-Initiated Sends with Salesforce Reports or Campaigns')) {
+        return res.status(400).json({
+          status: 'ERROR',
+          message: 'This EmailSendDefinition cannot be updated via API because it is a User-Initiated Send tied to Salesforce Reports or Campaigns. This is a Salesforce platform restriction.'
+        });
+      }
       console.error('❌ [Update ESD] SOAP Error:', status, result);
-      res.status(500).json({ status: 'ERROR', message: status });
+      res.status(500).json({ status: 'ERROR', message: statusMessage || status });
     }
   } catch (e) {
     console.error('❌ [Update ESD] Exception:', e.response?.data || e.message, e.stack);
@@ -1860,8 +1868,8 @@ app.get('/search/publication', async (req, res) => {
               <Properties>Category</Properties>
             </RetrieveRequest>
           </RetrieveRequestMsg>
-        </soapenv:Body>
-      </soapenv:Envelope>
+        </s:Body>
+      </s:Envelope>
     `;
     const response = await axios.post(
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
