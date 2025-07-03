@@ -2212,7 +2212,7 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
 
 
     // Step 6: Create Journey
-await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec to ensure event is ready
+await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec
 
 const journeyName = `Journey_${eventDtStr}`;
 
@@ -2220,48 +2220,50 @@ const journeyPayload = {
   key: journeyName,
   name: journeyName,
   description: `Auto-created journey for ${deName}`,
-  workflowApiVersion: 1,
-  definitionType: 'multi-step', // 🔁 fixed typo from "multistep"
-  journeyStatus: 'Draft',
+  workflowApiVersion: 1.0,
+  definitionType: 'Journey',
+  status: 'Draft',
+  entryMode: 'SingleEntryEvent',
+  activities: [],
   triggers: [
     {
       key: `event-key-${eventDtStr}`,
       name: 'Journey Entry',
-      type: 'APIEvent',
+      type: 'Event',
       eventDefinitionKey: eventKey,
-      configurationArguments: {},
-      arguments: {}
-    }
-  ],
-  entryMode: 'Event',
-  entrySpecification: {
-    eventDefinitionKey: eventKey,
-    mode: 'ContactEvent',
-    type: 'APIEvent',
-    sourceApplicationExtensionId: '0b0587e3-13e3-4d2a-8824-4bd36d398dfd' // ✅ Required for Distributed Marketing
-  },
-  entryEvents: [
-    {
-      eventDefinitionKey: eventKey,
-      mode: 'ContactEvent'
+      arguments: {
+        executionMode: 'Production'
+      }
     }
   ]
 };
 
-const journeyResp = await axios.post(
-  `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
-  journeyPayload,
-  {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
+// Log the payload for debugging
+console.log('[Journey Payload]', JSON.stringify(journeyPayload, null, 2));
+
+try {
+  const journeyResp = await axios.post(
+    `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
+    journeyPayload,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
     }
-  }
-);
+  );
 
-console.log('[Journey Created]', journeyResp.data);
-
-const journeyId = journeyResp.data.id;
+  console.log('[Journey Created]', journeyResp.data);
+  const journeyId = journeyResp.data.id;
+} catch (error) {
+  console.log('[Journey Creation Error]', {
+    status: error.response?.status,
+    statusText: error.response?.statusText,
+    data: error.response?.data,
+    message: error.message
+  });
+  throw error;  // Re-throw to be caught by the outer try-catch
+}
 
 return res.status(200).json({
   status: "OK",
@@ -2271,6 +2273,7 @@ return res.status(200).json({
   journeyName,
   journeyId
 });
+
 
 
 
