@@ -1980,7 +1980,7 @@ if (Array.isArray(rootFolders)) {
     if (!parentId) return res.status(500).json({ status: 'ERROR', message: 'Root folder for dataextensions not found' });
 
      // Step 2: Try to find folder first
-    const folderName = 'MC-Explorer-Distributed Marketing';
+    const folderName = `MC-Explorer-Distributed Marketing-${Date.now()}`;
     let folderId = null;
     const folderSoap = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
