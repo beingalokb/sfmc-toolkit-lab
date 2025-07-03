@@ -1980,7 +1980,7 @@ if (Array.isArray(rootFolders)) {
     if (!parentId) return res.status(500).json({ status: 'ERROR', message: 'Root folder for dataextensions not found' });
 
      // Step 2: Try to find folder first
-    const folderName = `MC-Explorer-Distributed Marketing-${Date.now()}`;
+    const folderName = `MC-Explorer-DM-${Date.now()}`;
     let folderId = null;
     const folderSoap = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -2121,14 +2121,18 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
       deSoap,
       { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
-    );
-    const deResult = await folderParser.parseStringPromise(deResp.data);
-    const status = deResult?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['OverallStatus'];
-    if (status && status.toLowerCase().includes('ok')) {
-      return res.json({ status: 'OK', path: `${folderName}/${deName}` });
-    } else {
-      return res.status(500).json({ status: 'ERROR', message: status });
-    }
+    );console.log('[SOAP DE Create Raw]', deResponse.data);
+  const deParsed = await parser.parseStringPromise(deResponse.data);
+  const statusMsg = deParsed?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['Results']?.['StatusMessage'];
+  const errorCode = deParsed?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['Results']?.['ErrorCode'];
+
+  if (errorCode && errorCode !== '0') {
+    console.error('[DE Creation Failed]', statusMsg);
+    return res.status(500).json({ status: 'ERROR', message: 'Failed to create Data Extension', details: statusMsg });
+  }
+
+  return res.status(200).json({ status: 'OK', message: 'Folder and Data Extension created successfully', folderId, deName });
+
   } catch (e) {
     console.error('❌ [DM DataExtension] Error:', e.response?.data || e.message);
     res.status(500).json({ status: 'ERROR', message: e.message });
