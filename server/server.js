@@ -2204,7 +2204,8 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
         }
       }
     );
-    console.log('✅ Event Definition created successfully:', eventKey);
+    const eventDefinitionKey = `dm_event_${eventDtStr}`;
+    console.log('✅ Event Definition created successfully:', eventDefinitionKey);
 
 
     // Step 6: Create Journey
@@ -2221,7 +2222,7 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
         channelType: 'Email',
         goals: [],
         entryEvent: {
-          eventDefinitionKey: eventKey,
+          eventDefinitionKey: eventDefinitionKey,
           eventType: 'APIEvent',
           isActive: true,
           mode: 'ContactEvent'
