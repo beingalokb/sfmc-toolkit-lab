@@ -1990,12 +1990,13 @@ app.post('/create/dm-dataextension', async (req, res) => {
           </soapenv:Body>
         </soapenv:Envelope>
       `;
-      console.log(createFolderResp.data)
+      
       const createFolderResp = await axios.post(
         `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
         createFolderSoap,
         { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
       );
+      console.log(createFolderResp.data)
       const createFolderResult = await folderParser.parseStringPromise(createFolderResp.data);
       folderId = createFolderResult?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['Results']?.['NewID'];
     }
