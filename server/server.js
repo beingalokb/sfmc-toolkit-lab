@@ -1969,25 +1969,33 @@ app.post('/create/dm-dataextension', async (req, res) => {
     // If not found, create folder
     if (!folderId) {
       const createFolderSoap = `
-        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:wsdl="http://exacttarget.com/wsdl/partnerAPI">
           <soapenv:Header>
             <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
           </soapenv:Header>
-          <soapenv:Body>
-            <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
-              <Objects xsi:type="DataFolder">
-                <Name>${folderName}</Name>
-                <ContentType>dataextension</ContentType>
-                <IsActive>true</IsActive>
-                <IsEditable>true</IsEditable>
-                <AllowChildren>true</AllowChildren>
-                <ParentFolder>
-            <ID>0</ID>
-            <ContentType>dataextension</ContentType>
-          </ParentFolder>
-              </Objects>
-            </CreateRequest>
-          </soapenv:Body>
+            <soapenv:Body>
+              <wsdl:CreateRequest>
+                <wsdl:Options/>
+                <wsdl:Objects xsi:type="wsdl:DataFolder">
+                  <wsdl:ModifiedDate xsi:nil="true"/>
+                  <wsdl:ObjectID xsi:nil="true"/>
+                  <wsdl:CustomerKey>${folderName}</wsdl:CustomerKey>
+                  <wsdl:Name>${folderName}</wsdl:Name>
+                  <wsdl:Description>Folder for DM Data Extensions</wsdl:Description>
+                  <wsdl:ContentType>dataextension</wsdl:ContentType>
+                  <wsdl:IsActive>true</wsdl:IsActive>
+                  <wsdl:IsEditable>true</wsdl:IsEditable>
+                  <wsdl:AllowChildren>true</wsdl:AllowChildren>
+                  <wsdl:ParentFolder>
+                  <wsdl:ID>0</wsdl:ID>
+                  <wsdl:ModifiedDate xsi:nil="true"/>
+                  <wsdl:ObjectID xsi:nil="true"/>
+                  </wsdl:ParentFolder>
+                </wsdl:Objects>
+              </wsdl:CreateRequest>
+            </soapenv:Body>
         </soapenv:Envelope>
       `;
       
