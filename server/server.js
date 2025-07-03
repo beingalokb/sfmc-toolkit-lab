@@ -2214,7 +2214,6 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     // Step 6: Create Journey
 await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec to ensure event is ready
 
-const eventDtStr = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
 const journeyName = `Journey_${eventDtStr}`;
 
 const journeyPayload = {
