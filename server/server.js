@@ -2219,28 +2219,25 @@ const startDate = new Date().toISOString();
 const endDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(); // 1 year
 
 const journeyPayload = {
-  name: journeyName,
   key: journeyName,
+  name: journeyName,
   description: `Auto-created journey for ${deName}`,
   workflowApiVersion: 1.0,
   definitionType: 'Multistep',
   status: 'Draft',
-  entryMode: 'SingleEntryEvent',
   schedule: {
-    startDate,
-    endDate
-  },
-  goals: [],
-  exits: [],
-  stats: {
-    numberOfActivities: 0
+    startDate: new Date().toISOString(),
+    endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
   },
   triggers: [
     {
       key: `event-key-${eventDtStr}`,
-      name: 'Distributed Marketing API Entry',
       type: 'APIEvent',
+      name: 'Distributed Marketing API Entry',
       eventDefinitionKey: eventKey,
+      metaData: {
+        eventDefinitionKey: eventKey
+      },
       configurationArguments: {
         sourceApplicationExtensionId: '0b0587e3-13e3-4d2a-8824-4bd36d398dfd'
       },
