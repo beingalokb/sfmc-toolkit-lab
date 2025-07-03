@@ -1968,8 +1968,12 @@ app.post('/create/dm-dataextension', async (req, res) => {
 
     let parentId = null;
     if (Array.isArray(rootFolders)) {
-      const rootDEFolder = rootFolders.find(f => f.ContentType === 'dataextension');
-      parentId = rootDEFolder?.ID;
+        const rootDEFolder = Array.isArray(rootFolders)
+        ? rootFolders.find(f => f.ContentType === 'dataextension' && f.Name === 'dataextension')
+        : (rootFolders?.ContentType === 'dataextension' ? rootFolders : null);
+
+  const parentId = rootDEFolder?.ID;
+
     } else if (rootFolders?.ContentType === 'dataextension') {
       parentId = rootFolders.ID;
     }
@@ -2018,36 +2022,43 @@ app.post('/create/dm-dataextension', async (req, res) => {
     }
       // Step 3: Create folder if not found
     if (!folderId) {
+      console.log('[Parent Folder ID]', parentId);
+
       const createFolderSoap = `
-        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-          <soapenv:Header>
-            <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
-          </soapenv:Header>
-          <soapenv:Body>
-            <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
-              <Objects xsi:type="DataFolder">
-                <Name>${folderName}</Name>
-                <ContentType>dataextension</ContentType>
-                <IsActive>true</IsActive>
-                <IsEditable>true</IsEditable>
-                <AllowChildren>true</AllowChildren>
-                <ParentFolder>
-                  <ID>${parentId}</ID>
-                  <ObjectID xsi:nil="true" />
-                  <CustomerKey xsi:nil="true" />
-                </ParentFolder>
-              </Objects>
-            </CreateRequest>
-          </soapenv:Body>
-        </soapenv:Envelope>
-      `;
+  <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <soapenv:Header>
+      <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+    </soapenv:Header>
+    <soapenv:Body>
+      <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+        <Options/>
+        <Objects xsi:type="DataFolder">
+          <CustomerKey>${folderName}</CustomerKey>
+          <Name>${folderName}</Name>
+          <Description>${folderName}</Description>
+          <ContentType>dataextension</ContentType>
+          <IsActive>true</IsActive>
+          <IsEditable>true</IsEditable>
+          <AllowChildren>true</AllowChildren>
+          <ParentFolder>
+            <ID>${parentId}</ID>
+            <ObjectID xsi:nil="true"/>
+            <CustomerKey xsi:nil="true"/>
+          </ParentFolder>
+        </Objects>
+      </CreateRequest>
+    </soapenv:Body>
+  </soapenv:Envelope>
+`;
+
 
       const createFolderResp = await axios.post(
         `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
         createFolderSoap,
         { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
       );
-
+console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       const createFolderResult = await parser.parseStringPromise(createFolderResp.data);
       folderId = createFolderResult?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['Results']?.['NewID'];
     }
