@@ -2163,8 +2163,11 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
         }
       }
     );
+    console.log('✅ Event Definition created successfully:', eventKey);
+
 
     // Step 6: Create Journey
+    await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 seconds
     const journeyName = `Journey_${deName}`;
     const journeyDefResp = await axios.post(
       `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
@@ -2177,7 +2180,8 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
         entryMode: 'Event',
         entrySpecification: {
           eventDefinitionKey: eventKey,
-          mode: 'ContactEvent'
+          mode: 'ContactEvent',
+          type: 'APIEvent'
         },
         activities: [],
         entryEvents: [
