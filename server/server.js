@@ -2221,9 +2221,8 @@ const journeyPayload = {
   name: journeyName,
   description: `Auto-created journey for ${deName}`,
   workflowApiVersion: 1,
-  definitionType: 'multistep',
+  definitionType: 'multi-step', // 🔁 fixed typo from "multistep"
   journeyStatus: 'Draft',
-  entryMode: 'Event',
   triggers: [
     {
       key: `event-key-${eventDtStr}`,
@@ -2234,11 +2233,12 @@ const journeyPayload = {
       arguments: {}
     }
   ],
+  entryMode: 'Event',
   entrySpecification: {
     eventDefinitionKey: eventKey,
     mode: 'ContactEvent',
     type: 'APIEvent',
-    sourceApplicationExtensionId: '0b0587e3-13e3-4d2a-8824-4bd36d398dfd' // for Distributed Marketing
+    sourceApplicationExtensionId: '0b0587e3-13e3-4d2a-8824-4bd36d398dfd' // ✅ Required for Distributed Marketing
   },
   entryEvents: [
     {
