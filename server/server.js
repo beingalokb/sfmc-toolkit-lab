@@ -2186,12 +2186,13 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
 
     // Step 6: Create API Event Definition with correct ObjectID
     const eventDtStr = new Date().toISOString().replace(/[:\-\.]/g, '').slice(0, 14);
+    const eventKey = `dm_event_${eventDtStr}`;
     const eventDefResp = await axios.post(
       `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/eventDefinitions`,
       {
         name: `DM Event Definition - ${eventDtStr}`,
-        eventDefinitionKey: `dm_event_${eventDtStr}`,
-        dataExtensionId: deObjectID, // This must be the ObjectID, not customer key
+        eventDefinitionKey: eventKey,
+        dataExtensionId: deObjectID, // ObjectID from your log
         dataExtensionName: deName,
         eventType: 'APIEvent',
         isActive: true,
@@ -2204,33 +2205,45 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
         }
       }
     );
-    const eventDefinitionKey = `dm_event_${eventDtStr}`;
-    console.log('✅ Event Definition created successfully:', eventDefinitionKey);
+    
+    console.log('[Created Event Definition]', eventDefResp.data);
 
 
     // Step 6: Create Journey
     await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 seconds
-    const journeyName = `Journey_${deName}`;
-    const journeyDefResp = await axios.post(
-      `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
-      {
-        name: journeyName,
-        key: journeyName,
-        description: `Journey for ${deName}`,
-        definitionType: 'multistep',
-        entryMode: 'Event',
-        channelType: 'Email',
-        goals: [],
-        entryEvent: {
-          eventDefinitionKey: eventDefinitionKey,
-          eventType: 'APIEvent',
-          isActive: true,
-          mode: 'ContactEvent'
-        },
-        activities: [],
-        workflowApiVersion: 1.0,
-        triggers: []
+    const journeyName = `Journey_${eventDtStr}`;
+    const journeyPayload = {
+      name: journeyName,
+      key: journeyName,
+      description: `Journey for ${deName}`,
+      definitionType: 'multi-step',
+      journeyStatus: 'Draft',
+      workflowApiVersion: 1.0,
+      entryMode: 'Event',
+      triggers: [
+        {
+          key: `entry_${eventDtStr}`,
+          type: 'Event',
+          eventDefinitionKey: eventKey,
+          name: 'Journey Entry Trigger'
+        }
+      ],
+      entrySpecification: {
+        eventDefinitionKey: eventKey,
+        mode: 'ContactEvent'
       },
+      activities: [],
+      entryEvents: [
+        {
+          eventDefinitionKey: eventKey,
+          mode: 'ContactEvent'
+        }
+      ]
+    };
+
+    const journeyResp = await axios.post(
+      `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
+      journeyPayload,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -2239,7 +2252,9 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       }
     );
 
-    const journeyId = journeyDefResp.data.id;
+    console.log('[Journey Created]', journeyResp.data);
+
+    const journeyId = journeyResp.data.id;
 
     return res.status(200).json({
       status: 'OK',
