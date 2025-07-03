@@ -2216,22 +2216,19 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
         name: journeyName,
         key: journeyName,
         description: `Journey for ${deName}`,
-        journeyStatus: 'Draft',
-        definitionType: 'multi-step',
+        definitionType: 'multistep',
         entryMode: 'Event',
-        entrySpecification: {
+        channelType: 'Email',
+        goals: [],
+        entryEvent: {
           eventDefinitionKey: eventKey,
-          mode: 'ContactEvent',
-          type: 'APIEvent'
+          eventType: 'APIEvent',
+          isActive: true,
+          mode: 'ContactEvent'
         },
         activities: [],
-        entryEvents: [
-          {
-            eventDefinitionKey: eventKey,
-            mode: 'ContactEvent'
-          }
-        ],
-        workflowApiVersion: 1.0
+        workflowApiVersion: 1.0,
+        triggers: []
       },
       {
         headers: {
