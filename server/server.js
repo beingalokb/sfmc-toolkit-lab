@@ -2033,7 +2033,7 @@ if (Array.isArray(rootFolders)) {
       <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
         <Options/>
         <Objects xsi:type="DataFolder">
-          <CustomerKey>${folderName}</CustomerKey>
+         <!-- <CustomerKey>${folderName}</CustomerKey> -->
           <Name>${folderName}</Name>
           <Description>${folderName}</Description>
           <ContentType>dataextension</ContentType>
