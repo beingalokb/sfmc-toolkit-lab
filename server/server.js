@@ -2121,8 +2121,8 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
       deSoap,
       { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
-    );console.log('[SOAP DE Create Raw]', deResponse.data);
-  const deParsed = await parser.parseStringPromise(deResponse.data);
+    );console.log('[SOAP DE Create Raw]', deResp.data);
+  const deParsed = await parser.parseStringPromise(deResp.data);
   const statusMsg = deParsed?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['Results']?.['StatusMessage'];
   const errorCode = deParsed?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['Results']?.['ErrorCode'];
 
