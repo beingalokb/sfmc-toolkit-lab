@@ -2220,7 +2220,7 @@ const journeyPayload = {
   name: journeyName,
   key: journeyName,
   description: `Auto-created journey for ${deName}`,
-  version: 1,
+  workflowApiVersion: 1.0,
   definitionType: 'Multistep',
   status: 'Draft',
   schedule: {
