@@ -2223,6 +2223,7 @@ const journeyPayload = {
   workflowApiVersion: 1,
   definitionType: 'multistep',
   journeyStatus: 'Draft',
+  entryMode: 'Event',
   triggers: [
     {
       key: `event-key-${eventDtStr}`,
@@ -2231,6 +2232,18 @@ const journeyPayload = {
       eventDefinitionKey: eventKey,
       configurationArguments: {},
       arguments: {}
+    }
+  ],
+  entrySpecification: {
+    eventDefinitionKey: eventKey,
+    mode: 'ContactEvent',
+    type: 'APIEvent',
+    sourceApplicationExtensionId: '0b0587e3-13e3-4d2a-8824-4bd36d398dfd' // for Distributed Marketing
+  },
+  entryEvents: [
+    {
+      eventDefinitionKey: eventKey,
+      mode: 'ContactEvent'
     }
   ]
 };
@@ -2248,7 +2261,6 @@ const journeyResp = await axios.post(
 
 console.log('[Journey Created]', journeyResp.data);
 
-
 const journeyId = journeyResp.data.id;
 
 return res.status(200).json({
@@ -2259,6 +2271,7 @@ return res.status(200).json({
   journeyName,
   journeyId
 });
+
 
 
 
