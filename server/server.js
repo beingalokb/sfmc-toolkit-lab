@@ -1981,6 +1981,9 @@ app.post('/create/dm-dataextension', async (req, res) => {
                 <IsActive>true</IsActive>
                 <IsEditable>true</IsEditable>
                 <AllowChildren>true</AllowChildren>
+                <ParentFolder>
+            <ID>0</ID>
+          </ParentFolder>
               </Objects>
             </CreateRequest>
           </soapenv:Body>
