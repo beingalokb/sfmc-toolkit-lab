@@ -2190,8 +2190,10 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     const eventDefResp = await axios.post(
       `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/eventDefinitions`,
       {
+        type: "Event",
         name: `DM Event Definition - ${eventDtStr}`,
         eventDefinitionKey: eventKey,
+        mode: "Production",
         dataExtensionId: deObjectID, // ObjectID from your log
         dataExtensionName: deName,
         eventType: 'APIEvent',
