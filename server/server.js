@@ -1934,28 +1934,29 @@ app.post('/create/dm-dataextension', async (req, res) => {
 
     // Step 1: Get root folder for dataextension
     const getRootFolderSoap = `
-      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-        <soapenv:Header>
-          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
-        </soapenv:Header>
-        <soapenv:Body>
-          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-            <RetrieveRequest>
-              <ObjectType>DataFolder</ObjectType>
-              <Properties>ID</Properties>
-              <Properties>Name</Properties>
-              <Properties>ContentType</Properties>
-              <Properties>ParentFolder.ID</Properties>
-              <Filter xsi:type="SimpleFilterPart">
-                <Property>ParentFolder.ID</Property>
-                <SimpleOperator>equals</SimpleOperator>
-                <Value>0</Value>
-              </Filter>
-            </RetrieveRequest>
-          </RetrieveRequestMsg>
-        </soapenv:Body>
-      </soapenv:Envelope>
-    `;
+  <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <soapenv:Header>
+      <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+    </soapenv:Header>
+    <soapenv:Body>
+      <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+        <RetrieveRequest>
+          <ObjectType>DataFolder</ObjectType>
+          <Properties>ID</Properties>
+          <Properties>Name</Properties>
+          <Properties>ContentType</Properties>
+          <Properties>ParentFolder.ID</Properties>
+          <Filter xsi:type="SimpleFilterPart">
+            <Property>ContentType</Property>
+            <SimpleOperator>equals</SimpleOperator>
+            <Value>dataextension</Value>
+          </Filter>
+        </RetrieveRequest>
+      </RetrieveRequestMsg>
+    </soapenv:Body>
+  </soapenv:Envelope>
+`;
+
 
     const rootResp = await axios.post(
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
@@ -1966,17 +1967,15 @@ app.post('/create/dm-dataextension', async (req, res) => {
     const rootParsed = await parser.parseStringPromise(rootResp.data);
     const rootFolders = rootParsed?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
 
-    let parentId = null;
-    if (Array.isArray(rootFolders)) {
-        const rootDEFolder = Array.isArray(rootFolders)
-        ? rootFolders.find(f => f.ContentType === 'dataextension' && f.Name === 'dataextension')
-        : (rootFolders?.ContentType === 'dataextension' ? rootFolders : null);
+let parentId = null;
 
-  const parentId = rootDEFolder?.ID;
+if (Array.isArray(rootFolders)) {
+  const rootDEFolder = rootFolders.find(f => f.ContentType === 'dataextension' && f['ParentFolder']?.ID === '0');
+  parentId = rootDEFolder?.ID;
+} else if (rootFolders?.ContentType === 'dataextension' && rootFolders?.ParentFolder?.ID === '0') {
+  parentId = rootFolders.ID;
+}
 
-    } else if (rootFolders?.ContentType === 'dataextension') {
-      parentId = rootFolders.ID;
-    }
 
     if (!parentId) return res.status(500).json({ status: 'ERROR', message: 'Root folder for dataextensions not found' });
 
@@ -2022,7 +2021,7 @@ app.post('/create/dm-dataextension', async (req, res) => {
     }
       // Step 3: Create folder if not found
     if (!folderId) {
-      console.log('[Parent Folder ID]', parentId);
+      console.log('[Resolved Root DataExtension Folder ID]', parentId);
 
       const createFolderSoap = `
   <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
