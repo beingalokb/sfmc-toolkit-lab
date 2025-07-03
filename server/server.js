@@ -2066,8 +2066,6 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
 
     if (!folderId) return res.status(500).json({ status: 'ERROR', message: 'Failed to create or find folder' });
 
-    return res.status(200).json({ status: 'OK', message: 'Folder ready', folderId });
-
     // 2. Create Data Extension with correct fields
     const now = new Date();
     const pad = n => n.toString().padStart(2, '0');
@@ -2121,17 +2119,37 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
       deSoap,
       { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
-    );console.log('[SOAP DE Create Raw]', deResp.data);
-  const deParsed = await parser.parseStringPromise(deResp.data);
-  const statusMsg = deParsed?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['Results']?.['StatusMessage'];
-  const errorCode = deParsed?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['Results']?.['ErrorCode'];
+    );
+    
+    // Log the raw response for debugging
+    console.log('[SOAP DE Create Raw]', deResp.data);
+    
+    const deParsed = await parser.parseStringPromise(deResp.data);
+    
+    // Get the overall status and any error messages
+    const overallStatus = deParsed?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['OverallStatus'];
+    const results = deParsed?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['Results'];
+    const statusMsg = results?.StatusMessage;
+    const errorCode = results?.ErrorCode;
+    
+    console.log('[DE Creation Response]', { overallStatus, statusMsg, errorCode });
 
-  if (errorCode && errorCode !== '0') {
-    console.error('[DE Creation Failed]', statusMsg);
-    return res.status(500).json({ status: 'ERROR', message: 'Failed to create Data Extension', details: statusMsg });
-  }
+    if (overallStatus !== 'OK' || (errorCode && errorCode !== '0')) {
+      console.error('[DE Creation Failed]', { statusMsg, overallStatus, errorCode });
+      return res.status(500).json({ 
+        status: 'ERROR', 
+        message: 'Failed to create Data Extension', 
+        details: statusMsg || overallStatus 
+      });
+    }
 
-  return res.status(200).json({ status: 'OK', message: 'Folder and Data Extension created successfully', folderId, deName });
+    return res.status(200).json({ 
+      status: 'OK', 
+      message: 'Folder and Data Extension created successfully', 
+      folderId, 
+      deName,
+      deCustomerKey: deName  // Include the CustomerKey for reference
+    });
 
   } catch (e) {
     console.error('❌ [DM DataExtension] Error:', e.response?.data || e.message);
