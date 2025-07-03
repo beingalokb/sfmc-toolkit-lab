@@ -2100,7 +2100,7 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
                 <Field><Name>journeyID</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>sfOrgId</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>DateEntered</Name><FieldType>Date</FieldType><IsRequired>false</IsRequired><DefaultValue>GETDATE()</DefaultValue></Field>
-                <Field><Name>smsValue</Name><FieldType>Text</FieldType><MaxLength>160</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>smsValue</FieldType><Text</FieldType><MaxLength>160</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>mobilePhone</Name><FieldType>Phone</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>EntryObjectId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
               </Fields>
@@ -2143,19 +2143,9 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       });
     }
 
-    return res.status(200).json({ 
-      status: 'OK', 
-      message: 'Folder and Data Extension created successfully', 
-      folderId, 
-      deName,
-      deCustomerKey: deName  // Include the CustomerKey for reference
-    });
-
-
- 
-    // === Step 5: Create API Event ===
+    // Step 5: Create API Event Definition
     const eventKey = `event_${deName}`;
-    const eventDefResp = await axios.post(
+    await axios.post(
       `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/eventDefinitions`,
       {
         name: eventKey,
@@ -2174,7 +2164,7 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       }
     );
 
-    // === Step 6: Create Journey ===
+    // Step 6: Create Journey
     const journeyName = `Journey_${deName}`;
     const journeyDefResp = await axios.post(
       `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
@@ -2213,6 +2203,7 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       message: 'Folder, Data Extension, and Journey created successfully',
       folderId,
       deName,
+      journeyName,
       journeyId
     });
 
