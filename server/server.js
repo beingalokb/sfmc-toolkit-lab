@@ -2215,6 +2215,8 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
 await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec
 
 const journeyName = `Journey_${eventDtStr}`;
+const startDate = new Date().toISOString();
+const endDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(); // 1 year
 
 const journeyPayload = {
   name: journeyName,
@@ -2223,9 +2225,10 @@ const journeyPayload = {
   workflowApiVersion: 1.0,
   definitionType: 'Multistep',
   status: 'Draft',
+  entryMode: 'SingleEntryEvent',
   schedule: {
-    startDate: new Date().toISOString(),
-    endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 1 year from now
+    startDate,
+    endDate
   },
   goals: [],
   exits: [],
@@ -2235,10 +2238,14 @@ const journeyPayload = {
   triggers: [
     {
       key: `event-key-${eventDtStr}`,
-      type: 'Event',
-      name: 'Journey Entry',
-      metaData: {
-        eventDefinitionKey: eventKey
+      name: 'Distributed Marketing API Entry',
+      type: 'APIEvent',
+      eventDefinitionKey: eventKey,
+      configurationArguments: {
+        sourceApplicationExtensionId: '0b0587e3-13e3-4d2a-8824-4bd36d398dfd'
+      },
+      arguments: {
+        executionMode: 'Production'
       }
     }
   ],
