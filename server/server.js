@@ -2212,23 +2212,24 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
 
 
     // Step 6: Create Journey
-    await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 seconds
+await new Promise(resolve => setTimeout(resolve, 2000)); // Let SFMC sync the Event Definition
 
 const journeyName = `Journey_${eventDtStr}`;
+
 const journeyPayload = {
+  definitionType: "MultiStep",
+  entryMode: "Event",
   name: journeyName,
   key: journeyName,
   description: `Journey for ${deName}`,
+  journeyStatus: "Draft",
   workflowApiVersion: 1.0,
-  definitionType: 'multi-step',
-  journeyStatus: 'Draft',
-  entryMode: 'Event',
   triggers: [
     {
       key: `entry_${eventDtStr}`,
-      type: 'Event',
+      type: "Event",
       eventDefinitionKey: eventKey,
-      name: 'Journey Entry Trigger',
+      name: "Entry Event",
       arguments: {},
       metaData: {}
     }
@@ -2245,18 +2246,18 @@ const journeyResp = await axios.post(
   {
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
+      "Content-Type": "application/json"
     }
   }
 );
 
-console.log('[Journey Created]', journeyResp.data);
+console.log("[Journey Created]", journeyResp.data);
 
 const journeyId = journeyResp.data.id;
 
 return res.status(200).json({
-  status: 'OK',
-  message: 'Folder, Data Extension, and Journey created successfully',
+  status: "OK",
+  message: "Folder, Data Extension, Event, and Journey created successfully",
   folderId,
   deName,
   journeyName,
