@@ -2033,6 +2033,8 @@ app.post('/create/dm-dataextension', async (req, res) => {
                 <AllowChildren>true</AllowChildren>
                 <ParentFolder>
                   <ID>${parentId}</ID>
+                  <ObjectID xsi:nil="true" />
+                  <CustomerKey xsi:nil="true" />
                 </ParentFolder>
               </Objects>
             </CreateRequest>
