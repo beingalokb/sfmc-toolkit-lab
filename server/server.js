@@ -2213,59 +2213,56 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
 
     // Step 6: Create Journey
     await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 seconds
-    const journeyName = `Journey_${eventDtStr}`;
-    const journeyPayload = {
-      name: journeyName,
-      key: journeyName,
-      description: `Journey for ${deName}`,
-      definitionType: 'multi-step',
-      journeyStatus: 'Draft',
-      workflowApiVersion: 1.0,
-      entryMode: 'Event',
-      triggers: [
-        {
-          key: `entry_${eventDtStr}`,
-          type: 'Event',
-          eventDefinitionKey: eventKey,
-          name: 'Journey Entry Trigger'
-        }
-      ],
-      entrySpecification: {
-        eventDefinitionKey: eventKey,
-        mode: 'ContactEvent'
-      },
-      activities: [],
-      entryEvents: [
-        {
-          eventDefinitionKey: eventKey,
-          mode: 'ContactEvent'
-        }
-      ]
-    };
 
-    const journeyResp = await axios.post(
-      `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
-      journeyPayload,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+const journeyName = `Journey_${eventDtStr}`;
+const journeyPayload = {
+  name: journeyName,
+  key: journeyName,
+  description: `Journey for ${deName}`,
+  workflowApiVersion: 1.0,
+  definitionType: 'multi-step',
+  journeyStatus: 'Draft',
+  entryMode: 'Event',
+  triggers: [
+    {
+      key: `entry_${eventDtStr}`,
+      type: 'Event',
+      eventDefinitionKey: eventKey,
+      name: 'Journey Entry Trigger',
+      arguments: {},
+      metaData: {}
+    }
+  ],
+  activities: [],
+  goals: [],
+  defaults: {},
+  metaData: {}
+};
 
-    console.log('[Journey Created]', journeyResp.data);
+const journeyResp = await axios.post(
+  `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
+  journeyPayload,
+  {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  }
+);
 
-    const journeyId = journeyResp.data.id;
+console.log('[Journey Created]', journeyResp.data);
 
-    return res.status(200).json({
-      status: 'OK',
-      message: 'Folder, Data Extension, and Journey created successfully',
-      folderId,
-      deName,
-      journeyName,
-      journeyId
-    });
+const journeyId = journeyResp.data.id;
+
+return res.status(200).json({
+  status: 'OK',
+  message: 'Folder, Data Extension, and Journey created successfully',
+  folderId,
+  deName,
+  journeyName,
+  journeyId
+});
+
 
 
 
