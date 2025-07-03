@@ -2009,11 +2009,12 @@ app.post('/create/dm-dataextension', async (req, res) => {
         <soapenv:Body>
           <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
             <Options />
-            <Objects xsi:type="DataExtension">
+            <Objects xmlns:ns1="http://exacttarget.com/wsdl/partnerAPI" xsi:type="ns1:DataExtension">
               <Name>${deName}</Name>
               <CustomerKey>${deName}</CustomerKey>
               <CategoryID>${folderId}</CategoryID>
-              <IsSendable>false</IsSendable>
+              <IsSendable>true</IsSendable>
+              <IsTestable>true</IsTestable>
               <Fields>
                 <Field><Name>greeting</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>id</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired></Field>
@@ -2033,6 +2034,12 @@ app.post('/create/dm-dataextension', async (req, res) => {
                 <Field><Name>mobilePhone</Name><FieldType>Phone</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>EntryObjectId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
               </Fields>
+                <SendableDataExtensionField>
+                  <Name>id</Name>
+                </SendableDataExtensionField>
+                <SendableSubscriberField>
+                  <Name>Subscriber Key</Name>
+                </SendableSubscriberField>
             </Objects>
           </CreateRequest>
         </soapenv:Body>
