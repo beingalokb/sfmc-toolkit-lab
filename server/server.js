@@ -2217,22 +2217,40 @@ await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec
 const journeyName = `Journey_${eventDtStr}`;
 
 const journeyPayload = {
-  key: journeyName,
   name: journeyName,
+  key: journeyName,
   description: `Auto-created journey for ${deName}`,
-  workflowApiVersion: 1.0,
-  definitionType: 'Journey',
+  version: 1,
+  definitionType: 'Multistep',
   status: 'Draft',
-  entryMode: 'SingleEntryEvent',
-  activities: [],
+  schedule: {
+    startDate: new Date().toISOString(),
+    endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 1 year from now
+  },
+  goals: [],
+  exits: [],
+  stats: {
+    numberOfActivities: 0
+  },
   triggers: [
     {
       key: `event-key-${eventDtStr}`,
-      name: 'Journey Entry',
       type: 'Event',
-      eventDefinitionKey: eventKey,
+      name: 'Journey Entry',
+      metaData: {
+        eventDefinitionKey: eventKey
+      }
+    }
+  ],
+  activities: [
+    {
+      key: 'WAIT-1',
+      name: 'Wait',
+      type: 'Wait',
+      metaData: {},
       arguments: {
-        executionMode: 'Production'
+        duration: '1',
+        unit: 'days'
       }
     }
   ]
