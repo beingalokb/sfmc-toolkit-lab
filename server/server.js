@@ -2151,6 +2151,73 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       deCustomerKey: deName  // Include the CustomerKey for reference
     });
 
+
+ 
+    // === Step 5: Create API Event ===
+    const eventKey = `event_${deName}`;
+    const eventDefResp = await axios.post(
+      `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/eventDefinitions`,
+      {
+        name: eventKey,
+        eventDefinitionKey: eventKey,
+        dataExtensionId: deName,
+        dataExtensionName: deName,
+        eventType: 'APIEvent',
+        description: `Triggered by ${deName}`,
+        isActive: true
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    // === Step 6: Create Journey ===
+    const journeyName = `Journey_${deName}`;
+    const journeyDefResp = await axios.post(
+      `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
+      {
+        name: journeyName,
+        key: journeyName,
+        description: `Journey for ${deName}`,
+        journeyStatus: 'Draft',
+        definitionType: 'multi-step',
+        entryMode: 'Event',
+        entrySpecification: {
+          eventDefinitionKey: eventKey,
+          mode: 'ContactEvent'
+        },
+        activities: [],
+        entryEvents: [
+          {
+            eventDefinitionKey: eventKey,
+            mode: 'ContactEvent'
+          }
+        ],
+        workflowApiVersion: 1.0
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const journeyId = journeyDefResp.data.id;
+
+    return res.status(200).json({
+      status: 'OK',
+      message: 'Folder, Data Extension, and Journey created successfully',
+      folderId,
+      deName,
+      journeyId
+    });
+
+
+
   } catch (e) {
     console.error('❌ [DM DataExtension] Error:', e.response?.data || e.message);
     res.status(500).json({ status: 'ERROR', message: e.message });
