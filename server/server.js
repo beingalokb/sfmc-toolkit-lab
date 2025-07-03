@@ -2143,14 +2143,55 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       });
     }
 
-    // Step 5: Create API Event Definition
+    // Step 5: Get DE ObjectID using SOAP
+    const deRetrieveSoap = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataExtension</ObjectType>
+              <Properties>ObjectID</Properties>
+              <Properties>Name</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>Name</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>${deName}</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+
+    const retrieveResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      deRetrieveSoap,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+    
+    console.log('[DE Retrieve Response]', retrieveResp.data);
+    
+    const retrieveParsed = await parser.parseStringPromise(retrieveResp.data);
+    const deObjectID = retrieveParsed?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results']?.ObjectID;
+
+    if (!deObjectID) {
+      console.error('[DE ObjectID Retrieval Failed]', retrieveParsed);
+      return res.status(500).json({ status: 'ERROR', message: 'Failed to retrieve DE ObjectID' });
+    }
+
+    console.log('[Retrieved DE ObjectID]', deObjectID);
+
+    // Step 6: Create API Event Definition with correct ObjectID
     const eventKey = `event_${deName}`;
     await axios.post(
       `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/eventDefinitions`,
       {
         name: eventKey,
         eventDefinitionKey: eventKey,
-        dataExtensionId: deName,
+        dataExtensionId: deObjectID,
         dataExtensionName: deName,
         eventType: 'APIEvent',
         description: `Triggered by ${deName}`,
