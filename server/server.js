@@ -1983,12 +1983,14 @@ app.post('/create/dm-dataextension', async (req, res) => {
                 <AllowChildren>true</AllowChildren>
                 <ParentFolder>
             <ID>0</ID>
+            <ContentType>dataextension</ContentType>
           </ParentFolder>
               </Objects>
             </CreateRequest>
           </soapenv:Body>
         </soapenv:Envelope>
       `;
+      console.log(createFolderResp.data)
       const createFolderResp = await axios.post(
         `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
         createFolderSoap,
