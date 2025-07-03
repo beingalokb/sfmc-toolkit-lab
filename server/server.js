@@ -2185,17 +2185,17 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     console.log('[Retrieved DE ObjectID]', deObjectID);
 
     // Step 6: Create API Event Definition with correct ObjectID
-    const eventKey = `event_${deName}`;
-    await axios.post(
+    const eventDtStr = new Date().toISOString().replace(/[:\-\.]/g, '').slice(0, 14);
+    const eventDefResp = await axios.post(
       `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/eventDefinitions`,
       {
-        name: eventKey,
-        eventDefinitionKey: eventKey,
-        dataExtensionId: deObjectID,
+        name: `DM Event Definition - ${eventDtStr}`,
+        eventDefinitionKey: `dm_event_${eventDtStr}`,
+        dataExtensionId: deObjectID, // This must be the ObjectID, not customer key
         dataExtensionName: deName,
         eventType: 'APIEvent',
-        description: `Triggered by ${deName}`,
-        isActive: true
+        isActive: true,
+        description: `Triggered DE for ${deName}`
       },
       {
         headers: {
