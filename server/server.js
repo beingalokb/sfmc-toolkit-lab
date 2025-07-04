@@ -2211,54 +2211,54 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     console.log('[Created Event Definition]', eventDefResp.data);
 
 
-    // Step 6: Create Journey
+    // Step 6: Create Journey for Distributed Marketing
 await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec
 
 const journeyName = `Journey_${eventDtStr}`;
-const startDate = new Date().toISOString();
-const endDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(); // 1 year
 
 const journeyPayload = {
   key: journeyName,
   name: journeyName,
   description: `Auto-created journey for ${deName}`,
-  workflowApiVersion: 1.0,
-  definitionType: 'Multistep',
-  status: 'Draft',
-  entryMode: "SingleEntryEvent",
+  workflowApiVersion: 1,
+  definitionType: "Multistep",
+  entryMode: "APIEvent",
+  status: "Draft",
   schedule: {
     startDate: new Date().toISOString(),
-    endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+    endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 1 year
   },
   triggers: [
     {
       key: `event-key-${eventDtStr}`,
-      type: 'APIEvent',
-      name: 'Distributed Marketing API Entry',
+      name: "Distributed Marketing API Entry",
+      type: "Event",
       eventDefinitionKey: eventKey,
-      metaData: {
-        eventDefinitionKey: eventKey
-      },
       configurationArguments: {
-        sourceApplicationExtensionId: '0b0587e3-13e3-4d2a-8824-4bd36d398dfd'
+        sourceApplicationExtensionId: "0b0587e3-13e3-4d2a-8824-4bd36d398dfd"
       },
       arguments: {
-        executionMode: 'Production'
+        executionMode: "Production"
       }
     }
   ],
   activities: [
     {
-      key: 'WAIT-1',
-      name: 'Wait',
-      type: 'Wait',
+      key: "WAIT-1",
+      name: "Wait",
+      type: "Wait",
       metaData: {},
       arguments: {
-        duration: '1',
-        unit: 'days'
+        duration: "1",
+        unit: "days"
       }
     }
-  ]
+  ],
+  goals: [],
+  exits: [],
+  stats: {
+    numberOfActivities: 1
+  }
 };
 
 // Log the payload for debugging
@@ -2277,30 +2277,25 @@ try {
   );
 
   console.log('[Journey Created]', journeyResp.data);
-    const journeyId = journeyResp.data.definitionId || journeyResp.data.id;
-    
-    if (!journeyId) {
-      throw new Error('Journey created but no journey ID was returned');
-    }
+  journeyId = journeyResp.data.id;
+} catch (error) {
+  console.log('[Journey Creation Error]', {
+    status: error.response?.status,
+    statusText: error.response?.statusText,
+    data: error.response?.data,
+    message: error.message
+  });
+  throw error;
+}
 
-    return res.status(200).json({
-      status: "OK",
-      message: "Folder, Data Extension, Event, and Journey created successfully",
-      folderId,
-      deName,
-      journeyName,
-      journeyId,
-      eventDefinitionKey: eventKey
-    });
-  } catch (error) {
-    console.log('[Journey Creation Error]', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message
-    });
-    throw error;  // Re-throw to be caught by the outer try-catch
-  }
+return res.status(200).json({
+  status: "OK",
+  message: "Folder, Data Extension, Event, and Journey created successfully",
+  folderId,
+  deName,
+  journeyName,
+  journeyId
+});
 
 
 
