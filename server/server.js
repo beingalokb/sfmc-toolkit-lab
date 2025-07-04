@@ -2238,15 +2238,23 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       iconUrl: "/events/images/icon_journeyBuilder-event-api-blue.svg",
       triggers: [
         {
-          key: `trigger-${eventDtStr}`,
+          id: eventDefinitionId,  // Using the Event Definition ID we got from creation
+          key: "TRIGGER",
+          name: `New Journey - ${eventDtStr}`,
+          description: "",
           type: "APIEvent",
-          name: "DM API Event Trigger",
-          eventDefinitionKey: `dm_event_${eventDtStr}`,
-          configurationArguments: {
-            sourceApplicationExtensionId: "7db1f972-f8b7-49b6-91b5-fa218e13953d"
-          },
-          arguments: {
-            executionMode: "Production"
+          outcomes: [],
+          arguments: {},
+          configurationArguments: {},
+          metaData: {
+            eventDefinitionId: eventDefinitionId,
+            eventDefinitionKey: eventKey,
+            chainType: "None",
+            configurationRequired: false,
+            iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
+            title: "",
+            entrySourceGroupConfigUrl: "jb:///data/entry/api-event/entrysourcegroupconfig.json",
+            sourceInteractionId: "00000000-0000-0000-0000-000000000000"
           }
         }
       ],
