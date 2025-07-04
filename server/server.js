@@ -1985,7 +1985,7 @@ if (Array.isArray(rootFolders)) {
     const folderSoap = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <soapenv:Header>
-          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+          <fueloauth>${accessToken}</fueloauth>
         </soapenv:Header>
         <soapenv:Body>
           <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
@@ -2027,7 +2027,7 @@ if (Array.isArray(rootFolders)) {
   <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <soapenv:Header>
-      <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+      <fueloauth>${accessToken}</fueloauth>
     </soapenv:Header>
     <soapenv:Body>
       <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
@@ -2184,42 +2184,20 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
 
     console.log('[Retrieved DE ObjectID]', deObjectID);
 
-    // Step 6: Create API Event Definition with correct ObjectID
+    // Step 6: Create Event Definition with correct ObjectID
     const eventDtStr = new Date().toISOString().replace(/[:\-\.]/g, '').slice(0, 14);
     const eventKey = `dm_event_${eventDtStr}`;
     // Create API Event Definition with proper format
     const eventDefPayload = {
-      name: `DM Event Definition - ${eventDtStr}`,
       type: "APIEvent",
-      dataExtensionId: deObjectID,
+      name: `DM Event Definition - ${eventDtStr}`,
       description: `Triggered DE for ${deName}`,
-      eventDefinitionKey: eventKey,
       mode: "Production",
-      iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
-      isVisibleInPicker: false,
-      category: "Event",
-      disableDEDataLogging: false,
-      isPlatformObject: false,
-      metaData: {
-        scheduleState: "No Schedule"
-      },
-      dataExtensionName: deName,
-      schema: {
-        schema: "https://",
-        application: "JS"
-      },
-      arguments: {
-        serializedObjectType: 11,
-        eventDefinitionId: "",
-        eventDefinitionKey: eventKey,
-        dataExtensionId: deObjectID,
-        criteria: ""
-      },
-      sourceApplicationExtensionId: "7db1f972-f8b7-49b6-91b5-fa218e13953d",
-      configurationArguments: {
-        applicationExtensionKey: "rest-activity"
-      },
-      deliveryMechanismId: 0
+      eventDefinitionKey: eventKey,
+      dataExtensionId: deObjectID,
+      iconUrl: "/events/images/icon_journeyBuilder-event-api-blue.svg",
+      isVisibleInPicker: true,
+      category: "Event"
     };
 
     console.log('[Creating Event Definition with payload]', JSON.stringify(eventDefPayload, null, 2));
@@ -2244,102 +2222,45 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     const eventDefinitionId = eventDefResp.data.id;
     console.log(`[Event Definition created with ID: ${eventDefinitionId}]`);
 
-    // Wait for event definition to be ready
-    await new Promise(resolve => setTimeout(resolve, 5000)); // wait for 5 sec
-
     // Step 6: Create Journey for Distributed Marketing
     await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec
 
     const journeyName = `Journey_${eventDtStr}`;
 
     const journeyPayload = {
-      name: journeyName,
       key: journeyName,
+      version: 1,
+      name: journeyName,
       description: "Distributed Marketing Journey",
-      workflowApiVersion: "1.0",
-      type: "Journey",
-      definitionType: "Multistep",
-      scheduleState: "Draft",
-      metaData: {
-        sourceApplicationExtensionId: "7db1f972-f8b7-49b6-91b5-fa218e13953d",
-        dataExtensionId: deObjectID,
-        eventDefinitionId: eventDefResp.data.id,
-        eventDefinitionKey: eventKey,
-        configurationRequired: true,
-        waitDays: "1"
-      },
-      goals: [],
-      exits: [],
+      workflowApiVersion: 1.0,
+      createdDate: new Date().toISOString(),
+      modifiedDate: new Date().toISOString(),
+      iconUrl: "/events/images/icon_journeyBuilder-event-api-blue.svg",
       triggers: [
         {
           key: `trigger-${eventDtStr}`,
           type: "APIEvent",
-          name: "DM Event Entry",
-          metaData: {
-            isConfigured: true
-          },
+          name: "DM API Event Trigger",
+          eventDefinitionKey: eventKey,
           configurationArguments: {
-            applicationExtensionKey: "rest-activity",
-            waitDays: "1"
+            sourceApplicationExtensionId: "7db1f972-f8b7-49b6-91b5-fa218e13953d"
           },
           arguments: {
-            waitType: "duration",
-            waitDuration: "1",
-            waitUnit: "days",
-            eventDefinitionId: eventDefResp.data.id,
-            eventDefinitionKey: eventKey,
-            dataExtensionId: deObjectID
-          },
-          outcomes: [
-            {
-              key: "trigger_outcome",
-              next: "WAIT-1",
-              arguments: {}
-            }
-          ]
+            executionMode: "Production"
+          }
         }
       ],
       activities: [
         {
           key: "WAIT-1",
-          name: "Wait Activity",
-          type: "WAIT",
-          metaData: {
-            isConfigured: true,
-            waitTime: "1"
-          },
-          configurationArguments: {
-            waitDays: "1"
-          },
+          name: "Wait 1 Day",
+          type: "Wait",
           arguments: {
-            waitType: "duration",
-            waitTime: "1",
-            waitUnit: "days"
-          },
-          outcomes: [
-            {
-              key: "wait_outcome",
-              next: "END-1"
-            }
-          ]
-        },
-        {
-          key: "END-1",
-          name: "End",
-          type: "REST",
-          metaData: {
-            isConfigured: true
-          },
-          configurationArguments: {
-            save: false
-          },
-          arguments: {
-            save: false
-          },
-          outcomes: []
+            duration: 1,
+            unit: "days"
+          }
         }
-      ],
-      uiType: "Journey"
+      ]
     };
 
     // Log the payload for debugging
