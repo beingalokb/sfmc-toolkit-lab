@@ -2241,7 +2241,7 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
           key: `trigger-${eventDtStr}`,
           type: "APIEvent",
           name: "DM API Event Trigger",
-          eventDefinitionKey: eventKey,
+          eventDefinitionKey: `dm_event_${eventDtStr}`,
           configurationArguments: {
             sourceApplicationExtensionId: "7db1f972-f8b7-49b6-91b5-fa218e13953d"
           },
