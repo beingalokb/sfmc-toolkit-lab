@@ -2217,49 +2217,42 @@ await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec
 const journeyName = `Journey_${eventDtStr}`;
 
 const journeyPayload = {
-  key: journeyName,
-  name: journeyName,
-  description: `Auto-created journey for ${deName}`,
-  workflowApiVersion: 1,
+  key: "Hardcoded_Journey_Test_001",
+  name: "Hardcoded Journey Test 001",
+  description: "Test journey with hardcoded values",
+  workflowApiVersion: 1.0,
   definitionType: "Multistep",
   entryMode: "SingleEntryEvent",
   status: "Draft",
   schedule: {
-    startDate: new Date().toISOString(),
-    endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+    startDate: "2025-07-04T10:00:00Z",
+    endDate: "2026-07-04T10:00:00Z"
   },
   triggers: [
     {
-      key: `event-key-${eventDtStr}`,
-      name: "Distributed Marketing API Entry",
+      key: "hardcoded-event-key-001",
+      name: "Hardcoded API Entry",
       type: "Event",
       eventDefinitionKey: eventKey,
-      metaData: {},
-      configurationArguments: {
-        sourceApplicationExtensionId: "0b0587e3-13e3-4d2a-8824-4bd36d398dfd"
-      },
       arguments: {
         executionMode: "Production"
+      },
+      configurationArguments: {
+        sourceApplicationExtensionId: "0b0587e3-13e3-4d2a-8824-4bd36d398dfd"
       }
     }
   ],
   activities: [
     {
       key: "WAIT-1",
-      name: "Wait",
+      name: "Wait 1 Day",
       type: "Wait",
-      metaData: {},
       arguments: {
         duration: "1",
         unit: "days"
       }
     }
-  ],
-  goals: [],
-  exits: [],
-  stats: {
-    numberOfActivities: 1
-  }
+  ]
 };
 
 // Log the payload for debugging
