@@ -2248,143 +2248,135 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     await new Promise(resolve => setTimeout(resolve, 5000)); // wait for 5 sec
 
     // Step 6: Create Journey for Distributed Marketing
-await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec
+    await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec
 
-const journeyName = `Journey_${eventDtStr}`;
+    const journeyName = `Journey_${eventDtStr}`;
 
-const journeyPayload = {
-  name: journeyName,
-  key: `Journey_${eventDtStr}`,
-  description: "Distributed Marketing Journey",
-  version: 1,
-  workflowApiVersion: 1.0,
-  definitionType: "APIEvent",
-  entryMode: "SingleEntryAcrossAllVersions",
-  status: "Draft",
-  metaData: {
-    eventDefinitionId: eventDefResp.data.id,
-    eventDefinitionKey: eventKey,
-    dataExtensionId: deObjectID,
-    scheduleState: "Draft"
-  },
-  goals: [],
-  exits: [],
-  triggers: [
-    {
-      key: `trigger-${eventDtStr}`,
-      type: "APIEvent",
-      name: "DM Event Entry",
+    const journeyPayload = {
+      name: journeyName,
+      key: journeyName,
+      description: "Distributed Marketing Journey",
+      workflowApiVersion: "1.0",
+      type: "Journey",
+      definitionType: "Multistep",
+      scheduleState: "Draft",
       metaData: {
+        sourceApplicationExtensionId: "7db1f972-f8b7-49b6-91b5-fa218e13953d",
+        dataExtensionId: deObjectID,
         eventDefinitionId: eventDefResp.data.id,
         eventDefinitionKey: eventKey,
-        schemaVersionId: 0,
         configurationRequired: true,
-        isConfigured: true,
-        iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
-        filterDefinitionId: "00000000-0000-0000-0000-000000000000"
+        waitDays: "1"
       },
-      configurationArguments: {
-        eventDefinitionId: eventDefResp.data.id,
-        dataExtensionId: deObjectID,
-        startActivityKey: "WAIT-1"
-      },
-      arguments: {
-        serializedObjectType: 11,
-        eventDefinitionKey: eventKey,
-        dataExtensionId: deObjectID,
-        criteria: ""
-      },
-      schema: {
-        schema: "https://",
-        application: "JS"
-      },
-      outcomes: [
+      goals: [],
+      exits: [],
+      triggers: [
         {
-          key: "trigger_outcome",
-          next: "WAIT-1",
-          arguments: {}
+          key: `trigger-${eventDtStr}`,
+          type: "APIEvent",
+          name: "DM Event Entry",
+          metaData: {
+            isConfigured: true
+          },
+          configurationArguments: {
+            applicationExtensionKey: "rest-activity",
+            waitDays: "1"
+          },
+          arguments: {
+            waitType: "duration",
+            waitDuration: "1",
+            waitUnit: "days",
+            eventDefinitionId: eventDefResp.data.id,
+            eventDefinitionKey: eventKey,
+            dataExtensionId: deObjectID
+          },
+          outcomes: [
+            {
+              key: "trigger_outcome",
+              next: "WAIT-1",
+              arguments: {}
+            }
+          ]
         }
-      ]
-    }
-  ],
-  activities: [
-    {
-      key: "WAIT-1",
-      name: "Wait 1 Day",
-      type: "Wait",
-      metaData: {
-        isConfigured: true
-      },
-      configurationArguments: {
-        startActivityKey: "END-1"
-      },
-      arguments: {
-        waitType: "duration",
-        duration: 1,
-        unit: "days"
-      },
-      outcomes: [
+      ],
+      activities: [
         {
-          key: "wait_outcome",
-          next: "END-1",
-          arguments: {}
+          key: "WAIT-1",
+          name: "Wait Activity",
+          type: "WAIT",
+          metaData: {
+            isConfigured: true,
+            waitTime: "1"
+          },
+          configurationArguments: {
+            waitDays: "1"
+          },
+          arguments: {
+            waitType: "duration",
+            waitTime: "1",
+            waitUnit: "days"
+          },
+          outcomes: [
+            {
+              key: "wait_outcome",
+              next: "END-1"
+            }
+          ]
+        },
+        {
+          key: "END-1",
+          name: "End",
+          type: "REST",
+          metaData: {
+            isConfigured: true
+          },
+          configurationArguments: {
+            save: false
+          },
+          arguments: {
+            save: false
+          },
+          outcomes: []
         }
-      ]
-    },
-    {
-      key: "END-1",
-      name: "End",
-      type: "End",
-      metaData: {
-        isConfigured: true
-      },
-      configurationArguments: {},
-      arguments: {},
-      outcomes: []
+      ],
+      uiType: "Journey"
+    };
+
+    // Log the payload for debugging
+    console.log('[Journey Payload]', JSON.stringify(journeyPayload, null, 2));
+
+    try {
+      const journeyResp = await axios.post(
+        `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
+        journeyPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('[Journey Created]', journeyResp.data);
+      journeyId = journeyResp.data.id;
+    } catch (error) {
+      console.log('[Journey Creation Error]', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      throw error;
     }
-  ]
-};
 
-// Log the payload for debugging
-console.log('[Journey Payload]', JSON.stringify(journeyPayload, null, 2));
-
-try {
-  const journeyResp = await axios.post(
-    `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/interactions`,
-    journeyPayload,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    }
-  );
-
-  console.log('[Journey Created]', journeyResp.data);
-  journeyId = journeyResp.data.id;
-} catch (error) {
-  console.log('[Journey Creation Error]', {
-    status: error.response?.status,
-    statusText: error.response?.statusText,
-    data: error.response?.data,
-    message: error.message
-  });
-  throw error;
-}
-
-return res.status(200).json({
-  status: "OK",
-  message: "Folder, Data Extension, Event, and Journey created successfully",
-  folderId,
-  deName,
-  journeyName,
-  journeyId
-});
-
-
-
-
-
+    return res.status(200).json({
+      status: "OK",
+      message: "Folder, Data Extension, Event, and Journey created successfully",
+      folderId,
+      deName,
+      journeyName,
+      journeyId
+    });
 
   } catch (e) {
     console.error('❌ [DM DataExtension] Error:', e.response?.data || e.message);
