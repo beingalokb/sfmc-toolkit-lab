@@ -2230,12 +2230,16 @@ const journeyPayload = {
   },
   triggers: [
     {
-      key: "hardcoded-event-key-001",
-      name: "Hardcoded API Entry",
-      type: "Event",
+      key: "event-key-dm",
+      name: "Distributed Marketing Trigger",
+      type: "APIEvent",
       eventDefinitionKey: eventKey,
       arguments: {
-        executionMode: "Production"
+        serializedObjectType: 11,
+        eventDefinitionId: eventDefResp.data.id,
+        eventDefinitionKey: eventKey,
+        dataExtensionId: deObjectID,
+        criteria: ""
       },
       configurationArguments: {
         sourceApplicationExtensionId: "0b0587e3-13e3-4d2a-8824-4bd36d398dfd"
