@@ -2232,7 +2232,7 @@ const journeyPayload = {
     {
       key: `event-key-${eventDtStr}`,
       name: "Distributed Marketing API Entry",
-      type: "APIEvent",
+      type: "Event",
       eventDefinitionKey: eventKey,
       metaData: {},
       configurationArguments: {
