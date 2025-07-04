@@ -2187,32 +2187,46 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     // Step 6: Create API Event Definition with correct ObjectID
     const eventDtStr = new Date().toISOString().replace(/[:\-\.]/g, '').slice(0, 14);
     const eventKey = `dm_event_${eventDtStr}`;
+    // Create API Event Definition with proper format
+    const eventDefPayload = {
+      name: `DM Event Definition - ${eventDtStr}`,
+      type: "APIEvent",
+      dataExtensionId: deObjectID,
+      description: `Triggered DE for ${deName}`,
+      eventDefinitionKey: eventKey,
+      mode: "Production",
+      iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
+      isVisibleInPicker: false,
+      category: "Event",
+      disableDEDataLogging: false,
+      isPlatformObject: false,
+      metaData: {
+        scheduleState: "No Schedule"
+      },
+      dataExtensionName: deName,
+      schema: {
+        schema: "https://",
+        application: "JS"
+      },
+      arguments: {
+        serializedObjectType: 11,
+        eventDefinitionId: "",
+        eventDefinitionKey: eventKey,
+        dataExtensionId: deObjectID,
+        criteria: ""
+      },
+      sourceApplicationExtensionId: "7db1f972-f8b7-49b6-91b5-fa218e13953d",
+      configurationArguments: {
+        applicationExtensionKey: "rest-activity"
+      },
+      deliveryMechanismId: 0
+    };
+
+    console.log('[Creating Event Definition with payload]', JSON.stringify(eventDefPayload, null, 2));
+    
     const eventDefResp = await axios.post(
       `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/eventDefinitions`,
-      {
-        name: `DM Event Definition - ${eventDtStr}`,
-        type: "APIEvent",
-        dataExtensionId: deObjectID,
-        description: `Triggered DE for ${deName}`,
-        eventDefinitionKey: eventKey,
-        mode: "Production",
-        iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
-        isVisibleInPicker: false,
-        category: "Event",
-        disableDEDataLogging: false,
-        isPlatformObject: false,
-        metaData: {
-          scheduleState: "No Schedule"
-        },
-        arguments: {
-          serializedObjectType: 11,
-          eventDefinitionId: "",  // Will be populated after creation
-          eventDefinitionKey: eventKey,
-          dataExtensionId: deObjectID,
-          criteria: ""
-        },
-        sourceApplicationExtensionId: "0b0587e3-13e3-4d2a-8824-4bd36d398dfd"
-      },
+      eventDefPayload,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -2223,6 +2237,15 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     
     console.log('[Created Event Definition]', eventDefResp.data);
 
+    if (!eventDefResp.data.id) {
+      throw new Error('Event Definition creation failed - no ID returned');
+    }
+
+    const eventDefinitionId = eventDefResp.data.id;
+    console.log(`[Event Definition created with ID: ${eventDefinitionId}]`);
+
+    // Wait for event definition to be ready
+    await new Promise(resolve => setTimeout(resolve, 5000)); // wait for 5 sec
 
     // Step 6: Create Journey for Distributed Marketing
 await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec
@@ -2230,28 +2253,32 @@ await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec
 const journeyName = `Journey_${eventDtStr}`;
 
 const journeyPayload = {
-  key: "Hardcoded_Journey_Test_001",
-  name: "Hardcoded Journey Test 001",
-  description: "Test journey with hardcoded values",
-  workflowApiVersion: 1.0,
-  definitionType: "Multistep",
-  entryMode: "SingleEntryEvent",
+  key: `Journey_${eventDtStr}`,
+  name: journeyName,
+  description: "Distributed Marketing Journey",
+  workflowApiVersion: "1.0",
+  definitionType: "CustomEvent",
+  entryMode: "SingleEntryAcrossAllVersions",
   status: "Draft",
-  schedule: {
-    startDate: "2025-07-04T10:00:00Z",
-    endDate: "2026-07-04T10:00:00Z"
+  metaData: {
+    scheduleState: "Draft",
+    eventDefinitionId: eventDefResp.data.id,
+    eventDefinitionKey: eventKey,
+    dataExtensionId: deObjectID
   },
+  goals: [],
+  exits: [],
   triggers: [
     {
-      key: `trigger-${eventDtStr}`,
+      type: "Event",
       name: "DM Event Entry",
-      type: "APIEvent",
       eventDefinitionKey: eventKey,
-      iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
-      isVisibleInPicker: false,
-      category: "Event",
-      metaData: {
-        scheduleState: "No Schedule"
+      configurationArguments: {
+        startActivityKey: "WAIT-1",
+        eventDefinitionId: eventDefResp.data.id,
+        dataExtensionId: deObjectID,
+        scheduleState: "Draft",
+        sourceApplicationExtensionId: "0b0587e3-13e3-4d2a-8824-4bd36d398dfd"
       },
       arguments: {
         serializedObjectType: 11,
@@ -2260,20 +2287,58 @@ const journeyPayload = {
         dataExtensionId: deObjectID,
         criteria: ""
       },
-      configurationArguments: {
-        sourceApplicationExtensionId: "0b0587e3-13e3-4d2a-8824-4bd36d398dfd"
+      metaData: {
+        iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
+        isConfigured: true,
+        isVisibleInPicker: false,
+        scheduleState: "Draft"
+      },
+      category: "Event",
+      outcomes: [],
+      key: `trigger-${eventDtStr}`,
+      schema: {
+        schema: "https://",
+        application: "JS"
       }
     }
   ],
   activities: [
     {
-      key: "WAIT-1",
-      name: "Wait 1 Day",
       type: "Wait",
+      name: "Wait 1 Day",
+      key: "WAIT-1",
+      configurationArguments: {
+        startActivityKey: "END-1",
+        scheduleState: "Draft"
+      },
       arguments: {
-        duration: "1",
+        waitType: "duration",
+        duration: 1,
         unit: "days"
-      }
+      },
+      metaData: {
+        isConfigured: true,
+        scheduleState: "Draft"
+      },
+      outcomes: [
+        {
+          next: "END-1",
+          arguments: {},
+          key: "wait_outcome_key"
+        }
+      ]
+    },
+    {
+      type: "End",
+      name: "End",
+      key: "END-1",
+      configurationArguments: {},
+      arguments: {},
+      metaData: {
+        isConfigured: true,
+        scheduleState: "Draft"
+      },
+      outcomes: []
     }
   ]
 };
