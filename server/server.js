@@ -2256,13 +2256,16 @@ const journeyPayload = {
   name: journeyName,
   key: `Journey_${eventDtStr}`,
   description: "Distributed Marketing Journey",
+  version: 1,
   workflowApiVersion: 1.0,
-  definitionType: "Multistep",
-  entryMode: "MultipleEntries",
-  executionMode: "Production",
+  definitionType: "APIEvent",
+  entryMode: "SingleEntryAcrossAllVersions",
   status: "Draft",
   metaData: {
-    scheduleState: "NoSchedule"
+    eventDefinitionId: eventDefResp.data.id,
+    eventDefinitionKey: eventKey,
+    dataExtensionId: deObjectID,
+    scheduleState: "Draft"
   },
   goals: [],
   exits: [],
@@ -2274,17 +2277,26 @@ const journeyPayload = {
       metaData: {
         eventDefinitionId: eventDefResp.data.id,
         eventDefinitionKey: eventKey,
-        chainType: "None",
-        configurationRequired: false,
-        iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg"
+        schemaVersionId: 0,
+        configurationRequired: true,
+        isConfigured: true,
+        iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
+        filterDefinitionId: "00000000-0000-0000-0000-000000000000"
       },
       configurationArguments: {
-        filterDefinitionId: "00000000-0000-0000-0000-000000000000",
-        criteria: ""
+        eventDefinitionId: eventDefResp.data.id,
+        dataExtensionId: deObjectID,
+        startActivityKey: "WAIT-1"
       },
       arguments: {
-        startActivityKey: "{{Context.StartActivityKey}}",
-        filterResult: "true"
+        serializedObjectType: 11,
+        eventDefinitionKey: eventKey,
+        dataExtensionId: deObjectID,
+        criteria: ""
+      },
+      schema: {
+        schema: "https://",
+        application: "JS"
       },
       outcomes: [
         {
@@ -2303,7 +2315,11 @@ const journeyPayload = {
       metaData: {
         isConfigured: true
       },
+      configurationArguments: {
+        startActivityKey: "END-1"
+      },
       arguments: {
+        waitType: "duration",
         duration: 1,
         unit: "days"
       },
@@ -2322,6 +2338,7 @@ const journeyPayload = {
       metaData: {
         isConfigured: true
       },
+      configurationArguments: {},
       arguments: {},
       outcomes: []
     }
