@@ -2253,91 +2253,76 @@ await new Promise(resolve => setTimeout(resolve, 2000)); // wait for 2 sec
 const journeyName = `Journey_${eventDtStr}`;
 
 const journeyPayload = {
-  key: `Journey_${eventDtStr}`,
   name: journeyName,
+  key: `Journey_${eventDtStr}`,
   description: "Distributed Marketing Journey",
-  workflowApiVersion: "1.0",
-  definitionType: "CustomEvent",
-  entryMode: "SingleEntryAcrossAllVersions",
+  workflowApiVersion: 1.0,
+  definitionType: "Multistep",
+  entryMode: "MultipleEntries",
+  executionMode: "Production",
   status: "Draft",
   metaData: {
-    scheduleState: "Draft",
-    eventDefinitionId: eventDefResp.data.id,
-    eventDefinitionKey: eventKey,
-    dataExtensionId: deObjectID
+    scheduleState: "NoSchedule"
   },
   goals: [],
   exits: [],
   triggers: [
     {
-      type: "Event",
+      key: `trigger-${eventDtStr}`,
+      type: "APIEvent",
       name: "DM Event Entry",
-      eventDefinitionKey: eventKey,
-      configurationArguments: {
-        startActivityKey: "WAIT-1",
-        eventDefinitionId: eventDefResp.data.id,
-        dataExtensionId: deObjectID,
-        scheduleState: "Draft",
-        sourceApplicationExtensionId: "0b0587e3-13e3-4d2a-8824-4bd36d398dfd"
-      },
-      arguments: {
-        serializedObjectType: 11,
+      metaData: {
         eventDefinitionId: eventDefResp.data.id,
         eventDefinitionKey: eventKey,
-        dataExtensionId: deObjectID,
+        chainType: "None",
+        configurationRequired: false,
+        iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg"
+      },
+      configurationArguments: {
+        filterDefinitionId: "00000000-0000-0000-0000-000000000000",
         criteria: ""
       },
-      metaData: {
-        iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
-        isConfigured: true,
-        isVisibleInPicker: false,
-        scheduleState: "Draft"
+      arguments: {
+        startActivityKey: "{{Context.StartActivityKey}}",
+        filterResult: "true"
       },
-      category: "Event",
-      outcomes: [],
-      key: `trigger-${eventDtStr}`,
-      schema: {
-        schema: "https://",
-        application: "JS"
-      }
+      outcomes: [
+        {
+          key: "trigger_outcome",
+          next: "WAIT-1",
+          arguments: {}
+        }
+      ]
     }
   ],
   activities: [
     {
-      type: "Wait",
-      name: "Wait 1 Day",
       key: "WAIT-1",
-      configurationArguments: {
-        startActivityKey: "END-1",
-        scheduleState: "Draft"
+      name: "Wait 1 Day",
+      type: "Wait",
+      metaData: {
+        isConfigured: true
       },
       arguments: {
-        waitType: "duration",
         duration: 1,
         unit: "days"
       },
-      metaData: {
-        isConfigured: true,
-        scheduleState: "Draft"
-      },
       outcomes: [
         {
+          key: "wait_outcome",
           next: "END-1",
-          arguments: {},
-          key: "wait_outcome_key"
+          arguments: {}
         }
       ]
     },
     {
-      type: "End",
-      name: "End",
       key: "END-1",
-      configurationArguments: {},
-      arguments: {},
+      name: "End",
+      type: "End",
       metaData: {
-        isConfigured: true,
-        scheduleState: "Draft"
+        isConfigured: true
       },
+      arguments: {},
       outcomes: []
     }
   ]
