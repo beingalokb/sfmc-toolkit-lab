@@ -2225,6 +2225,7 @@ const journeyPayload = {
   workflowApiVersion: 1.0,
   definitionType: 'Multistep',
   status: 'Draft',
+  entryMode: "SingleEntryEvent",
   schedule: {
     startDate: new Date().toISOString(),
     endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
@@ -2276,25 +2277,30 @@ try {
   );
 
   console.log('[Journey Created]', journeyResp.data);
-  const journeyId = journeyResp.data.id;
-} catch (error) {
-  console.log('[Journey Creation Error]', {
-    status: error.response?.status,
-    statusText: error.response?.statusText,
-    data: error.response?.data,
-    message: error.message
-  });
-  throw error;  // Re-throw to be caught by the outer try-catch
-}
+    const journeyId = journeyResp.data.definitionId || journeyResp.data.id;
+    
+    if (!journeyId) {
+      throw new Error('Journey created but no journey ID was returned');
+    }
 
-return res.status(200).json({
-  status: "OK",
-  message: "Folder, Data Extension, Event, and Journey created successfully",
-  folderId,
-  deName,
-  journeyName,
-  journeyId
-});
+    return res.status(200).json({
+      status: "OK",
+      message: "Folder, Data Extension, Event, and Journey created successfully",
+      folderId,
+      deName,
+      journeyName,
+      journeyId,
+      eventDefinitionKey: eventKey
+    });
+  } catch (error) {
+    console.log('[Journey Creation Error]', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
+    throw error;  // Re-throw to be caught by the outer try-catch
+  }
 
 
 
