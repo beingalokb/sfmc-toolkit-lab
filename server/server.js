@@ -2190,15 +2190,28 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     const eventDefResp = await axios.post(
       `https://${subdomain}.rest.marketingcloudapis.com/interaction/v1/eventDefinitions`,
       {
-        type: "Event",
         name: `DM Event Definition - ${eventDtStr}`,
+        type: "APIEvent",
+        dataExtensionId: deObjectID,
+        description: `Triggered DE for ${deName}`,
         eventDefinitionKey: eventKey,
         mode: "Production",
-        dataExtensionId: deObjectID, // ObjectID from your log
-        dataExtensionName: deName,
-        eventType: 'APIEvent',
-        isActive: true,
-        description: `Triggered DE for ${deName}`
+        iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
+        isVisibleInPicker: false,
+        category: "Event",
+        disableDEDataLogging: false,
+        isPlatformObject: false,
+        metaData: {
+          scheduleState: "No Schedule"
+        },
+        arguments: {
+          serializedObjectType: 11,
+          eventDefinitionId: "",  // Will be populated after creation
+          eventDefinitionKey: eventKey,
+          dataExtensionId: deObjectID,
+          criteria: ""
+        },
+        sourceApplicationExtensionId: "0b0587e3-13e3-4d2a-8824-4bd36d398dfd"
       },
       {
         headers: {
@@ -2230,10 +2243,16 @@ const journeyPayload = {
   },
   triggers: [
     {
-      key: "event-key-dm",
-      name: "Distributed Marketing Trigger",
+      key: `trigger-${eventDtStr}`,
+      name: "DM Event Entry",
       type: "APIEvent",
       eventDefinitionKey: eventKey,
+      iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
+      isVisibleInPicker: false,
+      category: "Event",
+      metaData: {
+        scheduleState: "No Schedule"
+      },
       arguments: {
         serializedObjectType: 11,
         eventDefinitionId: eventDefResp.data.id,
