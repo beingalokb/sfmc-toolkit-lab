@@ -2222,18 +2222,19 @@ const journeyPayload = {
   description: `Auto-created journey for ${deName}`,
   workflowApiVersion: 1,
   definitionType: "Multistep",
-  entryMode: "APIEvent",
+  entryMode: "SingleEntryEvent",
   status: "Draft",
   schedule: {
     startDate: new Date().toISOString(),
-    endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 1 year
+    endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
   },
   triggers: [
     {
       key: `event-key-${eventDtStr}`,
       name: "Distributed Marketing API Entry",
-      type: "Event",
+      type: "APIEvent",
       eventDefinitionKey: eventKey,
+      metaData: {},
       configurationArguments: {
         sourceApplicationExtensionId: "0b0587e3-13e3-4d2a-8824-4bd36d398dfd"
       },
