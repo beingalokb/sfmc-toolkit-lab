@@ -757,7 +757,7 @@ export default function MainApp() {
           setQSStatus("Creating Quick Send Data Extension...");
           setQSDetails(null);
           try {
-            const res = await fetch(`${baseURL}/createDMFullSetup`);
+            const res = await fetch(`${baseURL}/create/dm-dataextension`, { method: 'POST' });
             const json = await res.json();
             if (json.status === "OK") {
               setQSStatus("✅ All set!");
