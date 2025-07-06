@@ -12,6 +12,8 @@ export default function MainApp() {
   const [activeTab, setActiveTab] = useState('de');
   const [parentNav, setParentNav] = useState('main');
   const [dmStep, setDMStep] = useState(1);
+  const [deCreated, setDECreated] = useState(false);
+  const [eventCreated, setEventCreated] = useState(false);
 
   const renderNavigation = () => {
     return (
@@ -54,7 +56,65 @@ export default function MainApp() {
 
   const renderMainContent = () => {
     if (activeTab === 'dm') {
-      return <DMWizard step={dmStep} setStep={setDMStep} />;
+      return (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-indigo-700 mb-4">Distributed Marketing Journey Setup</h2>
+          <div className="mb-6">
+            <ol className="list-decimal pl-6 space-y-2">
+              <li className={dmStep >= 1 ? 'text-indigo-600 font-semibold' : 'text-gray-500'}>
+                Step 1: Create Data Extension
+                <button
+                  className="ml-4 px-4 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600"
+                  onClick={async () => {
+                    const res = await fetch(`${baseURL}/createDE`);
+                    const json = await res.json();
+                    if (json.status === 'OK') {
+                      setDECreated(true);
+                      setDMStep(2);
+                    }
+                  }}
+                  disabled={deCreated}
+                >
+                  {deCreated ? "✓ Created" : "Create DE"}
+                </button>
+              </li>
+              <li className={dmStep >= 2 ? 'text-indigo-600 font-semibold' : 'text-gray-500'}>
+                Step 2: Create Event Definition
+                <button
+                  className="ml-4 px-4 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600"
+                  onClick={async () => {
+                    const res = await fetch(`${baseURL}/createEvent`);
+                    const json = await res.json();
+                    if (json.status === 'OK') {
+                      setEventCreated(true);
+                      setDMStep(3);
+                    }
+                  }}
+                  disabled={!deCreated || eventCreated}
+                >
+                  {eventCreated ? "✓ Created" : "Create Event"}
+                </button>
+              </li>
+              <li className={dmStep >= 3 ? 'text-indigo-600 font-semibold' : 'text-gray-500'}>
+                Step 3: Create Journey
+                <button
+                  className="ml-4 px-4 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600"
+                  onClick={async () => {
+                    const res = await fetch(`${baseURL}/createJourney`);
+                    const json = await res.json();
+                    if (json.status === 'OK') {
+                      alert("Journey created successfully!");
+                    }
+                  }}
+                  disabled={!eventCreated}
+                >
+                  Create Journey
+                </button>
+              </li>
+            </ol>
+          </div>
+        </div>
+      );
     }
     return (
       <div className="bg-white rounded-lg shadow">
