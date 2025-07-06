@@ -1,0 +1,50 @@
+.wizard-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.step-content {
+  margin: 24px 0;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.step-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.success-container {
+  text-align: center;
+  padding: 24px;
+}
+
+.success-icon {
+  font-size: 48px;
+  color: #4caf50;
+  margin-bottom: 16px;
+}
+
+.result-item {
+  margin: 8px 0;
+  padding: 12px;
+  background: #f1f8e9;
+  border-radius: 4px;
+  border-left: 4px solid #4caf50;
+}
+
+.error-message {
+  margin: 12px 0;
+  padding: 12px;
+  background: #ffebee;
+  border-radius: 4px;
+  border-left: 4px solid #f44336;
+  color: #d32f2f;
+}

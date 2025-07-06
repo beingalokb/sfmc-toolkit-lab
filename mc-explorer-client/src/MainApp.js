@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
 import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
+import DMWizard from './components/DMWizard';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -722,37 +723,10 @@ export default function MainApp() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-100">
-      {/* App Title and Header */}
-      <div id="mc-explorer-root" className="bg-white rounded-xl shadow-lg p-6 mt-6 mb-8 mx-auto" style={{maxWidth: '1100px'}}>
-        <header className="bg-indigo-800 text-white p-4 shadow flex items-center gap-4 rounded-t-lg">
-          <img src={require('./logo.svg').default} alt="MC Explorer Logo" className="h-10 w-10" />
-          <h1 className="text-2xl font-bold tracking-wide" style={{ color: '#61DAFB', letterSpacing: '0.04em' }}>MC Explorer</h1>
-        </header>
-        {/* Parent Navigation */}
-        <div className="flex gap-4 p-4 bg-white shadow mb-4 rounded-b-lg">
-          <button
-            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'search' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-            onClick={() => setParentNav('search')}
-          >
-            Search Assets
-          </button>
-          <button
-            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'preference' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-            onClick={() => setParentNav('preference')}
-          >
-            Guided Preference Center
-          </button>
-          <button
-            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'distributedMarketing' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-            onClick={() => setParentNav('distributedMarketing')}
-          >
-            Distributed Marketing
-          </button>
-        </div>
-        {/* Render content based on parentNav */}
-        {parentNav === 'search' ? (
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'de':
+        return (
           <>
             <div className="flex justify-between items-center mb-4">
               <h1 className="text-3xl font-bold text-indigo-700">MC Explorer</h1>
