@@ -747,9 +747,9 @@ export default function MainApp() {
 
   // Render main content for DM Quick Send
   const renderDMQuickSend = () => (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div>
       <h2 className="text-2xl font-semibold text-indigo-700 mb-6">
-        🚀 Single Click Distributed Marketing Quick Send Journey Setup
+        Single Click Distributed Marketing Quick Send Journey Setup
       </h2>
       <button
         onClick={async () => {
@@ -763,7 +763,7 @@ export default function MainApp() {
               setQSStatus("✅ All set!");
               setQSDetails({
                 deName: json.deName,
-                dePath: `/Data Extensions / MC-Explorer-DM-${json.folderId}`,
+                dePath: `/Data Extensions / ${json.folderName}`,
                 eventName: json.eventName || json.eventDefinitionKey,
                 journeyName: json.journeyName,
               });
