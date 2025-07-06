@@ -2189,15 +2189,28 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     const eventKey = `dm_event_${eventDtStr}`;
     // Create API Event Definition with proper format
     const eventDefPayload = {
-      type: "APIEvent",
       name: `DM Event Definition - ${eventDtStr}`,
-      description: `Triggered DE for ${deName}`,
-      mode: "Production",
-      eventDefinitionKey: eventKey,
+      type: "APIEvent",
       dataExtensionId: deObjectID,
-      iconUrl: "/events/images/icon_journeyBuilder-event-api-blue.svg",
-      isVisibleInPicker: true,
-      category: "Event"
+      description: `Triggered DE for ${deName}`,
+      eventDefinitionKey: eventKey,
+      mode: "Production",
+      iconUrl: "/images/icon_journeyBuilder-event-api-blue.svg",
+      isVisibleInPicker: false,
+      category: "Event",
+      disableDEDataLogging: false,
+      isPlatformObject: false,
+      metaData: {
+        scheduleState: "No Schedule"
+      },
+      arguments: {
+        serializedObjectType: 11,
+        eventDefinitionId: "",
+        eventDefinitionKey: eventKey,
+        dataExtensionId: deObjectID,
+        criteria: ""
+      },
+      sourceApplicationExtensionId: "7db1f972-f8b7-49b6-91b5-fa218e13953d"
     };
 
     console.log('[Creating Event Definition with payload]', JSON.stringify(eventDefPayload, null, 2));
