@@ -2210,7 +2210,7 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
         dataExtensionId: deObjectID,
         criteria: ""
       },
-      //sourceApplicationExtensionId: "7db1f972-f8b7-49b6-91b5-fa218e13953d"
+      sourceApplicationExtensionId: "7db1f972-f8b7-49b6-91b5-fa218e13953d"
     };
 
     console.log('[Creating Event Definition with payload]', JSON.stringify(eventDefPayload, null, 2));
