@@ -763,9 +763,9 @@ export default function MainApp() {
               setQSStatus("✅ All set!");
               setQSDetails({
                 deName: json.deName,
-                dePath: `/Data Extensions / ${json.folderName}`,
-                eventName: json.eventName || json.eventDefinitionKey,
-                journeyName: json.journeyName,
+                dePath: json.folderName ? `/Data Extensions / ${json.folderName}` : '',
+                eventName: json.eventName || json.eventDefinitionKey || '',
+                journeyName: json.journeyName || '',
               });
             } else {
               setQSStatus("❌ Setup failed.");
@@ -786,9 +786,9 @@ export default function MainApp() {
         {qsDetails && (
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
             <p>🔹 <strong>QS DE name:</strong> {qsDetails.deName}</p>
-            <p>🔹 <strong>QS DE path:</strong> {qsDetails.dePath}</p>
-            <p>🔹 <strong>QS Event name:</strong> {qsDetails.eventName}</p>
-            <p>🔹 <strong>QS Journey name:</strong> {qsDetails.journeyName}</p>
+            {qsDetails.dePath && <p>🔹 <strong>QS DE path:</strong> {qsDetails.dePath}</p>}
+            {qsDetails.eventName && <p>🔹 <strong>QS Event name:</strong> {qsDetails.eventName}</p>}
+            {qsDetails.journeyName && <p>🔹 <strong>QS Journey name:</strong> {qsDetails.journeyName}</p>}
           </div>
         )}
       </div>
