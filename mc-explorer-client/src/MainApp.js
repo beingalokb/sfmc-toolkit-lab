@@ -54,6 +54,11 @@ export default function MainApp() {
   const [dmJourneyPath, setDMJourneyPath] = useState('');
   const [dmStatus, setDMStatus] = useState('');
 
+  // Add new state for DM Quick Send
+  const [qsStatus, setQSStatus] = useState("");
+  const [qsDetails, setQSDetails] = useState(null);
+  const [qsLoading, setQSLoading] = useState(false);
+
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
     if (!key) return '';
@@ -722,6 +727,74 @@ export default function MainApp() {
     );
   }
 
+  // Render navigation tabs
+  const renderNavigation = () => (
+    <div className="flex space-x-4 mb-6">
+      <button
+        className={`px-4 py-2 rounded-lg ${activeTab === 'de' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+        onClick={() => setActiveTab('de')}
+      >
+        Data Extensions
+      </button>
+      <button
+        className={`px-4 py-2 rounded-lg ${activeTab === 'dm' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+        onClick={() => setActiveTab('dm')}
+      >
+        Distributed Marketing
+      </button>
+    </div>
+  );
+
+  // Render main content for DM Quick Send
+  const renderDMQuickSend = () => (
+    <div className="bg-white rounded-lg shadow p-6">
+      <h2 className="text-2xl font-semibold text-indigo-700 mb-6">
+        🚀 Single Click Distributed Marketing Quick Send Journey Setup
+      </h2>
+      <button
+        onClick={async () => {
+          setQSLoading(true);
+          setQSStatus("Creating Quick Send Data Extension...");
+          setQSDetails(null);
+          try {
+            const res = await fetch(`${baseURL}/createDMFullSetup`);
+            const json = await res.json();
+            if (json.status === "OK") {
+              setQSStatus("✅ All set!");
+              setQSDetails({
+                deName: json.deName,
+                dePath: `/Data Extensions / MC-Explorer-DM-${json.folderId}`,
+                eventName: json.eventName || json.eventDefinitionKey,
+                journeyName: json.journeyName,
+              });
+            } else {
+              setQSStatus("❌ Setup failed.");
+            }
+          } catch (e) {
+            setQSStatus("❌ Error during setup.");
+          } finally {
+            setQSLoading(false);
+          }
+        }}
+        disabled={qsLoading}
+        className={`mt-4 px-6 py-2 rounded-md ${qsLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} text-white`}
+      >
+        {qsLoading ? 'Processing...' : 'Create DM QS'}
+      </button>
+      <div className="mt-6 text-gray-700 space-y-2">
+        {qsStatus && <p className="text-lg font-medium">{qsStatus}</p>}
+        {qsDetails && (
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <p>🔹 <strong>QS DE name:</strong> {qsDetails.deName}</p>
+            <p>🔹 <strong>QS DE path:</strong> {qsDetails.dePath}</p>
+            <p>🔹 <strong>QS Event name:</strong> {qsDetails.eventName}</p>
+            <p>🔹 <strong>QS Journey name:</strong> {qsDetails.journeyName}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* App Title and Header */}
@@ -1217,14 +1290,13 @@ export default function MainApp() {
                     <span className="font-semibold">The data extension path is:</span> <span className="font-mono text-blue-900">Data Extensions &gt; {deName || 'N/A'}</span>
                   </div>
                   <div className="mb-2 text-gray-800">
-                    <span className="font-semibold">Update the below attributes in the data extension:</span>
+                    <span className="font-semibold">We have set the below attributes in the data extension:</span>
                     <ul className="list-disc ml-6 mt-1">
-                      <li><span className="font-semibold">USED FOR SENDING</span></li>
-                      <li><span className="font-semibold">USED FOR TESTING</span></li>
-                      <li><span className="font-semibold">SUBSCRIBER RELATIONSHIP</span></li>
+                      <li><span className="font-semibold">USED FOR SENDING: Yes</span></li>
+                      <li><span className="font-semibold">USED FOR TESTING: Yes</span></li>
+                      <li><span className="font-semibold">SUBSCRIBER RELATIONSHIP: id relates to Subscribers on Subscriber Key</span></li>
                     </ul>
                   </div>
-                  <div className="mt-3 text-indigo-800 font-semibold">Now you are ready to create the Journey.</div>
                 </div>
               );
             })()}
@@ -1288,86 +1360,7 @@ export default function MainApp() {
           </div>
         ) : parentNav === 'distributedMarketing' ? (
           <div className="bg-white shadow rounded p-6 max-w-xl mx-auto">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-700">Distributed Marketing Journey Setup</h2>
-            <ol className="mb-6 flex gap-4">
-              <li className={`font-semibold ${dmStep === 1 ? 'text-blue-700' : 'text-gray-500'}`}>1. Create Data Extension</li>
-              <li className={`font-semibold ${dmStep === 2 ? 'text-blue-700' : 'text-gray-500'}`}>2. Create Journey</li>
-            </ol>
-            {dmStep === 1 && (
-              <div>
-                <button
-                  className="bg-blue-700 text-white px-4 py-2 rounded font-semibold"
-                  onClick={async () => {
-                    setDMStatus('Creating Data Extension...');
-                    const res = await fetch('/create/dm-dataextension', { method: 'POST' });
-                    const data = await res.json();
-                    if (data.status === 'OK') {
-                      setDMDEPath(data.path);
-                      setDMStatus('Data Extension created!');
-                      setDMStep(2);
-                    } else {
-                      setDMStatus('Failed to create Data Extension: ' + (data.message || 'Unknown error'));
-                    }
-                  }}
-                >Create Data Extension</button>
-                {dmStatus && (
-                  <div className="mt-4 text-sm text-gray-700">{dmStatus}</div>
-                )}
-                {dmStatus === 'Data Extension created!' && (
-                  (() => {
-                    // Try to extract DE name from dmDEPath, fallback to status if not available
-                    let deName = '';
-                    if (dmDEPath) {
-                      const parts = dmDEPath.split('/');
-                      deName = parts[parts.length - 1];
-                    }
-                    return (
-                      <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
-                        <div className="text-green-800 font-bold mb-2">Data Extension created!</div>
-                        <div className="mb-2 text-gray-800">
-                          <span className="font-semibold">Your data extension name is:</span> <span className="font-mono text-blue-900">{deName || 'N/A'}</span>
-                        </div>
-                        <div className="mb-2 text-gray-800">
-                          <span className="font-semibold">The data extension path is:</span> <span className="font-mono text-blue-900">Data Extensions &gt; {deName || 'N/A'}</span>
-                        </div>
-                        <div className="mb-2 text-gray-800">
-                          <span className="font-semibold">Update the below attributes in the data extension:</span>
-                          <ul className="list-disc ml-6 mt-1">
-                            <li><span className="font-semibold">USED FOR SENDING</span></li>
-                            <li><span className="font-semibold">USED FOR TESTING</span></li>
-                            <li><span className="font-semibold">SUBSCRIBER RELATIONSHIP</span></li>
-                          </ul>
-                        </div>
-                        <div className="mt-3 text-indigo-800 font-semibold">Now you are ready to create the Journey.</div>
-                      </div>
-                    );
-                  })()
-                )}
-              </div>
-            )}
-            {dmStep === 2 && (
-              <div>
-                <button
-                  className="bg-green-700 text-white px-4 py-2 rounded font-semibold"
-                  onClick={async () => {
-                    setDMStatus('Creating Journey...');
-                    const res = await fetch('/create/dm-journey', { method: 'POST' });
-                    const data = await res.json();
-                    if (data.status === 'OK') {
-                      setDMJourneyPath(data.path);
-                      setDMStatus('Journey created!');
-                    } else {
-                      setDMStatus('Failed to create Journey: ' + (data.message || 'Unknown error'));
-                    }
-                  }}
-                >Create Journey</button>
-                {dmStatus && <div className="mt-4 text-sm text-gray-700">{dmStatus}</div>}
-                {dmJourneyPath && <div className="mt-2 text-green-700">Journey Path: {dmJourneyPath}</div>}
-                <div className="mt-4 text-blue-800 text-sm">
-                  Your journey is ready for quick send. Feel free to edit your journey, add your emails to the Journey and also if needed update the data extension or move it to your desired path.
-                </div>
-              </div>
-            )}
+            {renderDMQuickSend()}
           </div>
         ) : null}
       </div>
