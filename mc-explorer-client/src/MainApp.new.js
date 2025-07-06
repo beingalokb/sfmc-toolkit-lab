@@ -14,6 +14,9 @@ export default function MainApp() {
   const [dmStep, setDMStep] = useState(1);
   const [deCreated, setDECreated] = useState(false);
   const [eventCreated, setEventCreated] = useState(false);
+  const [qsStatus, setQSStatus] = useState("");
+  const [qsDetails, setQSDetails] = useState(null);
+  const [qsLoading, setQSLoading] = useState(false);
 
   const renderNavigation = () => {
     return (
@@ -58,60 +61,51 @@ export default function MainApp() {
     if (activeTab === 'dm') {
       return (
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-indigo-700 mb-4">Distributed Marketing Journey Setup</h2>
-          <div className="mb-6">
-            <ol className="list-decimal pl-6 space-y-2">
-              <li className={dmStep >= 1 ? 'text-indigo-600 font-semibold' : 'text-gray-500'}>
-                Step 1: Create Data Extension
-                <button
-                  className="ml-4 px-4 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600"
-                  onClick={async () => {
-                    const res = await fetch(`${baseURL}/createDE`);
-                    const json = await res.json();
-                    if (json.status === 'OK') {
-                      setDECreated(true);
-                      setDMStep(2);
-                    }
-                  }}
-                  disabled={deCreated}
-                >
-                  {deCreated ? "✓ Created" : "Create DE"}
-                </button>
-              </li>
-              <li className={dmStep >= 2 ? 'text-indigo-600 font-semibold' : 'text-gray-500'}>
-                Step 2: Create Event Definition
-                <button
-                  className="ml-4 px-4 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600"
-                  onClick={async () => {
-                    const res = await fetch(`${baseURL}/createEvent`);
-                    const json = await res.json();
-                    if (json.status === 'OK') {
-                      setEventCreated(true);
-                      setDMStep(3);
-                    }
-                  }}
-                  disabled={!deCreated || eventCreated}
-                >
-                  {eventCreated ? "✓ Created" : "Create Event"}
-                </button>
-              </li>
-              <li className={dmStep >= 3 ? 'text-indigo-600 font-semibold' : 'text-gray-500'}>
-                Step 3: Create Journey
-                <button
-                  className="ml-4 px-4 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600"
-                  onClick={async () => {
-                    const res = await fetch(`${baseURL}/createJourney`);
-                    const json = await res.json();
-                    if (json.status === 'OK') {
-                      alert("Journey created successfully!");
-                    }
-                  }}
-                  disabled={!eventCreated}
-                >
-                  Create Journey
-                </button>
-              </li>
-            </ol>
+          <h2 className="text-2xl font-semibold text-indigo-700 mb-6">
+            🚀 Single Click Distributed Marketing Quick Send Journey Setup
+          </h2>
+
+          <button
+            className={`px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 ${qsLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+            onClick={async () => {
+              setQSLoading(true);
+              setQSStatus("Creating Quick Send Data Extension...");
+              setQSDetails(null);
+              try {
+                const res = await fetch(`${baseURL}/createDMFullSetup`);
+                const json = await res.json();
+                if (json.status === "OK") {
+                  setQSStatus("✅ All set!");
+                  setQSDetails({
+                    deName: json.deName,
+                    dePath: `/Data Extensions / MC-Explorer-DM-${json.folderId}`,
+                    eventName: json.eventName || json.eventDefinitionKey,
+                    journeyName: json.journeyName,
+                  });
+                } else {
+                  setQSStatus("❌ Setup failed.");
+                }
+              } catch (e) {
+                setQSStatus("❌ Error during setup.");
+              } finally {
+                setQSLoading(false);
+              }
+            }}
+            disabled={qsLoading}
+          >
+            {qsLoading ? "Working..." : "✨ Create DM QS"}
+          </button>
+
+          <div className="mt-6 text-gray-700 space-y-2">
+            {qsStatus && <p className="text-lg font-medium">{qsStatus}</p>}
+            {qsDetails && (
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <p>🔹 <strong>QS DE name:</strong> {qsDetails.deName}</p>
+                <p>🔹 <strong>QS DE path:</strong> {qsDetails.dePath}</p>
+                <p>🔹 <strong>QS Event name:</strong> {qsDetails.eventName}</p>
+                <p>🔹 <strong>QS Journey name:</strong> {qsDetails.journeyName}</p>
+              </div>
+            )}
           </div>
         </div>
       );
