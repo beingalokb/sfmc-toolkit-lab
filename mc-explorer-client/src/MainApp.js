@@ -789,6 +789,9 @@ export default function MainApp() {
             {qsDetails.dePath && <p>🔹 <strong>QS DE path:</strong> {qsDetails.dePath}</p>}
             {qsDetails.eventName && <p>🔹 <strong>QS Event name:</strong> {qsDetails.eventName}</p>}
             {qsDetails.journeyName && <p>🔹 <strong>QS Journey name:</strong> {qsDetails.journeyName}</p>}
+            <p>🔹 <strong>Now go ahead and update the Journey with the email activity.</strong></p>
+            <p>🔹 <strong>Edit the journey settings to select contact re-entry mode and email attribute from Entry Source.</strong></p>
+            <p>🔹 <strong>Validate and activate the journey.</strong></p>
           </div>
         )}
       </div>
