@@ -754,7 +754,7 @@ export default function MainApp() {
       <button
         onClick={async () => {
           setQSLoading(true);
-          setQSStatus("Creating Quick Send Data Extension...");
+          setQSStatus("Creating Quick Send DE, Event, Journey...");
           setQSDetails(null);
           try {
             const res = await fetch(`${baseURL}/create/dm-dataextension`, { method: 'POST' });
