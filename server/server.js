@@ -2187,6 +2187,7 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     // Step 6: Create Event Definition with correct ObjectID
     const eventDtStr = new Date().toISOString().replace(/[:\-\.]/g, '').slice(0, 14);
     const eventKey = `dm_event_${eventDtStr}`;
+    const eventName = `DM Event Definition - ${eventDtStr}`;
     // Create API Event Definition with proper format
     const eventDefPayload = {
       name: `DM Event Definition - ${eventDtStr}`,
@@ -2314,14 +2315,77 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     return res.status(200).json({
       status: "OK",
       message: "Folder, Data Extension, Event, and Journey created successfully",
-      folderId,
+      folderName, // Show folderName instead of folderId
       deName,
+      eventName, // Ensure eventName is included
       journeyName,
       journeyId
     });
 
   } catch (e) {
     console.error('❌ [DM DataExtension] Error:', e.response?.data || e.message);
+    res.status(500).json({ status: 'ERROR', message: e.message });
+  }
+});
+
+// Single Click Distributed Marketing Quick Send Setup
+app.post('/createDMFullSetup', async (req, res) => {
+  try {
+    // 1. Get credentials and access token
+    const creds = getMCCreds(req);
+    const subdomain = creds.subdomain;
+    const accessToken = getAccessTokenFromRequest(req);
+    if (!accessToken || !subdomain) {
+      return res.status(401).json({ status: 'ERROR', message: 'Missing Marketing Cloud credentials' });
+    }
+
+    // 2. Create Folder (if needed) and Data Extension
+    // (Reuse your existing logic for folder/DE creation)
+    // For demo, we'll use a timestamp for uniqueness
+    const eventDtStr = new Date().toISOString().replace(/[:\-.]/g, '').slice(0, 14);
+    const deName = `DM_MC_explorer_${eventDtStr}`;
+    const folderId = Date.now().toString(); // Simulate folder ID
+
+    // ... Insert your DE creation logic here ...
+    // For demo, we'll just simulate a DE ObjectID
+    const deObjectID = `${Math.random().toString(36).substring(2, 10)}-objectid`;
+
+    // 3. Create Event Definition
+    const eventKey = `dm_event_${eventDtStr}`;
+    const eventName = `DM Event Definition - ${eventDtStr}`;
+    // ... Insert your Event Definition creation logic here ...
+    // For demo, we'll just simulate an eventDefinitionId
+    const eventDefinitionId = `${Math.random().toString(36).substring(2, 10)}-eventid`;
+
+    // 4. Create Journey
+    const journeyName = `Journey_${eventDtStr}`;
+    // ... Insert your Journey creation logic here ...
+
+    // 5. Return the required details
+    return res.json({
+      status: 'OK',
+      folderId,
+      deName,
+      eventName,
+      eventDefinitionKey: eventKey,
+      journeyName
+    });
+  } catch (e) {
+    console.error('❌ [DM Quick Send Setup] Error:', e.message);
+    res.status(500).json({ status: 'ERROR', message: e.message });
+  }
+});
+
+// Preference Center Config API
+app.post('/preference-center/configure', async (req, res) => {
+  try {
+    const config = req.body;
+    console.log('[Preference Center Config Received]', config);
+    // TODO: Implement logic to create DEs, publication lists, CloudPage, etc.
+    // For now, just return OK
+    res.json({ status: 'OK', message: 'Preference Center configuration received.' });
+  } catch (e) {
+    console.error('[Preference Center Config Error]', e);
     res.status(500).json({ status: 'ERROR', message: e.message });
   }
 });
