@@ -1381,25 +1381,27 @@ export default function MainApp() {
         ) : null}
 
         {/* Render content for Preference Center config */}
-        {activeTab === 'preferencecenter' && (
-          <PreferenceCenterConfigForm onSubmit={async config => {
-            setQSStatus('Submitting configuration...');
-            try {
-              const res = await fetch(`${baseURL}/preference-center/configure`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config)
-              });
-              const json = await res.json();
-              if (json.status === 'OK') {
-                setQSStatus('✅ Preference Center configuration submitted!');
-              } else {
-                setQSStatus('❌ Failed to submit configuration: ' + (json.message || 'Unknown error'));
+        {parentNav === 'preferencecenter' && (
+          <div className="bg-white shadow rounded p-6 max-w-xl mx-auto">
+            <PreferenceCenterConfigForm onSubmit={async config => {
+              setQSStatus('Submitting configuration...');
+              try {
+                const res = await fetch(`${baseURL}/preference-center/configure`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(config)
+                });
+                const json = await res.json();
+                if (json.status === 'OK') {
+                  setQSStatus('✅ Preference Center configuration submitted!');
+                } else {
+                  setQSStatus('❌ Failed to submit configuration: ' + (json.message || 'Unknown error'));
+                }
+              } catch (e) {
+                setQSStatus('❌ Error submitting configuration.');
               }
-            } catch (e) {
-              setQSStatus('❌ Error submitting configuration.');
-            }
-          }} />
+            }} />
+          </div>
         )}
       </div>
     </div>
