@@ -1542,7 +1542,7 @@ app.post('/update/emailsenddefinition-mass', async (req, res) => {
     const soapEnvelope = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <soapenv:Header>
-          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+          <fueloauth>${accessToken}</fueloauth>
         </soapenv:Header>
         <soapenv:Body>
           <UpdateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
@@ -1651,7 +1651,7 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
           <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">
             <soapenv:Header>
               <fueloauth xmlns=\"http://exacttarget.com\">${accessToken}</fueloauth>
-            </soapenv:Header>
+                                             </soapenv:Header>
             <soapenv:Body>
               <RetrieveRequestMsg xmlns=\"http://exacttarget.com/wsdl/partnerAPI\">
                 <RetrieveRequest>
@@ -2380,10 +2380,71 @@ app.post('/createDMFullSetup', async (req, res) => {
 app.post('/preference-center/configure', async (req, res) => {
   try {
     const config = req.body;
-    console.log('[Preference Center Config Received]', config);
-    // TODO: Implement logic to create DEs, publication lists, CloudPage, etc.
-    // For now, just return OK
-    res.json({ status: 'OK', message: 'Preference Center configuration received.' });
+    // ...existing code...
+    const now = new Date();
+    const dateTime = now.toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+    const controllerDEName = `PC_Controller_${dateTime}`;
+    const logDEName = `PC_Log_${dateTime}`;
+
+    // 1. Define DEs
+    const controllerDE = {
+      Name: 'PC_Controller',
+      CustomerKey: 'PC_Controller',
+      Description: 'Stores config-driven field mapping for dynamic preference center',
+      Fields: [
+        { Name: 'CategoryLabels', FieldType: 'Text', MaxLength: 200 },
+        { Name: 'ContactFields', FieldType: 'Text', MaxLength: 200 },
+        { Name: 'LeadFields', FieldType: 'Text', MaxLength: 200 },
+        { Name: 'Header', FieldType: 'Text', MaxLength: 200 },
+        { Name: 'SubHeader', FieldType: 'Text', MaxLength: 200 },
+        { Name: 'Footer', FieldType: 'Text', MaxLength: 500 },
+        { Name: 'LogoUrl', FieldType: 'Text', MaxLength: 500 },
+        { Name: 'OptOutLabel', FieldType: 'Text', MaxLength: 200 },
+        { Name: 'IntegrationType', FieldType: 'Text', MaxLength: 50 }
+      ],
+      Keys: [{ Name: 'IntegrationType', IsPrimaryKey: true }]
+    };
+    const logDE = {
+      Name: 'PC_Log',
+      CustomerKey: 'PC_Log',
+      Description: 'Logs all preference updates and changes',
+      Fields: [
+        { Name: 'SubscriberKey', FieldType: 'Text', MaxLength: 100, IsPrimaryKey: false },
+        { Name: 'EmailAddress', FieldType: 'EmailAddress' },
+        { Name: 'OldValues', FieldType: 'Text', MaxLength: 4000 },
+        { Name: 'NewValues', FieldType: 'Text', MaxLength: 4000 },
+        { Name: 'ChangeType', FieldType: 'Text', MaxLength: 100 },
+        { Name: 'DateModified', FieldType: 'Date' }
+      ],
+      Keys: [{ Name: 'SubscriberKey', IsPrimaryKey: false }]
+    };
+
+    // 2. Prepare upsert row for Controller DE
+    const categoryLabels = config.categories.map(cat => cat.label).join(' | ') + ' | ' + config.optOutLabel;
+    const contactFields = config.categories.map(cat => cat.fieldMapping.contact).join(' | ') + ' | hasOptedOutOfEmails';
+    const leadFields = config.categories.map(cat => cat.fieldMapping.lead).join(' | ') + ' | hasOptedOutOfEmails';
+    const controllerRow = {
+      CategoryLabels: categoryLabels,
+      ContactFields: contactFields,
+      LeadFields: leadFields,
+      Header: config.branding.header,
+      SubHeader: config.branding.subHeader,
+      Footer: config.branding.footer,
+      LogoUrl: config.branding.logoUrl,
+      OptOutLabel: config.optOutLabel,
+      IntegrationType: config.integrationType
+    };
+
+    // 3. TODO: Use MC API to create DEs and upsert row
+    // await createDataExtension(controllerDEName, controllerDE);
+    // await createDataExtension(logDEName, logDE);
+    // await upsertRow(controllerDEName, controllerRow);
+
+    console.log('[PC Controller DE]', controllerDEName, controllerDE);
+    console.log('[PC Controller Row]', controllerRow);
+    console.log('[PC Log DE]', logDEName, logDE);
+
+    res.json({ status: 'OK', message: 'Preference Center configuration processed.', controllerDEName, logDEName });
   } catch (e) {
     console.error('[Preference Center Config Error]', e);
     res.status(500).json({ status: 'ERROR', message: e.message });
