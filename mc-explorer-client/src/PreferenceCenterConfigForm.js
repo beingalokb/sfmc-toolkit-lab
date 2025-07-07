@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const defaultCategory = { label: '', description: '', apiName: '', publicationName: '' };
+const defaultCategory = { label: '', description: '', apiName: '', publicationName: '', publicationNameEdited: false };
 
 export default function PreferenceCenterConfigForm({ onSubmit }) {
   const [branding, setBranding] = useState({
@@ -36,17 +36,27 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
   const handleCategoryChange = (idx, field, value) => {
     setCategories(categories => {
       const updated = [...categories];
-      updated[idx][field] = value;
-      // Auto-populate publicationName from label if label changes
-      if (field === 'label' && !updated[idx].publicationName) {
+      if (field === 'label') {
+        updated[idx].label = value;
+        // Only auto-populate publicationName if user hasn't edited it
+        if (!updated[idx].publicationNameEdited) {
+          updated[idx].publicationName = value;
+        }
+      } else if (field === 'publicationName') {
         updated[idx].publicationName = value;
+        updated[idx].publicationNameEdited = true;
+      } else {
+        updated[idx][field] = value;
       }
       return updated;
     });
   };
 
   const addCategory = () => setCategories([...categories, { ...defaultCategory }]);
-  const removeCategory = idx => setCategories(categories.filter((_, i) => i !== idx));
+  const removeCategory = idx => setCategories(categories => {
+    const updated = categories.filter((_, i) => i !== idx);
+    return updated.length ? updated : [{ ...defaultCategory }];
+  });
 
   const handleSubmit = e => {
     e.preventDefault();
