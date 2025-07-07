@@ -60,6 +60,9 @@ export default function MainApp() {
   const [qsDetails, setQSDetails] = useState(null);
   const [qsLoading, setQSLoading] = useState(false);
 
+  // Add projectName state
+  const [projectName, setProjectName] = useState('');
+
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
     if (!key) return '';
@@ -634,9 +637,6 @@ export default function MainApp() {
   }, [activeTab, isAuthenticated]);
 
   // State for mass selection
-  // (already declared at the top)
-
-  // Handlers for select all and individual selection
   function toggleSelectAllESD() {
     if (allSelected) setSelectedESDKeys([]);
     else setSelectedESDKeys(resolvedEmailSendDefs.map(r => r.CustomerKey));
