@@ -128,11 +128,16 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
                 <>
                   <input className="flex-1 border rounded p-2" placeholder="Contact API Name" value={cat.apiNameContact} onChange={e => handleCategoryChange(idx, 'apiNameContact', e.target.value)} />
                   <input className="flex-1 border rounded p-2" placeholder="Lead API Name" value={cat.apiNameLead} onChange={e => handleCategoryChange(idx, 'apiNameLead', e.target.value)} />
+                  <input className="flex-1 border rounded p-2" placeholder="Publication Name" value={cat.publicationName} onChange={e => handleCategoryChange(idx, 'publicationName', e.target.value)} />
                 </>
               )}
               {integrationType !== 'None' && integrationType !== 'Contact' && integrationType !== 'Lead' && integrationType !== 'Contact & Lead' && (
                 <input className="flex-1 border rounded p-2" placeholder="API Name" value={cat.apiName} onChange={e => handleCategoryChange(idx, 'apiName', e.target.value)} />
               )}
+              {(integrationType === 'Contact' || integrationType === 'Lead' || (integrationType !== 'Contact & Lead' && integrationType !== 'None' && integrationType !== 'Contact' && integrationType !== 'Lead')) && (
+                <input className="flex-1 border rounded p-2" placeholder="Publication Name" value={cat.publicationName} onChange={e => handleCategoryChange(idx, 'publicationName', e.target.value)} />
+              )}
+              {/* Error messages */}
               {integrationType === 'Contact' && errors[`apiNameContact_${idx}`] && <div className="text-red-600 text-xs mt-1">{errors[`apiNameContact_${idx}`]}</div>}
               {integrationType === 'Lead' && errors[`apiNameLead_${idx}`] && <div className="text-red-600 text-xs mt-1">{errors[`apiNameLead_${idx}`]}</div>}
               {integrationType === 'Contact & Lead' && (
@@ -142,7 +147,6 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
                 </>
               )}
               {integrationType !== 'None' && integrationType !== 'Contact' && integrationType !== 'Lead' && integrationType !== 'Contact & Lead' && errors[`apiName_${idx}`] && <div className="text-red-600 text-xs mt-1">{errors[`apiName_${idx}`]}</div>}
-              <input className="flex-1 border rounded p-2" placeholder="Publication Name" value={cat.publicationName} onChange={e => handleCategoryChange(idx, 'publicationName', e.target.value)} />
             </div>
             <button type="button" className="text-red-600 text-xs underline" onClick={() => removeCategory(idx)} disabled={categories.length === 1}>Remove</button>
           </div>
