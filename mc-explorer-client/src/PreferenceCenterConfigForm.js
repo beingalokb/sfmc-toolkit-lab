@@ -118,24 +118,25 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
               <input className="flex-1 border rounded p-2" placeholder="Description" value={cat.description} onChange={e => handleCategoryChange(idx, 'description', e.target.value)} />
             </div>
             <div className="flex gap-2 mb-2">
-              {integrationType === 'Contact' && (
-                <input className="flex-1 border rounded p-2" placeholder="Contact API Name" value={cat.apiNameContact} onChange={e => handleCategoryChange(idx, 'apiNameContact', e.target.value)} />
-              )}
-              {integrationType === 'Lead' && (
-                <input className="flex-1 border rounded p-2" placeholder="Lead API Name" value={cat.apiNameLead} onChange={e => handleCategoryChange(idx, 'apiNameLead', e.target.value)} />
-              )}
-              {integrationType === 'Contact & Lead' && (
+              {integrationType === 'Contact & Lead' ? (
                 <>
                   <input className="flex-1 border rounded p-2" placeholder="Contact API Name" value={cat.apiNameContact} onChange={e => handleCategoryChange(idx, 'apiNameContact', e.target.value)} />
                   <input className="flex-1 border rounded p-2" placeholder="Lead API Name" value={cat.apiNameLead} onChange={e => handleCategoryChange(idx, 'apiNameLead', e.target.value)} />
                   <input className="flex-1 border rounded p-2" placeholder="Publication Name" value={cat.publicationName} onChange={e => handleCategoryChange(idx, 'publicationName', e.target.value)} />
                 </>
-              )}
-              {integrationType !== 'None' && integrationType !== 'Contact' && integrationType !== 'Lead' && integrationType !== 'Contact & Lead' && (
-                <input className="flex-1 border rounded p-2" placeholder="API Name" value={cat.apiName} onChange={e => handleCategoryChange(idx, 'apiName', e.target.value)} />
-              )}
-              {(integrationType === 'Contact' || integrationType === 'Lead' || (integrationType !== 'Contact & Lead' && integrationType !== 'None' && integrationType !== 'Contact' && integrationType !== 'Lead')) && (
-                <input className="flex-1 border rounded p-2" placeholder="Publication Name" value={cat.publicationName} onChange={e => handleCategoryChange(idx, 'publicationName', e.target.value)} />
+              ) : (
+                <>
+                  {integrationType === 'Contact' && (
+                    <input className="flex-1 border rounded p-2" placeholder="Contact API Name" value={cat.apiNameContact} onChange={e => handleCategoryChange(idx, 'apiNameContact', e.target.value)} />
+                  )}
+                  {integrationType === 'Lead' && (
+                    <input className="flex-1 border rounded p-2" placeholder="Lead API Name" value={cat.apiNameLead} onChange={e => handleCategoryChange(idx, 'apiNameLead', e.target.value)} />
+                  )}
+                  {integrationType !== 'None' && integrationType !== 'Contact' && integrationType !== 'Lead' && integrationType !== 'Contact & Lead' && (
+                    <input className="flex-1 border rounded p-2" placeholder="API Name" value={cat.apiName} onChange={e => handleCategoryChange(idx, 'apiName', e.target.value)} />
+                  )}
+                  <input className="flex-1 border rounded p-2" placeholder="Publication Name" value={cat.publicationName} onChange={e => handleCategoryChange(idx, 'publicationName', e.target.value)} />
+                </>
               )}
               {/* Error messages */}
               {integrationType === 'Contact' && errors[`apiNameContact_${idx}`] && <div className="text-red-600 text-xs mt-1">{errors[`apiNameContact_${idx}`]}</div>}
