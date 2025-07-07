@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-const defaultCategory = { label: '', description: '', apiName: '', publicationListId: '' };
+const defaultCategory = { label: '', description: '', apiName: '', publicationName: '' };
 
 export default function PreferenceCenterConfigForm({ onSubmit }) {
   const [branding, setBranding] = useState({
@@ -11,12 +11,36 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
   });
   const [optOutLabel, setOptOutLabel] = useState('');
   const [integrationType, setIntegrationType] = useState('None');
-  const [categories, setCategories] = useState([ { ...defaultCategory } ]);
+  const [categories, setCategories] = useState([{ ...defaultCategory }]);
+  const [errors, setErrors] = useState({});
+  const [showOptOutNote, setShowOptOutNote] = useState(false);
+
+  // Validation
+  const validate = () => {
+    const errs = {};
+    if (!branding.header) errs.header = 'Header is required';
+    if (!branding.footer) errs.footer = 'Footer is required';
+    if (integrationType !== 'None') {
+      categories.forEach((cat, idx) => {
+        if (!cat.apiName) errs[`apiName_${idx}`] = 'API Name is required';
+      });
+    }
+    return errs;
+  };
+
+  // Handle Opt-out note
+  useEffect(() => {
+    setShowOptOutNote(!!optOutLabel && integrationType !== 'None');
+  }, [optOutLabel, integrationType]);
 
   const handleCategoryChange = (idx, field, value) => {
     setCategories(categories => {
       const updated = [...categories];
       updated[idx][field] = value;
+      // Auto-populate publicationName from label if label changes
+      if (field === 'label' && !updated[idx].publicationName) {
+        updated[idx].publicationName = value;
+      }
       return updated;
     });
   };
@@ -26,6 +50,9 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
 
   const handleSubmit = e => {
     e.preventDefault();
+    const errs = validate();
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     onSubmit && onSubmit({ branding, optOutLabel, integrationType, categories });
   };
 
@@ -33,16 +60,18 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
     <form className="space-y-6 max-w-2xl mx-auto bg-white p-6 rounded shadow" onSubmit={handleSubmit}>
       <h2 className="text-2xl font-bold text-indigo-700 mb-4">Preference Center Configuration</h2>
       <div>
-        <label className="block font-semibold mb-1">Header</label>
+        <label className="block font-semibold mb-1">Header <span className="text-red-600">*</span></label>
         <input className="w-full border rounded p-2" value={branding.header} onChange={e => setBranding(b => ({ ...b, header: e.target.value }))} />
+        {errors.header && <div className="text-red-600 text-xs mt-1">{errors.header}</div>}
       </div>
       <div>
         <label className="block font-semibold mb-1">Sub-header</label>
         <input className="w-full border rounded p-2" value={branding.subHeader} onChange={e => setBranding(b => ({ ...b, subHeader: e.target.value }))} />
       </div>
       <div>
-        <label className="block font-semibold mb-1">Footer</label>
+        <label className="block font-semibold mb-1">Footer <span className="text-red-600">*</span></label>
         <input className="w-full border rounded p-2" value={branding.footer} onChange={e => setBranding(b => ({ ...b, footer: e.target.value }))} />
+        {errors.footer && <div className="text-red-600 text-xs mt-1">{errors.footer}</div>}
       </div>
       <div>
         <label className="block font-semibold mb-1">Logo URL</label>
@@ -51,6 +80,9 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
       <div>
         <label className="block font-semibold mb-1">Opt-out Label</label>
         <input className="w-full border rounded p-2" value={optOutLabel} onChange={e => setOptOutLabel(e.target.value)} />
+        {showOptOutNote && (
+          <div className="text-yellow-700 text-xs mt-1">Note: <b>hasOptOutOfEmail</b> will be tagged to the user action for Opt-out.</div>
+        )}
       </div>
       <div>
         <label className="block font-semibold mb-1">Integration Type</label>
@@ -72,7 +104,8 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
             </div>
             <div className="flex gap-2 mb-2">
               <input className="flex-1 border rounded p-2" placeholder="API Name" value={cat.apiName} onChange={e => handleCategoryChange(idx, 'apiName', e.target.value)} />
-              <input className="flex-1 border rounded p-2" placeholder="Publication List ID" value={cat.publicationListId} onChange={e => handleCategoryChange(idx, 'publicationListId', e.target.value)} />
+              {integrationType !== 'None' && errors[`apiName_${idx}`] && <div className="text-red-600 text-xs mt-1">{errors[`apiName_${idx}`]}</div>}
+              <input className="flex-1 border rounded p-2" placeholder="Publication Name" value={cat.publicationName} onChange={e => handleCategoryChange(idx, 'publicationName', e.target.value)} />
             </div>
             <button type="button" className="text-red-600 text-xs underline" onClick={() => removeCategory(idx)} disabled={categories.length === 1}>Remove</button>
           </div>
