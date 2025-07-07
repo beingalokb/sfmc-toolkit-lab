@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const defaultCategory = { label: '', description: '', apiName: '', publicationName: '', publicationNameEdited: false };
+const defaultCategory = { label: '', description: '', apiName: '', apiNameContact: '', apiNameLead: '', publicationName: '', publicationNameEdited: false };
 
 export default function PreferenceCenterConfigForm({ onSubmit }) {
   const [branding, setBranding] = useState({
@@ -20,11 +20,15 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
     const errs = {};
     if (!branding.header) errs.header = 'Header is required';
     if (!branding.footer) errs.footer = 'Footer is required';
-    if (integrationType !== 'None') {
-      categories.forEach((cat, idx) => {
-        if (!cat.apiName) errs[`apiName_${idx}`] = 'API Name is required';
-      });
-    }
+    if (!optOutLabel) errs.optOutLabel = 'Opt-out label is required';
+    categories.forEach((cat, idx) => {
+      if (integrationType === 'Contact' && !cat.apiNameContact) errs[`apiNameContact_${idx}`] = 'Contact API Name is required';
+      else if (integrationType === 'Lead' && !cat.apiNameLead) errs[`apiNameLead_${idx}`] = 'Lead API Name is required';
+      else if (integrationType === 'Contact & Lead') {
+        if (!cat.apiNameContact) errs[`apiNameContact_${idx}`] = 'Contact API Name is required';
+        if (!cat.apiNameLead) errs[`apiNameLead_${idx}`] = 'Lead API Name is required';
+      } else if (integrationType !== 'None' && !cat.apiName) errs[`apiName_${idx}`] = 'API Name is required';
+    });
     return errs;
   };
 
@@ -88,8 +92,9 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
         <input className="w-full border rounded p-2" value={branding.logoUrl} onChange={e => setBranding(b => ({ ...b, logoUrl: e.target.value }))} />
       </div>
       <div>
-        <label className="block font-semibold mb-1">Opt-out Label</label>
+        <label className="block font-semibold mb-1">Opt-out of all marketing emails Label <span className='text-red-600'>*</span></label>
         <input className="w-full border rounded p-2" value={optOutLabel} onChange={e => setOptOutLabel(e.target.value)} />
+        {errors.optOutLabel && <div className="text-red-600 text-xs mt-1">{errors.optOutLabel}</div>}
         {showOptOutNote && (
           <div className="text-yellow-700 text-xs mt-1">Note: <b>hasOptOutOfEmail</b> will be tagged to the user action for Opt-out.</div>
         )}
@@ -113,8 +118,30 @@ export default function PreferenceCenterConfigForm({ onSubmit }) {
               <input className="flex-1 border rounded p-2" placeholder="Description" value={cat.description} onChange={e => handleCategoryChange(idx, 'description', e.target.value)} />
             </div>
             <div className="flex gap-2 mb-2">
-              <input className="flex-1 border rounded p-2" placeholder="API Name" value={cat.apiName} onChange={e => handleCategoryChange(idx, 'apiName', e.target.value)} />
-              {integrationType !== 'None' && errors[`apiName_${idx}`] && <div className="text-red-600 text-xs mt-1">{errors[`apiName_${idx}`]}</div>}
+              {integrationType === 'Contact' && (
+                <input className="flex-1 border rounded p-2" placeholder="Contact API Name" value={cat.apiNameContact} onChange={e => handleCategoryChange(idx, 'apiNameContact', e.target.value)} />
+              )}
+              {integrationType === 'Lead' && (
+                <input className="flex-1 border rounded p-2" placeholder="Lead API Name" value={cat.apiNameLead} onChange={e => handleCategoryChange(idx, 'apiNameLead', e.target.value)} />
+              )}
+              {integrationType === 'Contact & Lead' && (
+                <>
+                  <input className="flex-1 border rounded p-2" placeholder="Contact API Name" value={cat.apiNameContact} onChange={e => handleCategoryChange(idx, 'apiNameContact', e.target.value)} />
+                  <input className="flex-1 border rounded p-2" placeholder="Lead API Name" value={cat.apiNameLead} onChange={e => handleCategoryChange(idx, 'apiNameLead', e.target.value)} />
+                </>
+              )}
+              {integrationType !== 'None' && integrationType !== 'Contact' && integrationType !== 'Lead' && integrationType !== 'Contact & Lead' && (
+                <input className="flex-1 border rounded p-2" placeholder="API Name" value={cat.apiName} onChange={e => handleCategoryChange(idx, 'apiName', e.target.value)} />
+              )}
+              {integrationType === 'Contact' && errors[`apiNameContact_${idx}`] && <div className="text-red-600 text-xs mt-1">{errors[`apiNameContact_${idx}`]}</div>}
+              {integrationType === 'Lead' && errors[`apiNameLead_${idx}`] && <div className="text-red-600 text-xs mt-1">{errors[`apiNameLead_${idx}`]}</div>}
+              {integrationType === 'Contact & Lead' && (
+                <>
+                  {errors[`apiNameContact_${idx}`] && <div className="text-red-600 text-xs mt-1">{errors[`apiNameContact_${idx}`]}</div>}
+                  {errors[`apiNameLead_${idx}`] && <div className="text-red-600 text-xs mt-1">{errors[`apiNameLead_${idx}`]}</div>}
+                </>
+              )}
+              {integrationType !== 'None' && integrationType !== 'Contact' && integrationType !== 'Lead' && integrationType !== 'Contact & Lead' && errors[`apiName_${idx}`] && <div className="text-red-600 text-xs mt-1">{errors[`apiName_${idx}`]}</div>}
               <input className="flex-1 border rounded p-2" placeholder="Publication Name" value={cat.publicationName} onChange={e => handleCategoryChange(idx, 'publicationName', e.target.value)} />
             </div>
             <button type="button" className="text-red-600 text-xs underline" onClick={() => removeCategory(idx)} disabled={categories.length === 1}>Remove</button>
