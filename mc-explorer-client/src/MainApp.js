@@ -833,6 +833,12 @@ export default function MainApp() {
           >
             Distributed Marketing
           </button>
+          <button
+            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'preferencecenter' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+            onClick={() => setParentNav('preferencecenter')}
+          >
+            Preference Center
+          </button>
         </div>
         {/* Render content based on parentNav */}
         {parentNav === 'search' ? (
