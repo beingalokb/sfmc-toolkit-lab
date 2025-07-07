@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
 import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
+import PreferenceCenterConfigForm from './PreferenceCenterConfigForm';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -742,6 +743,12 @@ export default function MainApp() {
       >
         Distributed Marketing
       </button>
+      <button
+        className={`px-4 py-2 rounded-lg ${activeTab === 'preferencecenter' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+        onClick={() => setActiveTab('preferencecenter')}
+      >
+        Preference Center
+      </button>
     </div>
   );
 
@@ -1366,6 +1373,28 @@ export default function MainApp() {
             {renderDMQuickSend()}
           </div>
         ) : null}
+
+        {/* Render content for Preference Center config */}
+        {activeTab === 'preferencecenter' && (
+          <PreferenceCenterConfigForm onSubmit={async config => {
+            setQSStatus('Submitting configuration...');
+            try {
+              const res = await fetch(`${baseURL}/preference-center/configure`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+              });
+              const json = await res.json();
+              if (json.status === 'OK') {
+                setQSStatus('✅ Preference Center configuration submitted!');
+              } else {
+                setQSStatus('❌ Failed to submit configuration: ' + (json.message || 'Unknown error'));
+              }
+            } catch (e) {
+              setQSStatus('❌ Error submitting configuration.');
+            }
+          }} />
+        )}
       </div>
     </div>
   );
