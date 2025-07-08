@@ -2481,6 +2481,9 @@ app.post('/preference-center/configure', async (req, res) => {
     await createDataExtensionSOAP(controllerDEName, controllerDE, accessToken, subdomain);
     await createDataExtensionSOAP(logDEName, logDE, accessToken, subdomain);
 
+    // Insert config row into controller DE
+    await insertRowToDE(controllerDEName, controllerRow, accessToken, subdomain);
+
     console.log('[PC Controller DE]', controllerDEName, controllerDE);
     console.log('[PC Controller Row]', controllerRow);
     console.log('[PC Log DE]', logDEName, logDE);
@@ -2553,6 +2556,32 @@ async function createDataExtensionSOAP(deName, deDef, accessToken, subdomain) {
   }
 
   return true;
+}
+
+// Helper to insert a row into a Data Extension using REST API
+async function insertRowToDE(deName, rowData, accessToken, subdomain) {
+  const url = `https://${subdomain}.rest.marketingcloudapis.com/hub/v1/dataevents/key:${deName}/rowset`;
+
+  const payload = [
+    {
+      keys: { IntegrationType: rowData.IntegrationType },
+      values: rowData
+    }
+  ];
+
+  const resp = await axios.post(url, payload, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+  if (resp.status !== 202) {
+    console.error('[Insert Row Error]', resp.status, resp.data);
+    throw new Error('Failed to insert row into DE: ' + deName);
+  }
+
+  console.log(`[✔] Inserted config row into '${deName}'`);
 }
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
