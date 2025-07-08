@@ -15,6 +15,7 @@ const axios = require('axios');
 const xml2js = require('xml2js');
 const cors = require('cors');
 const path = require('path');
+const bodyParser = require('body-parser');
 const session = require('express-session');
 const upsertRow = require('./upsertRow');
 
@@ -910,8 +911,12 @@ function generateCloudPageContent(config) {
   html += `<input type='submit' name='submit' value='Update' /></form></div></body></html>`;
   return ampscript.join('\n') + '\n' + html;
 }
+
+const axios = require('axios');
 app.post('/preference-center/save-config', async (req, res) => {
   const config = req.body;
+  const controllerDEName = 'PC_Controller';
+  const logDEName = 'PC_Log';  
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
   if (!accessToken || !subdomain) {
@@ -2392,6 +2397,9 @@ app.post('/createDMFullSetup', async (req, res) => {
 app.post('/preference-center/configure', async (req, res) => {
   try {
     const config = req.body;
+    const controllerDEName = 'PC_Controller';
+    const logDEName = 'PC_Log';
+
     // 1. Dynamically define DE fields based on config
     const dynamicFields = [];
     config.categories.forEach((cat, idx) => {
@@ -2408,6 +2416,7 @@ app.post('/preference-center/configure', async (req, res) => {
         dynamicFields.push({ Name: `Publication_${idx+1}`, FieldType: 'Text', MaxLength: 200 });
       }
     });
+
     // Add static fields
     dynamicFields.push(
       { Name: 'Header', FieldType: 'Text', MaxLength: 200 },
@@ -2417,32 +2426,35 @@ app.post('/preference-center/configure', async (req, res) => {
       { Name: 'OptOutLabel', FieldType: 'Text', MaxLength: 200 },
       { Name: 'IntegrationType', FieldType: 'Text', MaxLength: 50 }
     );
+
     const controllerDE = {
-      Name: 'PC_Controller',
-      CustomerKey: 'PC_Controller',
+      Name: controllerDEName,
+      CustomerKey: controllerDEName,
       Description: 'Stores config-driven field mapping for dynamic preference center',
       Fields: dynamicFields,
       Keys: [{ Name: 'IntegrationType', IsPrimaryKey: true }]
     };
+
     const logDE = {
-      Name: 'PC_Log',
-      CustomerKey: 'PC_Log',
+      Name: logDEName,
+      CustomerKey: logDEName,
       Description: 'Logs all preference updates and changes',
       Fields: [
-        { Name: 'SubscriberKey', FieldType: 'Text', MaxLength: 100, IsPrimaryKey: false },
+        { Name: 'SubscriberKey', FieldType: 'Text', MaxLength: 100 },
         { Name: 'EmailAddress', FieldType: 'EmailAddress' },
         { Name: 'OldValues', FieldType: 'Text', MaxLength: 4000 },
         { Name: 'NewValues', FieldType: 'Text', MaxLength: 4000 },
         { Name: 'ChangeType', FieldType: 'Text', MaxLength: 100 },
         { Name: 'DateModified', FieldType: 'Date' }
       ],
-      Keys: [{ Name: 'SubscriberKey', IsPrimaryKey: false }]
+      Keys: []
     };
 
-    // 2. Prepare upsert row for Controller DE
+    // Prepare row for controller DE
     const categoryLabels = config.categories.map(cat => cat.label).join(' | ') + ' | ' + config.optOutLabel;
     const contactFields = config.categories.map(cat => cat.fieldMapping.contact).join(' | ') + ' | hasOptedOutOfEmails';
     const leadFields = config.categories.map(cat => cat.fieldMapping.lead).join(' | ') + ' | hasOptedOutOfEmails';
+
     const controllerRow = {
       CategoryLabels: categoryLabels,
       ContactFields: contactFields,
@@ -2455,12 +2467,9 @@ app.post('/preference-center/configure', async (req, res) => {
       IntegrationType: config.integrationType
     };
 
-    // 3. TODO: Use MC API to create DEs and upsert row
-    // await createDataExtension(controllerDEName, controllerDE);
-    // await createDataExtension(logDEName, logDE);
+    // Create DEs if they do not exist
     await createDataExtensionSOAP(controllerDEName, controllerDE, accessToken, subdomain);
     await createDataExtensionSOAP(logDEName, logDE, accessToken, subdomain);
-    // await upsertRow(controllerDEName, controllerRow);
 
     console.log('[PC Controller DE]', controllerDEName, controllerDE);
     console.log('[PC Controller Row]', controllerRow);
@@ -2475,7 +2484,6 @@ app.post('/preference-center/configure', async (req, res) => {
 
 // Helper to create a Data Extension in Marketing Cloud using SOAP
 async function createDataExtensionSOAP(deName, deDef, accessToken, subdomain) {
-  // Build SOAP envelope for DE creation
   const fieldsXml = deDef.Fields.map(f => `
     <Field>
       <Name>${f.Name}</Name>
@@ -2484,6 +2492,7 @@ async function createDataExtensionSOAP(deName, deDef, accessToken, subdomain) {
       <IsRequired>${f.IsRequired ? 'true' : 'false'}</IsRequired>
       <IsPrimaryKey>${f.IsPrimaryKey ? 'true' : 'false'}</IsPrimaryKey>
     </Field>`).join('');
+
   const keysXml = deDef.Keys.map(k => `
     <Keys>
       <Key>
@@ -2491,6 +2500,7 @@ async function createDataExtensionSOAP(deName, deDef, accessToken, subdomain) {
         <IsPrimaryKey>${k.IsPrimaryKey ? 'true' : 'false'}</IsPrimaryKey>
       </Key>
     </Keys>`).join('');
+
   const soapEnvelope = `
     <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
       <soapenv:Header>
@@ -2509,13 +2519,20 @@ async function createDataExtensionSOAP(deName, deDef, accessToken, subdomain) {
       </soapenv:Body>
     </soapenv:Envelope>
   `;
+
   const url = `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`;
   const resp = await axios.post(url, soapEnvelope, {
     headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' }
   });
+
   if (!resp.data.includes('<OverallStatus>OK</OverallStatus>')) {
+    if (resp.data.includes('DataExtension with CustomerKey already exists')) {
+      console.log(`[Info] DE '${deName}' already exists.`);
+      return true;
+    }
     throw new Error('Failed to create DE: ' + deName);
   }
+
   return true;
 }
 
