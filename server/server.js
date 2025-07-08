@@ -2627,6 +2627,53 @@ async function dataExtensionExists(deName, accessToken, subdomain) {
   }
 }
 
+// Helper: Get Publication List ID by name
+async function getPublicationListIdByName(listName, accessToken, subdomain) {
+  const url = `https://${subdomain}.rest.marketingcloudapis.com/contacts/v1/lists?$filter=name eq '${listName}'`;
+  const resp = await axios.get(url, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+  const matchingList = resp.data?.items?.find(item => item.name === listName);
+  return matchingList ? matchingList.id : null;
+}
+
+// Helper: Create Publication List
+async function createPublicationList(listName, description, accessToken, subdomain) {
+  const url = `https://${subdomain}.rest.marketingcloudapis.com/contacts/v1/lists`;
+  const payload = {
+    name: listName,
+    description: description,
+    type: "publication",
+    status: "active"
+  };
+  const resp = await axios.post(url, payload, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+  if (![200, 201, 202].includes(resp.status)) {
+    console.error('[Publication List Error]', resp.status, resp.data);
+    throw new Error('Failed to create publication list: ' + listName);
+  }
+  console.log(`[✔] Publication List '${listName}' created successfully.`);
+  return resp.data.id;
+}
+
+// Helper: Get or Create Publication List
+async function getOrCreatePublicationList(listName, description, accessToken, subdomain) {
+  const existingId = await getPublicationListIdByName(listName, accessToken, subdomain);
+  if (existingId) {
+    console.log(`[ℹ] Publication List '${listName}' already exists. ID: ${existingId}`);
+    return existingId;
+  }
+  const newId = await createPublicationList(listName, description, accessToken, subdomain);
+  return newId;
+}
+
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
 // Serve React frontend (must be last)
