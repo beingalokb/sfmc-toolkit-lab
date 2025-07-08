@@ -2482,6 +2482,20 @@ app.post('/preference-center/configure', async (req, res) => {
       await createDataExtensionSOAP(logDEName, logDE, accessToken, subdomain);
     }
 
+    // Create or get Publication Lists for each publication name
+    const publicationNames = config.categories.map(cat => cat.publication?.name).filter(Boolean);
+    const publicationListIds = [];
+    for (const pubName of publicationNames) {
+      const pubId = await getOrCreatePublicationList(
+        pubName,
+        `Publication List for ${pubName}`,
+        accessToken,
+        subdomain
+      );
+      publicationListIds.push({ name: pubName, id: pubId });
+    }
+    console.log('[Publication List IDs]', publicationListIds);
+
     console.log('[PC Controller DE]', controllerDEName, controllerDE);
     console.log('[PC Controller Row]', controllerRow);
     console.log('[PC Log DE]', logDEName, logDE);
