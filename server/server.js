@@ -2602,6 +2602,27 @@ async function upsertRowToDE(deName, rowData, accessToken, subdomain, primaryKey
   console.log(`[✔] Upserted config row into '${deName}'`);
 }
 
+// Helper to check if a Data Extension exists using REST API
+async function dataExtensionExists(deName, accessToken, subdomain) {
+  const url = `https://${subdomain}.rest.marketingcloudapis.com/hub/v1/dataevents/key:${deName}`;
+  try {
+    const resp = await axios.get(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+    // If we get a 200, the DE exists
+    return resp.status === 200;
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      return false; // DE does not exist
+    }
+    // Other errors should be thrown
+    throw err;
+  }
+}
+
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
 // Serve React frontend (must be last)
