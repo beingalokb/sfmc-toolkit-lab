@@ -912,7 +912,7 @@ function generateCloudPageContent(config) {
   return ampscript.join('\n') + '\n' + html;
 }
 
-const axios = require('axios');
+
 app.post('/preference-center/save-config', async (req, res) => {
   const config = req.body;
   const controllerDEName = 'PC_Controller';
