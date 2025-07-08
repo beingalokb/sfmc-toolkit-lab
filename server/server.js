@@ -2466,7 +2466,9 @@ app.post('/preference-center/configure', async (req, res) => {
 
     // Create DEs if they do not exist
     // PC_Controller logic: upsert if exists, else create and insert
-    if (await dataExtensionExists(controllerDEName, accessToken, subdomain)) {
+    const controllerExists = await dataExtensionExists(controllerDEName, accessToken, subdomain);
+    console.log(`[DEBUG] dataExtensionExists('${controllerDEName}') =`, controllerExists);
+    if (controllerExists) {
       await upsertRowToDE(controllerDEName, controllerRow, accessToken, subdomain, ['IntegrationType']);
     } else {
       await createDataExtensionSOAP(controllerDEName, controllerDE, accessToken, subdomain);
@@ -2474,7 +2476,9 @@ app.post('/preference-center/configure', async (req, res) => {
     }
 
     // PC_Log: create if not exists
-    if (!(await dataExtensionExists(logDEName, accessToken, subdomain))) {
+    const logExists = await dataExtensionExists(logDEName, accessToken, subdomain);
+    console.log(`[DEBUG] dataExtensionExists('${logDEName}') =`, logExists);
+    if (!logExists) {
       await createDataExtensionSOAP(logDEName, logDE, accessToken, subdomain);
     }
 
