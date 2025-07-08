@@ -2392,28 +2392,36 @@ app.post('/createDMFullSetup', async (req, res) => {
 app.post('/preference-center/configure', async (req, res) => {
   try {
     const config = req.body;
-    // ...existing code...
-    const now = new Date();
-    const dateTime = now.toISOString().replace(/[-:T.]/g, '').slice(0, 14);
-    const controllerDEName = `PC_Controller_${dateTime}`;
-    const logDEName = `PC_Log_${dateTime}`;
-
-    // 1. Define DEs
+    // 1. Dynamically define DE fields based on config
+    const dynamicFields = [];
+    config.categories.forEach((cat, idx) => {
+      if (cat.label) {
+        dynamicFields.push({ Name: `CategoryLabel_${idx+1}`, FieldType: 'Text', MaxLength: 200 });
+      }
+      if (cat.fieldMapping && cat.fieldMapping.contact) {
+        dynamicFields.push({ Name: `ContactField_${idx+1}`, FieldType: 'Text', MaxLength: 200 });
+      }
+      if (cat.fieldMapping && cat.fieldMapping.lead) {
+        dynamicFields.push({ Name: `LeadField_${idx+1}`, FieldType: 'Text', MaxLength: 200 });
+      }
+      if (cat.publication && cat.publication.name) {
+        dynamicFields.push({ Name: `Publication_${idx+1}`, FieldType: 'Text', MaxLength: 200 });
+      }
+    });
+    // Add static fields
+    dynamicFields.push(
+      { Name: 'Header', FieldType: 'Text', MaxLength: 200 },
+      { Name: 'SubHeader', FieldType: 'Text', MaxLength: 200 },
+      { Name: 'Footer', FieldType: 'Text', MaxLength: 500 },
+      { Name: 'LogoUrl', FieldType: 'Text', MaxLength: 500 },
+      { Name: 'OptOutLabel', FieldType: 'Text', MaxLength: 200 },
+      { Name: 'IntegrationType', FieldType: 'Text', MaxLength: 50 }
+    );
     const controllerDE = {
       Name: 'PC_Controller',
       CustomerKey: 'PC_Controller',
       Description: 'Stores config-driven field mapping for dynamic preference center',
-      Fields: [
-        { Name: 'CategoryLabels', FieldType: 'Text', MaxLength: 200 },
-        { Name: 'ContactFields', FieldType: 'Text', MaxLength: 200 },
-        { Name: 'LeadFields', FieldType: 'Text', MaxLength: 200 },
-        { Name: 'Header', FieldType: 'Text', MaxLength: 200 },
-        { Name: 'SubHeader', FieldType: 'Text', MaxLength: 200 },
-        { Name: 'Footer', FieldType: 'Text', MaxLength: 500 },
-        { Name: 'LogoUrl', FieldType: 'Text', MaxLength: 500 },
-        { Name: 'OptOutLabel', FieldType: 'Text', MaxLength: 200 },
-        { Name: 'IntegrationType', FieldType: 'Text', MaxLength: 50 }
-      ],
+      Fields: dynamicFields,
       Keys: [{ Name: 'IntegrationType', IsPrimaryKey: true }]
     };
     const logDE = {
