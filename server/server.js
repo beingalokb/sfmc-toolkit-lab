@@ -16,6 +16,7 @@ const xml2js = require('xml2js');
 const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
+const upsertRow = require('./upsertRow');
 
 const app = express();
 app.use(express.json());
@@ -1628,7 +1629,6 @@ app.post('/parse/emailsenddefinition-config', (req, res) => {
       sendClassification: sendClassificationInput ? sendClassificationInput.meta.entityType : null,
       sendClassificationKey: sendClassificationInputKey,
       deliveryProfile: deliveryProfileInput ? deliveryProfileInput.meta.entityType : null,
-      deliveryProfileKey: deliveryProfileInputKey
     };
   });
 
