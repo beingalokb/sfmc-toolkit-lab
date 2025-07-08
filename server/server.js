@@ -112,6 +112,20 @@ function getSubdomainFromRequest(req) {
   return null;
 }
 
+// Helper to get MC access token from session credentials
+async function getMCAccessToken(req) {
+  const creds = req.session.mcCreds;
+  if (!creds) throw new Error('No Marketing Cloud credentials in session');
+  const url = `https://${creds.subdomain}.auth.marketingcloudapis.com/v2/token`;
+  const resp = await axios.post(url, {
+    grant_type: 'client_credentials',
+    client_id: creds.clientId,
+    client_secret: creds.clientSecret,
+    account_id: creds.accountId
+  });
+  return resp.data.access_token;
+}
+
 // Endpoint to check if backend has credentials (per session)
 app.get('/has-credentials', (req, res) => {
   const creds = req.session.mcCreds || {};
@@ -1206,8 +1220,8 @@ app.get('/search/emailsenddefinition', async (req, res) => {
     const parser = new xml2js.Parser({ explicitArray: false });
     parser.parseString(response.data, (err, result) => {
       if (err) {
-        console.error('❌ XML Parse Error:', err);
-        return res.status(500).json({ error: 'Failed to parse XML' });
+        console.error('❌ Error parsing EmailSendDefinition SOAP response:', err);
+        return res.status(500).json([]);
       }
       try {
         const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
@@ -1216,8 +1230,6 @@ app.get('/search/emailsenddefinition', async (req, res) => {
         const sendDefs = resultArray.map(item => ({
           Name: item.Name || '',
           CustomerKey: item.CustomerKey || '',
-          CategoryID: item.CategoryID || '',
-          ModifiedDate: item.ModifiedDate || '',
           SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
           SenderProfileKey: item['SenderProfile']?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
           DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || ''
@@ -1651,7 +1663,7 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
           <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">
             <soapenv:Header>
               <fueloauth xmlns=\"http://exacttarget.com\">${accessToken}</fueloauth>
-                                             </soapenv:Header>
+            </soapenv:Header>
             <soapenv:Body>
               <RetrieveRequestMsg xmlns=\"http://exacttarget.com/wsdl/partnerAPI\">
                 <RetrieveRequest>
