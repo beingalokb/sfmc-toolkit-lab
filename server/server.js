@@ -2164,7 +2164,7 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
     const deRetrieveSoap = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <soapenv:Header>
-          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+          <fueloauth>${accessToken}</fueloauth>
         </soapenv:Header>
         <soapenv:Body>
           <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
@@ -2411,27 +2411,30 @@ app.post('/preference-center/configure', async (req, res) => {
     const dynamicFields = [];
     config.categories.forEach((cat, idx) => {
       if (cat.label) {
-        dynamicFields.push({ Name: `CategoryLabel_${idx+1}`, FieldType: 'Text', MaxLength: 200 });
+        dynamicFields.push({ Name: `CategoryLabel_${idx+1}`, FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false });
       }
       if (cat.fieldMapping && cat.fieldMapping.contact) {
-        dynamicFields.push({ Name: `ContactField_${idx+1}`, FieldType: 'Text', MaxLength: 200 });
+        dynamicFields.push({ Name: `ContactField_${idx+1}`, FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false });
       }
       if (cat.fieldMapping && cat.fieldMapping.lead) {
-        dynamicFields.push({ Name: `LeadField_${idx+1}`, FieldType: 'Text', MaxLength: 200 });
+        dynamicFields.push({ Name: `LeadField_${idx+1}`, FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false });
       }
       if (cat.publication && cat.publication.name) {
-        dynamicFields.push({ Name: `Publication_${idx+1}`, FieldType: 'Text', MaxLength: 200 });
+        dynamicFields.push({ Name: `Publication_${idx+1}`, FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false });
       }
     });
 
     // Add static fields
     dynamicFields.push(
-      { Name: 'Header', FieldType: 'Text', MaxLength: 200 },
-      { Name: 'SubHeader', FieldType: 'Text', MaxLength: 200 },
-      { Name: 'Footer', FieldType: 'Text', MaxLength: 500 },
-      { Name: 'LogoUrl', FieldType: 'Text', MaxLength: 500 },
-      { Name: 'OptOutLabel', FieldType: 'Text', MaxLength: 200 },
-      { Name: 'IntegrationType', FieldType: 'Text', MaxLength: 50 }
+      { Name: 'Header', FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false },
+      { Name: 'SubHeader', FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false },
+      { Name: 'Footer', FieldType: 'Text', MaxLength: 500, IsRequired: false, IsPrimaryKey: false },
+      { Name: 'LogoUrl', FieldType: 'Text', MaxLength: 500, IsRequired: false, IsPrimaryKey: false },
+      { Name: 'OptOutLabel', FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false },
+      { Name: 'IntegrationType', FieldType: 'Text', MaxLength: 50, IsRequired: true, IsPrimaryKey: true },
+      { Name: 'CategoryLabels', FieldType: 'Text', MaxLength: 1000, IsRequired: false, IsPrimaryKey: false },
+      { Name: 'ContactFields', FieldType: 'Text', MaxLength: 1000, IsRequired: false, IsPrimaryKey: false },
+      { Name: 'LeadFields', FieldType: 'Text', MaxLength: 1000, IsRequired: false, IsPrimaryKey: false }
     );
 
     const controllerDE = {
@@ -2491,22 +2494,26 @@ app.post('/preference-center/configure', async (req, res) => {
 
 // Helper to create a Data Extension in Marketing Cloud using SOAP
 async function createDataExtensionSOAP(deName, deDef, accessToken, subdomain) {
-  const fieldsXml = deDef.Fields.map(f => `
-    <Field>
-      <Name>${f.Name}</Name>
-      <FieldType>${f.FieldType}</FieldType>
-      <MaxLength>${f.MaxLength || ''}</MaxLength>
-      <IsRequired>${f.IsRequired ? 'true' : 'false'}</IsRequired>
-      <IsPrimaryKey>${f.IsPrimaryKey ? 'true' : 'false'}</IsPrimaryKey>
-    </Field>`).join('');
+  const fieldsXml = deDef.Fields.map(f => {
+    // Only include MaxLength for Text and EmailAddress fields
+    const maxLengthXml = (f.FieldType === 'Text' || f.FieldType === 'EmailAddress') ? `<MaxLength>${f.MaxLength || 100}</MaxLength>` : '';
+    return `
+      <Field>
+        <Name>${f.Name}</Name>
+        <FieldType>${f.FieldType}</FieldType>
+        ${maxLengthXml}
+        <IsRequired>${f.IsRequired ? 'true' : 'false'}</IsRequired>
+        <IsPrimaryKey>${f.IsPrimaryKey ? 'true' : 'false'}</IsPrimaryKey>
+      </Field>`;
+  }).join('');
 
-  const keysXml = deDef.Keys.map(k => `
-    <Keys>
+  const keysXml = deDef.Keys && deDef.Keys.length > 0
+    ? `<Keys>${deDef.Keys.map(k => `
       <Key>
         <Name>${k.Name}</Name>
         <IsPrimaryKey>${k.IsPrimaryKey ? 'true' : 'false'}</IsPrimaryKey>
-      </Key>
-    </Keys>`).join('');
+      </Key>`).join('')}
+    </Keys>` : '';
 
   const soapEnvelope = `
     <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -2537,7 +2544,7 @@ async function createDataExtensionSOAP(deName, deDef, accessToken, subdomain) {
       console.log(`[Info] DE '${deName}' already exists.`);
       return true;
     }
-    throw new Error('Failed to create DE: ' + deName);
+    throw new Error('Failed to create DE: ' + deName + '\nResponse: ' + resp.data);
   }
 
   return true;
