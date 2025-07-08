@@ -2408,24 +2408,8 @@ app.post('/preference-center/configure', async (req, res) => {
     }
 
     // 1. Dynamically define DE fields based on config
-    const dynamicFields = [];
-    config.categories.forEach((cat, idx) => {
-      if (cat.label) {
-        dynamicFields.push({ Name: `CategoryLabel_${idx+1}`, FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false });
-      }
-      if (cat.fieldMapping && cat.fieldMapping.contact) {
-        dynamicFields.push({ Name: `ContactField_${idx+1}`, FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false });
-      }
-      if (cat.fieldMapping && cat.fieldMapping.lead) {
-        dynamicFields.push({ Name: `LeadField_${idx+1}`, FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false });
-      }
-      if (cat.publication && cat.publication.name) {
-        dynamicFields.push({ Name: `Publication_${idx+1}`, FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false });
-      }
-    });
-
-    // Add static fields
-    dynamicFields.push(
+    // 1. Define DE fields for Preference Center (no dynamic category/lead/contact/publication fields)
+    const dynamicFields = [
       { Name: 'Header', FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false },
       { Name: 'SubHeader', FieldType: 'Text', MaxLength: 200, IsRequired: false, IsPrimaryKey: false },
       { Name: 'Footer', FieldType: 'Text', MaxLength: 500, IsRequired: false, IsPrimaryKey: false },
@@ -2434,8 +2418,9 @@ app.post('/preference-center/configure', async (req, res) => {
       { Name: 'IntegrationType', FieldType: 'Text', MaxLength: 50, IsRequired: true, IsPrimaryKey: true },
       { Name: 'CategoryLabels', FieldType: 'Text', MaxLength: 1000, IsRequired: false, IsPrimaryKey: false },
       { Name: 'ContactFields', FieldType: 'Text', MaxLength: 1000, IsRequired: false, IsPrimaryKey: false },
-      { Name: 'LeadFields', FieldType: 'Text', MaxLength: 1000, IsRequired: false, IsPrimaryKey: false }
-    );
+      { Name: 'LeadFields', FieldType: 'Text', MaxLength: 1000, IsRequired: false, IsPrimaryKey: false },
+      { Name: 'Publications', FieldType: 'Text', MaxLength: 1000, IsRequired: false, IsPrimaryKey: false }
+    ];
 
     const controllerDE = {
       Name: controllerDEName,
@@ -2460,15 +2445,17 @@ app.post('/preference-center/configure', async (req, res) => {
       Keys: []
     };
 
-    // Prepare row for controller DE
+    // Prepare row for controller DE (casing matches DE schema)
     const categoryLabels = config.categories.map(cat => cat.label).join(' | ') + ' | ' + config.optOutLabel;
     const contactFields = config.categories.map(cat => cat.fieldMapping.contact).join(' | ') + ' | hasOptedOutOfEmails';
     const leadFields = config.categories.map(cat => cat.fieldMapping.lead).join(' | ') + ' | hasOptedOutOfEmails';
+    const publications = config.categories.map(cat => cat.publication?.name).filter(Boolean).join(' | ');
 
     const controllerRow = {
       CategoryLabels: categoryLabels,
       ContactFields: contactFields,
       LeadFields: leadFields,
+      Publications: publications,
       Header: config.branding.header,
       SubHeader: config.branding.subHeader,
       Footer: config.branding.footer,
