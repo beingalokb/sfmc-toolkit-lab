@@ -2546,8 +2546,8 @@ async function createDataExtensionSOAP(deName, deDef, accessToken, subdomain) {
   });
 
   if (!resp.data.includes('<OverallStatus>OK</OverallStatus>')) {
-    if (resp.data.includes('DataExtension with CustomerKey already exists')) {
-      console.log(`[Info] DE '${deName}' already exists.`);
+    if (resp.data.includes('DataExtension with CustomerKey already exists') || resp.data.includes('Updating an existing Data Extension definition is not allowed')) {
+      console.log(`[Info] DE '${deName}' already exists or cannot be updated. Skipping create.`);
       return true;
     }
     throw new Error('Failed to create DE: ' + deName + '\nResponse: ' + resp.data);
