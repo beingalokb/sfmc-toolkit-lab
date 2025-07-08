@@ -2465,11 +2465,18 @@ app.post('/preference-center/configure', async (req, res) => {
     };
 
     // Create DEs if they do not exist
-    await createDataExtensionSOAP(controllerDEName, controllerDE, accessToken, subdomain);
-    await createDataExtensionSOAP(logDEName, logDE, accessToken, subdomain);
+    // PC_Controller logic: upsert if exists, else create and insert
+    if (await dataExtensionExists(controllerDEName, accessToken, subdomain)) {
+      await upsertRowToDE(controllerDEName, controllerRow, accessToken, subdomain, ['IntegrationType']);
+    } else {
+      await createDataExtensionSOAP(controllerDEName, controllerDE, accessToken, subdomain);
+      await insertRowToDE(controllerDEName, controllerRow, accessToken, subdomain);
+    }
 
-    // Insert config row into controller DE
-    await insertRowToDE(controllerDEName, controllerRow, accessToken, subdomain);
+    // PC_Log: create if not exists
+    if (!(await dataExtensionExists(logDEName, accessToken, subdomain))) {
+      await createDataExtensionSOAP(logDEName, logDE, accessToken, subdomain);
+    }
 
     console.log('[PC Controller DE]', controllerDEName, controllerDE);
     console.log('[PC Controller Row]', controllerRow);
@@ -2563,12 +2570,36 @@ async function insertRowToDE(deName, rowData, accessToken, subdomain) {
     }
   });
 
-  if (resp.status !== 202) {
+  if (![200, 201, 202].includes(resp.status)) {
     console.error('[Insert Row Error]', resp.status, resp.data);
     throw new Error('Failed to insert row into DE: ' + deName);
   }
 
   console.log(`[✔] Inserted config row into '${deName}'`);
+}
+
+// Helper to upsert a row into a Data Extension using REST API
+async function upsertRowToDE(deName, rowData, accessToken, subdomain, primaryKeys = ['IntegrationType']) {
+  const url = `https://${subdomain}.rest.marketingcloudapis.com/hub/v1/dataevents/key:${deName}/rowset`;
+  const keys = {};
+  primaryKeys.forEach(k => { keys[k] = rowData[k]; });
+  const payload = [
+    {
+      keys,
+      values: rowData
+    }
+  ];
+  const resp = await axios.post(url, payload, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+  if (![200, 201, 202].includes(resp.status)) {
+    console.error('[Upsert Row Error]', resp.status, resp.data);
+    throw new Error('Failed to upsert row into DE: ' + deName);
+  }
+  console.log(`[✔] Upserted config row into '${deName}'`);
 }
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
