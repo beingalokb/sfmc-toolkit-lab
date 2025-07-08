@@ -2526,13 +2526,18 @@ async function createDataExtensionSOAP(deName, deDef, accessToken, subdomain) {
             <Name>${deName}</Name>
             <CustomerKey>${deName}</CustomerKey>
             <Description>${deDef.Description || ''}</Description>
-            ${fieldsXml}
+            <Fields>
+              ${fieldsXml}
+            </Fields>
             ${keysXml}
           </Objects>
         </CreateRequest>
       </soapenv:Body>
     </soapenv:Envelope>
   `;
+
+  // Debug: Log the final SOAP envelope
+  console.log('[SOAP Envelope]', soapEnvelope);
 
   const url = `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`;
   const resp = await axios.post(url, soapEnvelope, {
