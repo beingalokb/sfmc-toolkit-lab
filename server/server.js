@@ -2400,6 +2400,13 @@ app.post('/preference-center/configure', async (req, res) => {
     const controllerDEName = 'PC_Controller';
     const logDEName = 'PC_Log';
 
+    // Retrieve accessToken and subdomain
+    const accessToken = getAccessTokenFromRequest(req);
+    const subdomain = getSubdomainFromRequest(req);
+    if (!accessToken || !subdomain) {
+      return res.status(401).json({ status: 'ERROR', message: 'Missing Marketing Cloud credentials' });
+    }
+
     // 1. Dynamically define DE fields based on config
     const dynamicFields = [];
     config.categories.forEach((cat, idx) => {
