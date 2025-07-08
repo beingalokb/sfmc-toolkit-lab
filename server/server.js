@@ -2450,6 +2450,8 @@ app.post('/preference-center/configure', async (req, res) => {
     // 3. TODO: Use MC API to create DEs and upsert row
     // await createDataExtension(controllerDEName, controllerDE);
     // await createDataExtension(logDEName, logDE);
+    await createDataExtensionSOAP(controllerDEName, controllerDE, accessToken, subdomain);
+    await createDataExtensionSOAP(logDEName, logDE, accessToken, subdomain);
     // await upsertRow(controllerDEName, controllerRow);
 
     console.log('[PC Controller DE]', controllerDEName, controllerDE);
@@ -2462,6 +2464,52 @@ app.post('/preference-center/configure', async (req, res) => {
     res.status(500).json({ status: 'ERROR', message: e.message });
   }
 });
+
+// Helper to create a Data Extension in Marketing Cloud using SOAP
+async function createDataExtensionSOAP(deName, deDef, accessToken, subdomain) {
+  // Build SOAP envelope for DE creation
+  const fieldsXml = deDef.Fields.map(f => `
+    <Field>
+      <Name>${f.Name}</Name>
+      <FieldType>${f.FieldType}</FieldType>
+      <MaxLength>${f.MaxLength || ''}</MaxLength>
+      <IsRequired>${f.IsRequired ? 'true' : 'false'}</IsRequired>
+      <IsPrimaryKey>${f.IsPrimaryKey ? 'true' : 'false'}</IsPrimaryKey>
+    </Field>`).join('');
+  const keysXml = deDef.Keys.map(k => `
+    <Keys>
+      <Key>
+        <Name>${k.Name}</Name>
+        <IsPrimaryKey>${k.IsPrimaryKey ? 'true' : 'false'}</IsPrimaryKey>
+      </Key>
+    </Keys>`).join('');
+  const soapEnvelope = `
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <soapenv:Header>
+        <fueloauth>${accessToken}</fueloauth>
+      </soapenv:Header>
+      <soapenv:Body>
+        <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+          <Objects xsi:type="DataExtension">
+            <Name>${deName}</Name>
+            <CustomerKey>${deName}</CustomerKey>
+            <Description>${deDef.Description || ''}</Description>
+            ${fieldsXml}
+            ${keysXml}
+          </Objects>
+        </CreateRequest>
+      </soapenv:Body>
+    </soapenv:Envelope>
+  `;
+  const url = `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`;
+  const resp = await axios.post(url, soapEnvelope, {
+    headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' }
+  });
+  if (!resp.data.includes('<OverallStatus>OK</OverallStatus>')) {
+    throw new Error('Failed to create DE: ' + deName);
+  }
+  return true;
+}
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
