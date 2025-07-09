@@ -2644,14 +2644,21 @@ async function dataExtensionExists(deName, accessToken, subdomain) {
 // Helper: Get Publication List ID by name
 async function getPublicationListIdByName(listName, accessToken, subdomain) {
   const url = `https://${subdomain}.rest.marketingcloudapis.com/contacts/v1/lists?$filter=name eq '${listName}'`;
-  const resp = await axios.get(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`
+  try {
+    const resp = await axios.get(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+    const matchingList = resp.data?.items?.find(item => item.name === listName);
+    return matchingList ? matchingList.id : null;
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      return null; // List does not exist, so return null to trigger creation
     }
-  });
-  const matchingList = resp.data?.items?.find(item => item.name === listName);
-  return matchingList ? matchingList.id : null;
+    throw err; // Other errors should still be thrown
+  }
 }
 
 // Helper: Create Publication List
