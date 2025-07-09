@@ -2705,6 +2705,12 @@ async function createPublicationListSOAP(listName, accessToken, subdomain) {
             <Description>${listName}</Description>
             <CategoryID>0</CategoryID>
             <Sendable>true</Sendable>
+            <SendableDataExtensionField>
+            <Name>EmailAddress</Name>
+            </SendableDataExtensionField>
+            <SendableSubscriberField>
+            <Name>Email Address</Name>
+            </SendableSubscriberField>
           </Objects>
         </CreateRequest>
       </soapenv:Body>
