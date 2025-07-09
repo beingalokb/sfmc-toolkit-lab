@@ -2696,9 +2696,12 @@ async function createPublicationListSOAP(listName, accessToken, subdomain) {
       </soapenv:Header>
       <soapenv:Body>
         <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
-          <Objects xsi:type="Publication">
+          <Objects xsi:type="List">
             <ListName>${listName}</ListName>
-            <Type>Public</Type>
+            <CustomerKey>${listName}</CustomerKey>
+            <Type>Publication</Type>
+            <Description>${listName}</Description>
+            <Sendable>true</Sendable>
           </Objects>
         </CreateRequest>
       </soapenv:Body>
