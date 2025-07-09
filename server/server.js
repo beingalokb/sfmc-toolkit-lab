@@ -2482,17 +2482,36 @@ app.post('/preference-center/configure', async (req, res) => {
       await createDataExtensionSOAP(logDEName, logDE, accessToken, subdomain);
     }
 
+    // Fetch all existing publication lists from /search/publication
+    let existingPublications = [];
+    try {
+      const pubResp = await axios.get('http://localhost:3001/search/publication', {
+        headers: {
+          Cookie: req.headers.cookie // pass session cookie for auth
+        }
+      });
+      existingPublications = pubResp.data;
+    } catch (err) {
+      console.error('[Publication Fetch Error]', err.message);
+    }
+
     // Create or get Publication Lists for each publication name
     const publicationNames = config.categories.map(cat => cat.publication?.name).filter(Boolean);
     const publicationListIds = [];
     for (const pubName of publicationNames) {
-      const pubId = await getOrCreatePublicationList(
-        pubName,
-        `Publication List for ${pubName}`,
-        accessToken,
-        subdomain
-      );
-      publicationListIds.push({ name: pubName, id: pubId });
+      const existing = existingPublications.find(p => p.name === pubName);
+      if (existing) {
+        publicationListIds.push({ name: pubName, id: existing.id });
+        console.log(`[ℹ] Publication List '${pubName}' already exists. ID: ${existing.id}`);
+      } else {
+        const pubId = await getOrCreatePublicationList(
+          pubName,
+          `Publication List for ${pubName}`,
+          accessToken,
+          subdomain
+        );
+        publicationListIds.push({ name: pubName, id: pubId });
+      }
     }
     console.log('[Publication List IDs]', publicationListIds);
 
