@@ -2703,10 +2703,9 @@ async function createPublicationListSOAP(listName, accessToken, subdomain) {
             <CustomerKey>${listName}</CustomerKey>
             <Type>Publication</Type>
             <Description>${listName}</Description>
-            <CategoryID>0</CategoryID>
             <Sendable>true</Sendable>
             <SendableDataExtensionField>
-            <Name>EmailAddress</Name>
+            <Name>Email Address</Name>
             </SendableDataExtensionField>
             <SendableSubscriberField>
             <Name>Email Address</Name>
