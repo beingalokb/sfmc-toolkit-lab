@@ -2689,6 +2689,8 @@ async function createPublicationList(listName, description, accessToken, subdoma
 
 // Helper: Create Publication List using SOAP
 async function createPublicationListSOAP(listName, accessToken, subdomain) {
+  // Debug: Log input parameters
+  console.log('[DEBUG] createPublicationListSOAP called with:', { listName, subdomain });
   const soapEnvelope = `
     <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
       <soapenv:Header>
@@ -2707,10 +2709,14 @@ async function createPublicationListSOAP(listName, accessToken, subdomain) {
       </soapenv:Body>
     </soapenv:Envelope>
   `;
+  // Debug: Log the SOAP envelope being sent
+  console.log('[DEBUG] Publication List SOAP Envelope:', soapEnvelope);
   const url = `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`;
   const resp = await axios.post(url, soapEnvelope, {
     headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' }
   });
+  // Debug: Log the raw SOAP response
+  console.log('[DEBUG] Publication List SOAP Response:', resp.data);
   if (!resp.data.includes('<OverallStatus>OK</OverallStatus>')) {
     if (resp.data.includes('already exists')) {
       console.log(`[Info] Publication List '${listName}' already exists.`);
