@@ -2482,38 +2482,22 @@ app.post('/preference-center/configure', async (req, res) => {
       await createDataExtensionSOAP(logDEName, logDE, accessToken, subdomain);
     }
 
-    // Fetch all existing publication lists from /search/publication
-    let existingPublications = [];
-    try {
-      const pubResp = await axios.get('http://localhost:3001/search/publication', {
-        headers: {
-          Cookie: req.headers.cookie // pass session cookie for auth
-        }
-      });
-      existingPublications = pubResp.data;
-    } catch (err) {
-      console.error('[Publication Fetch Error]', err.message);
-    }
-
-    // Create or get Publication Lists for each publication name
+    // Create or get Publication Lists for each publication name using SOAP only
     const publicationNames = config.categories.map(cat => cat.publication?.name).filter(Boolean);
-    const publicationListIds = [];
+    const publicationListResults = [];
     for (const pubName of publicationNames) {
-      const existing = existingPublications.find(p => p.name === pubName);
-      if (existing) {
-        publicationListIds.push({ name: pubName, id: existing.id });
-        console.log(`[ℹ] Publication List '${pubName}' already exists. ID: ${existing.id}`);
-      } else {
-        const pubId = await getOrCreatePublicationList(
+      try {
+        await createPublicationListSOAP(
           pubName,
-          `Publication List for ${pubName}`,
           accessToken,
           subdomain
         );
-        publicationListIds.push({ name: pubName, id: pubId });
+        publicationListResults.push({ name: pubName, status: 'created or already exists' });
+      } catch (err) {
+        publicationListResults.push({ name: pubName, status: 'error', error: err.message });
       }
     }
-    console.log('[Publication List IDs]', publicationListIds);
+    console.log('[Publication List SOAP Results]', publicationListResults);
 
     console.log('[PC Controller DE]', controllerDEName, controllerDE);
     console.log('[PC Controller Row]', controllerRow);
@@ -2703,15 +2687,36 @@ async function createPublicationList(listName, description, accessToken, subdoma
   return resp.data.id;
 }
 
-// Helper: Get or Create Publication List
-async function getOrCreatePublicationList(listName, description, accessToken, subdomain) {
-  const existingId = await getPublicationListIdByName(listName, accessToken, subdomain);
-  if (existingId) {
-    console.log(`[ℹ] Publication List '${listName}' already exists. ID: ${existingId}`);
-    return existingId;
+// Helper: Create Publication List using SOAP
+async function createPublicationListSOAP(listName, accessToken, subdomain) {
+  const soapEnvelope = `
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <soapenv:Header>
+        <fueloauth>${accessToken}</fueloauth>
+      </soapenv:Header>
+      <soapenv:Body>
+        <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+          <Objects xsi:type="List">
+            <ListName>${listName}</ListName>
+            <Type>Public</Type>
+          </Objects>
+        </CreateRequest>
+      </soapenv:Body>
+    </soapenv:Envelope>
+  `;
+  const url = `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`;
+  const resp = await axios.post(url, soapEnvelope, {
+    headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' }
+  });
+  if (!resp.data.includes('<OverallStatus>OK</OverallStatus>')) {
+    if (resp.data.includes('already exists')) {
+      console.log(`[Info] Publication List '${listName}' already exists.`);
+      return true;
+    }
+    throw new Error('Failed to create publication list: ' + listName + '\nResponse: ' + resp.data);
   }
-  const newId = await createPublicationList(listName, description, accessToken, subdomain);
-  return newId;
+  console.log(`[✔] Publication List '${listName}' created successfully.`);
+  return true;
 }
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

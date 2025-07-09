@@ -4,7 +4,7 @@
   "main": "server.js",
   "scripts": {
     "build": "cd mc-explorer-client && npm install && npm run build",
-    "start": "node server/server.js",
+    "start": "node --max-old-space-size=2048 server/server.js",
     "dev": "nodemon server.js"
   },
   "keywords": [],
