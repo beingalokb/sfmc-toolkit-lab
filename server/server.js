@@ -2446,7 +2446,8 @@ app.post('/preference-center/configure', async (req, res) => {
     };
 
     // Prepare row for controller DE (casing matches DE schema)
-    const categoryLabels = config.categories.map(cat => cat.label).join(' | ') + ' | ' + config.optOutLabel;
+    //const categoryLabels = config.categories.map(cat => cat.label).join(' | ') + ' | ' + config.optOutLabel;
+    const categoryLabels = config.categories.map(cat => cat.label).join(' | ');
     const contactFields = config.categories.map(cat => cat.fieldMapping.contact).join(' | ') + ' | hasOptedOutOfEmails';
     const leadFields = config.categories.map(cat => cat.fieldMapping.lead).join(' | ') + ' | hasOptedOutOfEmails';
     const publications = config.categories.map(cat => cat.publication?.name).filter(Boolean).join(' | ');
