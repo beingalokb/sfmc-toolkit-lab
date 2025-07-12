@@ -1383,24 +1383,43 @@ export default function MainApp() {
         {/* Render content for Preference Center config */}
         {parentNav === 'preferencecenter' && (
           <div className="bg-white shadow rounded p-6 max-w-xl mx-auto">
-            <PreferenceCenterConfigForm onSubmit={async config => {
-              setQSStatus('Submitting configuration...');
-              try {
-                const res = await fetch(`${baseURL}/preference-center/configure`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(config)
-                });
-                const json = await res.json();
-                if (json.status === 'OK') {
-                  setQSStatus('✅ Preference Center configuration submitted!');
-                } else {
-                  setQSStatus('❌ Failed to submit configuration: ' + (json.message || 'Unknown error'));
+            {qsStatus && qsStatus.startsWith('✅') && (
+              <div className="bg-green-50 border border-green-300 text-green-800 rounded p-4 mb-4">
+                <div className="text-2xl mb-2">✅ Configuration Completed Successfully!</div>
+                <div className="mb-2 font-semibold">Your Preference Center setup is now complete.</div>
+                <ul className="mb-2 list-disc pl-6">
+                  <li><b>PC_Controller</b>: This Data Extension contains all the configuration values used to render your dynamic Preference Center (labels, instructions, integration type, branding, etc.).</li>
+                  <li><b>PC_Log</b>: This Data Extension automatically tracks all subscriber preference updates, including old vs. new values for audit and compliance.</li>
+                </ul>
+                <div className="mb-2">Both Data Extensions are created under your Data Extensions folder.</div>
+                <div className="mb-2 font-semibold">Below is your ready-to-use CloudPage code. You can paste this into a new CloudPage to get started. Feel free to customize the HTML layout and styling to match your brand.</div>
+                {/* TODO: Render CloudPage code here if available */}
+              </div>
+            )}
+            <PreferenceCenterConfigForm 
+              onSubmit={async config => {
+                setQSStatus('Submitting configuration...');
+                setQSLoading(true);
+                try {
+                  const res = await fetch(`${baseURL}/preference-center/configure`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                  });
+                  const json = await res.json();
+                  if (json.status === 'OK') {
+                    setQSStatus('✅ Configuration Completed Successfully!');
+                  } else {
+                    setQSStatus('❌ Failed to submit configuration: ' + (json.message || 'Unknown error'));
+                  }
+                } catch (e) {
+                  setQSStatus('❌ Error submitting configuration.');
+                } finally {
+                  setQSLoading(false);
                 }
-              } catch (e) {
-                setQSStatus('❌ Error submitting configuration.');
-              }
-            }} />
+              }} 
+              submitting={qsLoading}
+            />
           </div>
         )}
       </div>
