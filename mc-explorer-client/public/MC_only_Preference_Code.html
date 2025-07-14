@@ -1,4 +1,388 @@
 %%[
-| SET @version = "1.0"
-| SET @submitCheck = RequestParameter("submitCheck")
-...existing code...
+SET @version = "1.0"
+SET @submitCheck = RequestParameter("submitCheck")
+SET @subscriberKey = RequestParameter("subscriberKey")
+SET @thankYouParam = RequestParameter("thankyou")
+SET @emailAddress = emailaddr
+SET @GlobalOptOut = RequestParameter("OptOutOfAll")
+
+IF EMPTY(@subscriberKey) THEN
+  SET @subscriberKey = _subscriberKey
+ENDIF
+
+
+/* Load Configuration */
+SET @configRow = LookupRows("PC_Controller", "IntegrationType", "MC_ONLY")
+IF RowCount(@configRow) > 0 THEN
+  SET @row = Row(@configRow, 1)
+  SET @Header = Field(@row, "Header")
+  SET @SubHeader = Field(@row, "SubHeader")
+  SET @Footer = Field(@row, "Footer")
+  SET @LogoUrl = Field(@row, "LogoUrl")
+  SET @OptOutLabel = Field(@row, "OptOutLabel")
+  SET @CategoryLabels = Field(@row, "CategoryLabels")
+ENDIF
+
+SET @labelList = BuildRowsetFromString(@CategoryLabels, "|")
+SET @categoryCount = RowCount(@labelList)
+
+/* Load last saved preferences */
+SET @lastPrefRow = LookupOrderedRows("PC_Log", 1, "DateModified DESC", "SubscriberKey", @subscriberKey)
+SET @existingPrefs = ""
+
+IF RowCount(@lastPrefRow) > 0 THEN
+  SET @existingPrefs = Field(Row(@lastPrefRow, 1), "NewValues")
+ENDIF
+
+/* Build prefRowset with saved or default values */
+IF NOT EMPTY(@existingPrefs) THEN
+  SET @prefRowset = BuildRowsetFromString(@existingPrefs, "|")
+    SET @optOutVal = ""
+  FOR @j = 1 TO RowCount(@prefRowset) DO
+  SET @entry = Field(Row(@prefRowset, @j), 1)
+
+  IF IndexOf(@entry, ":") > 0 THEN
+    SET @parts = BuildRowsetFromString(@entry, ":")
+    SET @key = Trim(Field(Row(@parts, 1), 1))
+    SET @val = Lowercase(Trim(Field(Row(@parts, 2), 1)))
+
+    IF @key == @OptOutLabel THEN
+      SET @optOutVal = @val
+    ENDIF
+  ENDIF
+NEXT @j
+
+ELSE
+  SET @defaultPrefs = ""
+FOR @i = 1 TO @categoryCount DO
+  SET @label = Trim(Field(Row(@labelList, @i), 1))
+  SET @defaultPrefs = Concat(@defaultPrefs, IIF(@i == 1, Concat(@label, ":false"), Concat("|", @label, ":false")))
+NEXT @i
+
+/* Append opt-out as labeled false by default */
+SET @defaultPrefs = Concat(@defaultPrefs, "|", @OptOutLabel, ": false")
+
+SET @prefRowset = BuildRowsetFromString(@defaultPrefs, "|")
+ENDIF
+
+/* Form submission */
+IF @submitCheck == "Update" THEN
+  SET @OldValues = ""
+SET @NewValues = ""
+SET @GlobalOptOut = RequestParameter("OptOutOfAll")
+
+FOR @i = 1 TO @categoryCount DO
+  SET @label = Trim(Field(Row(@labelList, @i), 1))
+
+  /* Retrieve previous saved value from @prefRowset */
+  SET @savedVal = Lowercase(Trim(Field(Row(@prefRowset, @i), 1)))
+  SET @oldVal = IIF(IndexOf(@savedVal, ":") > 0, Trim(Field(Row(BuildRowsetFromString(@savedVal, ":"), 2), 1)), @savedVal)
+
+  /* Get new submitted value */
+  SET @paramVal = IIF(NOT EMPTY(RequestParameter(@label)), "true", "false")
+
+  /* Build clean strings */
+  SET @OldValues = Concat(@OldValues, @label, ": ", Lowercase(@oldVal), " | ")
+  SET @NewValues = Concat(@NewValues, @label, ": ", Lowercase(@paramVal), " | ")
+  
+NEXT @i
+
+/* Handle Opt-out of all */
+SET @optOutLabel = Trim(@OptOutLabel)
+SET @optOutVal = IIF(@GlobalOptOut == "on", "true", "false")
+SET @optOutOld = "false" /* Default */
+
+IF RowCount(@prefRowset) >= Add(@categoryCount, 1) THEN
+  SET @optOutOld = Propercase(Trim(Field(Row(@prefRowset, Add(@categoryCount, 1)), 1)))
+  output(concat('@optOutOld ', @optOutOld, '<br>' ))
+ENDIF
+
+/* SET @OldValues = Concat(@OldValues, @optOutLabel, ": ", @optOutOld, " | ") */
+ SET @OldValues = Concat(@OldValues, @optOutOld, " | ") 
+output(concat('@OldValues ', @OldValues, '<br>' ))
+SET @NewValues = Concat(@NewValues, @optOutLabel, ": ", @optOutVal, " | ")
+
+
+
+  /* Global Unsubscribe */
+  IF @GlobalOptOut == "on" THEN
+  output(concat("GlobalOptOut loop ", @GlobalOptOut))
+    SET @jid = JobID
+    SET @listid = ListID
+    SET @batchid = _JobSubscriberBatchID
+    SET @reason = "Landing Page Unsubscribe"
+
+    SET @lue = CreateObject("ExecuteRequest")
+    SetObjectProperty(@lue, "Name", "LogUnsubEvent")
+
+    /* Add subscriberKey */
+    SET @props = CreateObject("APIProperty")
+    SetObjectProperty(@props, "Name", "subscriberKey")
+    SetObjectProperty(@props, "Value", @subscriberKey)
+    AddObjectArrayItem(@lue, "Parameters", @props)
+
+    /* Add job details */
+    SET @props = CreateObject("APIProperty")
+    SetObjectProperty(@props, "Name", "JobID")
+    SetObjectProperty(@props, "Value", @jid)
+    AddObjectArrayItem(@lue, "Parameters", @props)
+
+    SET @props = CreateObject("APIProperty")
+    SetObjectProperty(@props, "Name", "ListID")
+    SetObjectProperty(@props, "Value", @listid)
+    AddObjectArrayItem(@lue, "Parameters", @props)
+
+    SET @props = CreateObject("APIProperty")
+    SetObjectProperty(@props, "Name", "BatchID")
+    SetObjectProperty(@props, "Value", @batchid)
+    AddObjectArrayItem(@lue, "Parameters", @props)
+
+    SET @props = CreateObject("APIProperty")
+    SetObjectProperty(@props, "Name", "Reason")
+    SetObjectProperty(@props, "Value", @reason)
+    AddObjectArrayItem(@lue, "Parameters", @props)
+
+    SET @invokeStatus = InvokeExecute(@lue, @overallStatus, @requestId)
+    ELSE
+
+  /* Resubscribe the user */
+  SET @sub = CreateObject("Subscriber")
+  SetObjectProperty(@sub, "SubscriberKey", @subscriberKey)
+  SetObjectProperty(@sub, "EmailAddress", @emailAddress)
+  SetObjectProperty(@sub, "Status", "Active") /* This reactivates */
+
+  SET @status = InvokeUpdate(@sub, @updateStatus, @errorMsg)
+  ENDIF
+
+  /* Log */
+  UpsertDE("PC_Log", 1, "SubscriberKey", @subscriberKey, "EmailAddress", @emailAddress, "OldValues", @OldValues, "NewValues", @NewValues, "ChangeType", "Preference Center", "DateModified", NOW())
+  SET @prefRowset = BuildRowsetFromString(@NewValues, "|")
+  SET @thankYou = "Your preferences were updated successfully."
+  
+  
+  
+  
+ENDIF
+]%%
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Preference Center</title>
+  <style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+    margin: 0;
+    padding: 0;
+  }
+
+  .container {
+    max-width: 700px;
+    margin: 40px auto;
+    background: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+
+  .top-header {
+    background-color: #eef4fb;
+    padding: 20px;
+    text-align: center;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .top-header img {
+    max-height: 60px;
+    margin-bottom: 10px;
+  }
+
+  .top-header h1 {
+    font-size: 24px;
+    margin: 0;
+    color: #003366;
+  }
+
+  .sub-header-box {
+    background-color: #f8f9fa;
+    padding: 15px 20px;
+    border-left: 4px solid #005bac;
+    margin-top: 15px;
+    border-radius: 5px;
+    font-size: 15px;
+  }
+
+  .checkbox-group {
+    background-color: #fefefe;
+    border: 1px solid #ddd;
+    padding: 20px;
+    margin-top: 20px;
+    border-radius: 6px;
+  }
+
+  .checkbox-label {
+    display: block;
+    margin: 12px 0;
+    font-size: 16px;
+  }
+
+  .optout-box {
+    background-color: #fff3f3;
+    padding: 15px 20px;
+    border: 1px dashed #e29595;
+    margin-top: 20px;
+    border-radius: 5px;
+  }
+
+  .btn-container {
+    text-align: center;
+    margin-top: 25px;
+  }
+
+  .btn {
+    background: #005bac;
+    color: white;
+    padding: 10px 24px;
+    border: none;
+    font-size: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .btn:disabled {
+    background: #ccc;
+  }
+
+  .spinner {
+    display: none;
+    text-align: center;
+    margin-top: 15px;
+  }
+
+  .thank-you {
+    background-color: #d4edda;
+    color: #155724;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid #c3e6cb;
+    border-radius: 5px;
+    font-weight: bold;
+  }
+
+  .footer-note {
+    font-size: 13px;
+    color: #666;
+    margin-top: 30px;
+    text-align: center;
+  }
+</style>
+
+</head>
+<script>
+  function handleSubmit() {
+    document.getElementById("spinner").style.display = "block";
+    document.querySelector(".btn").disabled = true;
+    return true; // allow form to submit
+  }
+
+  function syncOptOut() {
+    const optOutCheckbox = document.querySelector('input[name="OptOutOfAll"]');
+    const topicCheckboxes = document.querySelectorAll('input[type="checkbox"]:not([name="OptOutOfAll"])');
+
+    if (!optOutCheckbox) return;
+
+    // When user checks Opt-out-of-all: uncheck all others
+    optOutCheckbox.addEventListener("change", function () {
+      if (optOutCheckbox.checked) {
+        topicCheckboxes.forEach(cb => cb.checked = false);
+      }
+    });
+
+    // If user checks any topic: uncheck the opt-out
+    topicCheckboxes.forEach(cb => {
+      cb.addEventListener("change", function () {
+        if (cb.checked) {
+          optOutCheckbox.checked = false;
+        }
+      });
+    });
+
+    // Optional: On initial load, if all topics are unchecked, auto-check OptOut
+    const allUnchecked = Array.from(topicCheckboxes).every(cb => !cb.checked);
+    optOutCheckbox.checked = allUnchecked;
+  }
+
+  window.onload = function () {
+    syncOptOut();
+
+    const thankYou = document.querySelector(".thank-you");
+    if (thankYou) {
+      document.getElementById("spinner").style.display = "none";
+      document.querySelector(".btn").disabled = false;
+    }
+  };
+</script>
+
+
+
+
+  
+<body>
+  <div class="container">
+    <div class="top-header">
+      <img src="%%=v(@LogoUrl)=%%" alt="Logo" />
+      <h1>%%=v(@Header)=%%</h1>
+    </div>
+
+    %%[ IF NOT EMPTY(@thankYou) THEN ]%%
+      <div class="thank-you">%%=v(@thankYou)=%%</div>
+    %%[ ENDIF ]%%
+
+
+    <div class="sub-header-box">
+      %%=v(@SubHeader)=%%
+    </div>
+
+    <form id="prefForm" method="POST" onsubmit="handleSubmit()">
+      <div id="spinner" class="spinner">
+        Saving your preferences...
+      </div>
+      <input type="hidden" name="submitCheck" value="Update" />
+      <input type="hidden" name="subscriberKey" value="%%=v(@subscriberKey)=%%" />
+
+      %%[ 
+        FOR @i = 1 TO @categoryCount DO
+          SET @label = Trim(Field(Row(@labelList, @i), 1))
+          SET @entry = Field(Row(@prefRowset, @i), 1)
+          SET @parts = BuildRowsetFromString(@entry, ":")
+          IF RowCount(@parts) == 2 THEN
+  SET @savedVal = Lowercase(Trim(Field(Row(@parts, 2), 1)))
+ELSE
+  SET @savedVal = "false" /* or whatever fallback you prefer */
+ENDIF
+          SET @checked = IIF(@savedVal == "true", "checked", "")
+      ]%%
+        <label class="checkbox-label">
+          <input type="checkbox" name="%%=v(@label)=%%" %%=v(@checked)=%%> %%=v(@label)=%%
+        </label>
+      %%[ NEXT @i ]%%
+
+      <label class="checkbox-label">
+  <input type="checkbox" name="OptOutOfAll" %%[IF @optOutVal == "true" THEN]%%checked%%[ENDIF]%%>
+  %%=v(@OptOutLabel)=%%
+</label>
+
+      <div class="btn-container">
+        <button type="submit" class="btn">Update Preferences</button>
+      </div>
+    </form>
+
+    <p class="footer-note">%%=v(@Footer)=%%</p>
+    <p class="footer-note">&copy; %%=Format(Now(), "yyyy")=%% %%=v(member_busname)=%%</p>
+  </div>
+</body>
+</html>
