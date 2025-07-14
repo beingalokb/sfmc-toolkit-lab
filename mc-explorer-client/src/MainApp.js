@@ -3,6 +3,7 @@ import './App.css';
 import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
 import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
 import PreferenceCenterConfigForm from './PreferenceCenterConfigForm';
+import codeSample from './MC_only_Preference_Code.html?raw';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -1446,7 +1447,6 @@ function formatDate(dateStr) {
 }
 
 function CloudPageCodeSample() {
-  const codeSample = `<!-- CloudPage HTML Sample -->\n<div>\n  <h1>Preference Center CloudPage</h1>\n  <!-- Your dynamic Preference Center code will go here -->\n</div>`;
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = () => {
@@ -1474,7 +1474,7 @@ function CloudPageCodeSample() {
       </div>
       <textarea
         className="w-full font-mono text-xs p-2 border rounded bg-gray-100"
-        rows={6}
+        rows={16}
         value={codeSample}
         readOnly
         style={{ resize: 'vertical' }}
