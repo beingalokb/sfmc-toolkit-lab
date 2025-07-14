@@ -3,7 +3,6 @@ import './App.css';
 import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
 import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
 import PreferenceCenterConfigForm from './PreferenceCenterConfigForm';
-import codeSample from './MC_only_Preference_Code.html?raw';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -1413,6 +1412,10 @@ export default function MainApp() {
                     setTimeout(() => {
                       const el = document.getElementById('preferencecenter-success-section');
 
+
+
+
+
                       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }, 100);
                   } else {
@@ -1447,7 +1450,14 @@ function formatDate(dateStr) {
 }
 
 function CloudPageCodeSample() {
+  const [codeSample, setCodeSample] = React.useState('');
   const [copied, setCopied] = React.useState(false);
+
+  useEffect(() => {
+    fetch(process.env.PUBLIC_URL + '/MC_only_Preference_Code.html')
+      .then(res => res.text())
+      .then(setCodeSample);
+  }, []);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(codeSample);
@@ -1477,7 +1487,6 @@ function CloudPageCodeSample() {
         rows={16}
         value={codeSample}
         readOnly
-        style={{ resize: 'vertical' }}
       />
     </div>
   );
