@@ -1382,9 +1382,9 @@ export default function MainApp() {
 
         {/* Render content for Preference Center config */}
         {parentNav === 'preferencecenter' && (
-          <div className="bg-white shadow rounded p-6 max-w-xl mx-auto">
+          <div className="bg-white shadow rounded p-6 max-w-xl mx-auto" id="preferencecenter-success-section">
             {qsStatus && qsStatus.startsWith('✅') && (
-              <div className="bg-green-50 border border-green-300 text-green-800 rounded p-4 mb-4">
+              <div className="bg-green-50 border border-green-300 text-green-800 rounded p-4 mb-4" id="preferencecenter-success-message">
                 <div className="text-2xl mb-2">✅ Configuration Completed Successfully!</div>
                 <div className="mb-2 font-semibold">Your Preference Center setup is now complete.</div>
                 <ul className="mb-2 list-disc pl-6">
@@ -1393,7 +1393,7 @@ export default function MainApp() {
                 </ul>
                 <div className="mb-2">Both Data Extensions are created under your Data Extensions folder.</div>
                 <div className="mb-2 font-semibold">Below is your ready-to-use CloudPage code. You can paste this into a new CloudPage to get started. Feel free to customize the HTML layout and styling to match your brand.</div>
-                {/* TODO: Render CloudPage code here if available */}
+                <CloudPageCodeSample />
               </div>
             )}
             <PreferenceCenterConfigForm 
@@ -1409,6 +1409,11 @@ export default function MainApp() {
                   const json = await res.json();
                   if (json.status === 'OK') {
                     setQSStatus('✅ Configuration Completed Successfully!');
+                    setTimeout(() => {
+                      const el = document.getElementById('preferencecenter-success-section');
+
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
                   } else {
                     setQSStatus('❌ Failed to submit configuration: ' + (json.message || 'Unknown error'));
                   }
@@ -1438,4 +1443,42 @@ function formatDate(dateStr) {
     hour: '2-digit',
     minute: '2-digit'
   }).replace(',', '');
+}
+
+function CloudPageCodeSample() {
+  const codeSample = `<!-- CloudPage HTML Sample -->\n<div>\n  <h1>Preference Center CloudPage</h1>\n  <!-- Your dynamic Preference Center code will go here -->\n</div>`;
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(codeSample);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([codeSample], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'PreferenceCenterCloudPage.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="mb-2">
+      <div className="flex items-center mb-1">
+        <span className="font-semibold mr-2">Show Code:</span>
+        <button onClick={handleCopy} className="bg-indigo-600 text-white px-2 py-1 rounded text-xs mr-2">{copied ? 'Copied!' : 'Copy'}</button>
+        <button onClick={handleDownload} className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs">Download as .html</button>
+      </div>
+      <textarea
+        className="w-full font-mono text-xs p-2 border rounded bg-gray-100"
+        rows={6}
+        value={codeSample}
+        readOnly
+        style={{ resize: 'vertical' }}
+      />
+    </div>
+  );
 }
