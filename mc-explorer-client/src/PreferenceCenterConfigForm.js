@@ -21,7 +21,6 @@ export default function PreferenceCenterConfigForm({ onSubmit, submitting }) {
   const [categories, setCategories] = useState([{ ...defaultCategory }]);
   const [errors, setErrors] = useState({});
   const [showOptOutNote, setShowOptOutNote] = useState(false);
-  const [codeSample, setCodeSample] = useState('');
 
   // Validation
   const validate = () => {
@@ -49,12 +48,6 @@ export default function PreferenceCenterConfigForm({ onSubmit, submitting }) {
   useEffect(() => {
     console.log('Current categories state:', categories);
   }, [categories]);
-
-  useEffect(() => {
-    fetch(process.env.PUBLIC_URL + '/MC_only_Preference_Code.html')
-      .then(res => res.text())
-      .then(setCodeSample);
-  }, []);
 
   const handleCategoryChange = (idx, field, value) => {
     setCategories(categories => {
@@ -197,10 +190,6 @@ export default function PreferenceCenterConfigForm({ onSubmit, submitting }) {
         )}
         {submitting ? 'Submitting...' : 'Submit Configuration'}
       </button>
-      <div className="mt-4">
-        <label className="block font-semibold mb-1">Code Sample</label>
-        <textarea className="w-full border rounded p-2" rows="10" value={codeSample} readOnly />
-      </div>
     </form>
   );
 }
