@@ -1053,6 +1053,135 @@ export default function MainApp() {
             </div>
           </>
         ) : null}
+        {parentNav === 'emailArchiving' ? (
+          <>
+            {/* Email Archiving UI moved here */}
+            {/* Distinct Search Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div>
+                <label className="block font-semibold mb-1">Job ID</label>
+                <input
+                  type="text"
+                  className="border rounded px-4 py-2 w-full"
+                  placeholder="Enter Job ID"
+                  value={archiveSearch.jobId}
+                  onChange={e => setArchiveSearch(s => ({ ...s, jobId: e.target.value, emailName: '', subject: '' }))}
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Subject</label>
+                <input
+                  type="text"
+                  className="border rounded px-4 py-2 w-full"
+                  placeholder="Enter Subject"
+                  value={archiveSearch.subject}
+                  onChange={e => setArchiveSearch(s => ({ ...s, subject: e.target.value, jobId: '', emailName: '' }))}
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Email Name</label>
+                <input
+                  type="text"
+                  className="border rounded px-4 py-2 w-full"
+                  placeholder="Enter Email Name"
+                  value={archiveSearch.emailName}
+                  onChange={e => setArchiveSearch(s => ({ ...s, emailName: e.target.value, jobId: '', subject: '' }))}
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Subscriber Key</label>
+                <input
+                  type="text"
+                  className="border rounded px-4 py-2 w-full"
+                  placeholder="Enter Subscriber Key (not yet implemented)"
+                  value={archiveSearch.subscriberKey || ''}
+                  onChange={e => setArchiveSearch(s => ({ ...s, subscriberKey: e.target.value, jobId: '', subject: '', emailName: '' }))}
+                  disabled
+                />
+              </div>
+            </div>
+            {/* Top Navigation Bar */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+              {/* Buttons */}
+              <div className="flex gap-2 ml-auto">
+                <button className="bg-blue-500 text-white px-4 py-2 rounded flex items-center gap-2" onClick={fetchEmailArchive}>
+                  <span>🔁</span> Refresh
+                </button>
+                <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2" disabled>
+                  <span>📥</span> Export
+                </button>
+                <button className="bg-gray-200 text-gray-800 px-4 py-2 rounded flex items-center gap-2" disabled>
+                  <span>⚙️</span> Settings
+                </button>
+              </div>
+            </div>
+            {/* Filters */}
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+              {/* Date Range */}
+              <div>
+                <label className="block font-semibold mb-1">Date Range 📆</label>
+                <input type="date" className="border rounded px-2 py-1 mr-2" value={archiveSearch.sentDateFrom} onChange={e => setArchiveSearch(s => ({ ...s, sentDateFrom: e.target.value }))} />
+                <span className="mx-1">to</span>
+                <input type="date" className="border rounded px-2 py-1" value={archiveSearch.sentDateTo} onChange={e => setArchiveSearch(s => ({ ...s, sentDateTo: e.target.value }))} />
+              </div>
+              {/* Business Unit */}
+              <div>
+                <label className="block font-semibold mb-1">Business Unit</label>
+                <select className="border rounded px-2 py-1" disabled>
+                  <option value="">All</option>
+                  {/* Map business units here */}
+                </select>
+              </div>
+              {/* Status */}
+              <div>
+                <label className="block font-semibold mb-1">Status</label>
+                <select className="border rounded px-2 py-1" disabled>
+                  <option value="">All</option>
+                  <option value="sent">Sent</option>
+                  <option value="canceled">Canceled</option>
+                  <option value="draft">Draft</option>
+                </select>
+              </div>
+            </div>
+            {/* Results Table */}
+            <div className="bg-white border rounded p-0 overflow-x-auto">
+              {emailArchiveLoading ? (
+                <div className="p-8 text-center text-gray-500">Loading...</div>
+              ) : emailArchiveError ? (
+                <div className="p-8 text-center text-red-600">{emailArchiveError}</div>
+              ) : (
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="p-2 text-left">Sent Date</th>
+                      <th className="p-2 text-left">Email Name</th>
+                      <th className="p-2 text-left">Subject</th>
+                      <th className="p-2 text-left">JobID</th>
+                      <th className="p-2 text-left">Subscriber Key</th>
+                      <th className="p-2 text-left">Preview</th>
+                      <th className="p-2 text-left">Download</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {emailArchiveResults.length === 0 ? (
+                      <tr><td colSpan={7} className="p-8 text-center text-gray-500">No results found.</td></tr>
+                    ) : emailArchiveResults.map((row, idx) => (
+                      <tr key={idx} className="border-t">
+                        <td className="p-2">{row.SentDate || ''}</td>
+                        <td className="p-2">{row.EmailName || ''}</td>
+                        <td className="p-2">{row.Subject || ''}</td>
+                        <td className="p-2">{row.ID || ''}</td>
+                        <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
+                        <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
+                        <td className="p-2"><button className="text-green-600 hover:underline">⬇️ HTML</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        ) : null}
         {/* Add similar blocks for other parentNav values if needed */}
       </div>
     </div>
