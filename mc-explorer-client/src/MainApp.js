@@ -3,8 +3,6 @@ import './App.css';
 import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
 import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
 import PreferenceCenterConfigForm from './PreferenceCenterConfigForm';
-import EmailsSendToSubscribers from './EmailsSendToSubscribers';
-import DMWizard from './components/DMWizard';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -64,28 +62,6 @@ export default function MainApp() {
 
   // Add projectName state
   const [projectName, setProjectName] = useState('');
-
-  // Email Archiving state
-  const [emailArchiveResults, setEmailArchiveResults] = useState([]);
-  const [emailArchiveLoading, setEmailArchiveLoading] = useState(false);
-  const [emailArchiveError, setEmailArchiveError] = useState('');
-  const [archiveSearch, setArchiveSearch] = useState({ jobId: '', emailName: '', subject: '' });
-  const [archivePage, setArchivePage] = useState(1);
-  const [archiveRowsPerPage, setArchiveRowsPerPage] = useState(5); // Reduced for better visibility
-
-  // SentEvent table state
-  const [selectedSendId, setSelectedSendId] = useState(null);
-  const [sentEventResults, setSentEventResults] = useState([]);
-  const [sentEventLoading, setSentEventLoading] = useState(false);
-  const [sentEventError, setSentEventError] = useState('');
-  const [sentEventPage, setSentEventPage] = useState(1);
-  const [sentEventRowsPerPage, setSentEventRowsPerPage] = useState(5); // Reduced for better visibility
-  const [sentEventSubscriberKey, setSentEventSubscriberKey] = useState('');
-
-  // Sorting state for Table 1 (Email Archiving)
-  const [archiveSort, setArchiveSort] = useState({ key: null, direction: 'asc' });
-  // Sorting state for Table 2 (SentEvent)
-  const [sentEventSort, setSentEventSort] = useState({ key: null, direction: 'asc' });
 
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
@@ -717,86 +693,6 @@ export default function MainApp() {
     }
   }
 
-  // --- FIX: Robust fetch and display for Table 1 (Email Archiving) ---
-  const fetchEmailArchive = async () => {
-    setEmailArchiveLoading(true);
-    setEmailArchiveError('');
-    setSelectedSendId(null); // Reset Table 2
-    setSentEventResults([]);
-    setSentEventPage(1);
-    try {
-      const params = new URLSearchParams();
-      if (archiveSearch.jobId) params.append('jobId', archiveSearch.jobId);
-      if (archiveSearch.emailName) params.append('emailName', archiveSearch.emailName);
-      if (archiveSearch.subject) params.append('subject', archiveSearch.subject);
-      const res = await fetch(`/api/email-archive/send?${params.toString()}`);
-      const data = await res.json();
-      // Accept both {results: [...]} and [...] as valid responses
-      let arr = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
-      setEmailArchiveResults(arr);
-      setArchivePage(1);
-    } catch (e) {
-      setEmailArchiveError('Failed to fetch email archive results.');
-      setEmailArchiveResults([]);
-    } finally {
-      setEmailArchiveLoading(false);
-    }
-  };
-
-  // --- FIX: Robust fetch and display for Table 2 (SentEvent) ---
-  useEffect(() => {
-    if (!selectedSendId) return;
-    setSentEventLoading(true);
-    setSentEventError('');
-    fetch(`/api/email-archive/sent-events?jobId=${encodeURIComponent(selectedSendId)}`)
-      .then(res => res.json())
-      .then(data => {
-        let arr = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
-        setSentEventResults(arr);
-        setSentEventPage(1);
-      })
-      .catch(() => setSentEventError('Failed to fetch sent events.'))
-      .finally(() => setSentEventLoading(false));
-  }, [selectedSendId]);
-
-  // --- FIX: Sorting logic for Table 1 ---
-  const sortedArchiveResults = [...emailArchiveResults].sort((a, b) => {
-    if (!archiveSort.key) return 0;
-    let aVal = a[archiveSort.key] || '';
-    let bVal = b[archiveSort.key] || '';
-    // Numeric sort for NumberSent, otherwise string
-    if (archiveSort.key === 'NumberSent') {
-      aVal = parseInt(aVal, 10) || 0;
-      bVal = parseInt(bVal, 10) || 0;
-    } else {
-      aVal = aVal.toString().toLowerCase();
-      bVal = bVal.toString().toLowerCase();
-    }
-    if (aVal < bVal) return archiveSort.direction === 'asc' ? -1 : 1;
-    if (aVal > bVal) return archiveSort.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-  const pagedArchiveResults = sortedArchiveResults.slice((archivePage-1)*archiveRowsPerPage, archivePage*archiveRowsPerPage);
-
-  // --- FIX: Sorting logic for Table 2 ---
-  const filteredSentEventResults = sentEventResults.filter(row =>
-    !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
-  );
-  const sortedSentEventResults = [...filteredSentEventResults].sort((a, b) => {
-    if (!sentEventSort.key) return 0;
-    let aVal = a[sentEventSort.key] || '';
-    let bVal = b[sentEventSort.key] || '';
-    aVal = aVal.toString().toLowerCase();
-    bVal = bVal.toString().toLowerCase();
-    if (aVal < bVal) return sentEventSort.direction === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sentEventSort.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-  const pagedSentEventResults = sortedSentEventResults.slice((sentEventPage-1)*sentEventRowsPerPage, sentEventPage*sentEventRowsPerPage);
-
-  // Calculate total pages for archive table (Table 1)
-  const archiveTotalPages = Math.ceil(sortedArchiveResults.length / archiveRowsPerPage) || 1;
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -925,14 +821,12 @@ export default function MainApp() {
           >
             Search Assets
           </button>
-          {/*
           <button
             className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'preference' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
             onClick={() => setParentNav('preference')}
           >
             Guided Preference Center
           </button>
-          */}
           <button
             className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'distributedMarketing' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
             onClick={() => setParentNav('distributedMarketing')}
@@ -944,12 +838,6 @@ export default function MainApp() {
             onClick={() => setParentNav('preferencecenter')}
           >
             Preference Center
-          </button>
-          <button
-            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'emailArchiving' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-            onClick={() => setParentNav('emailArchiving')}
-          >
-            Email Archiving
           </button>
         </div>
         {/* Render content based on parentNav */}
@@ -990,419 +878,616 @@ export default function MainApp() {
               </div>
             </div>
 
-            {/* Distinct Search Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div>
-                <label className="block font-semibold mb-1">Job ID</label>
-                <input
-                  type="text"
-                  className="border rounded px-4 py-2 w-full"
-                  placeholder="Enter Job ID"
-                  value={archiveSearch.jobId}
-                  onChange={e => setArchiveSearch(s => ({ ...s, jobId: e.target.value, emailName: '', subject: '' }))}
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1">Subject</label>
-                <input
-                  type="text"
-                  className="border rounded px-4 py-2 w-full"
-                  placeholder="Enter Subject"
-                  value={archiveSearch.subject}
-                  onChange={e => setArchiveSearch(s => ({ ...s, subject: e.target.value, jobId: '', emailName: '' }))}
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1">Email Name</label>
-                <input
-                  type="text"
-                  className="border rounded px-4 py-2 w-full"
-                  placeholder="Enter Email Name"
-                  value={archiveSearch.emailName}
-                  onChange={e => setArchiveSearch(s => ({ ...s, emailName: e.target.value, jobId: '', subject: '' }))}
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1">Subscriber Key</label>
-                <input
-                  type="text"
-                  className="border rounded px-4 py-2 w-full"
-                  placeholder="Enter Subscriber Key (not yet implemented)"
-                  value={archiveSearch.subscriberKey || ''}
-                  onChange={e => setArchiveSearch(s => ({ ...s, subscriberKey: e.target.value, jobId: '', subject: '', emailName: '' }))}
-                  disabled
-                />
-              </div>
+            {/* Responsive search bar row */}
+            <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-2">
+              <input
+                type="text"
+                placeholder="Search..."
+                className="border px-3 py-2 rounded w-full sm:w-64"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{ maxWidth: 320 }}
+              />
             </div>
-            {/* Top Navigation Bar */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-              {/* Buttons */}
-              <div className="flex gap-2 ml-auto">
-                <button className="bg-blue-500 text-white px-4 py-2 rounded flex items-center gap-2" onClick={fetchEmailArchive}>
-                  <span>🔁</span> Refresh
-                </button>
-                <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2" disabled>
-                  <span>📥</span> Export
-                </button>
-                <button className="bg-gray-200 text-gray-800 px-4 py-2 rounded flex items-center gap-2" disabled>
-                  <span>⚙️</span> Settings
-                </button>
-              </div>
-            </div>
-            {/* Results Table */}
-            <div className="bg-white border rounded p-0 overflow-x-auto">
-              {emailArchiveLoading ? (
-                <div className="p-8 text-center text-gray-500">Loading...</div>
-              ) : emailArchiveError ? (
-                <div className="p-8 text-center text-red-600">{emailArchiveError}</div>
-              ) : (
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      {['SentDate','EmailName','Subject','ID','MID','FromName','FromAddress','NumberSent','SubscriberKey'].map(col => (
-                        <th
-                          key={col}
-                          className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100"
-                          onClick={() => {
-                            setArchiveSort(s => ({
-                              key: col,
-                              direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc'
-                            }));
-                          }}
-                        >
-                          {col === 'ID' ? 'JobID' :
-                           col === 'MID' ? 'MID' :
-                           col === 'FromName' ? 'From Name' :
-                           col === 'FromAddress' ? 'From Email' :
-                           col === 'NumberSent' ? '# of emails Sent' :
-                           col === 'SubscriberKey' ? 'Subscriber Key' :
-                           col === 'SentDate' ? 'Sent Date' :
-                           col === 'EmailName' ? 'Email Name' :
-                           col === 'Subject' ? 'Subject' : col}
-                          {archiveSort.key === col && (archiveSort.direction === 'asc' ? ' ▲' : ' ▼')}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedArchiveResults.length === 0 ? (
-                      <tr><td colSpan={9} className="p-8 text-center text-gray-500">No results found.</td></tr>
-                    ) : pagedArchiveResults.map((row, idx) => (
-                      <tr key={idx} className="border-t">
-                        <td className="p-2">{row.SentDate || ''}</td>
-                        <td className="p-2">{row.EmailName || ''}</td>
-                        <td className="p-2">{row.Subject || ''}</td>
-                        <td className="p-2">{row.ID || ''}</td>
-                        <td className="p-2">{row.MID || ''}</td>
-                        <td className="p-2">{row.FromName || ''}</td>
-                        <td className="p-2">{row.FromAddress || ''}</td>
-                        <td className="p-2">
-                          {row.NumberSent ? (
-                            <button
-                              className="bg-yellow-400 text-black font-bold px-3 py-1 rounded shadow hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-600"
-                              onClick={() => { setSelectedSendId(row.ID); setSentEventPage(1); setSentEventSubscriberKey(''); }}
-                              title="Show sent events for this JobID"
-                            >
-                              {row.NumberSent}
-                            </button>
-                          ) : ''}
-                        </td>
-                        <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-            {/* Pagination Controls */}
-            {archiveTotalPages > 1 && (
-              <div className="flex justify-center items-center gap-2 mt-4">
+            {/* Tab buttons and CSV download */}
+            <div className="flex flex-wrap gap-2 mb-4 items-center">
+              {['de', 'automation', 'datafilter', 'journey', 'emailsenddefinition', 'publication'].map(tab => (
                 <button
-                  className={`px-3 py-1 rounded border ${archivePage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                  onClick={() => setArchivePage(p => Math.max(1, p - 1))}
-                  disabled={archivePage === 1}
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 rounded text-sm ${activeTab === tab ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
                 >
-                  Prev
+                  {tab === 'emailsenddefinition' ? 'EmailSendDefinition' : tab.toUpperCase()}
                 </button>
-                <span>Page {archivePage} of {archiveTotalPages}</span>
-                <button
-                  className={`px-3 py-1 rounded border ${archivePage === archiveTotalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                  onClick={() => setArchivePage(p => Math.min(archiveTotalPages, p + 1))}
-                  disabled={archivePage === archiveTotalPages}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        ) : null}
-        {parentNav === 'emailArchiving' ? (
-          <>
-            {/* Email Archiving UI moved here */}
-            {/* Distinct Search Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div>
-                <label className="block font-semibold mb-1">Job ID</label>
-                <input
-                  type="text"
-                  className="border rounded px-4 py-2 w-full"
-                  placeholder="Enter Job ID"
-                  value={archiveSearch.jobId}
-                  onChange={e => setArchiveSearch(s => ({ ...s, jobId: e.target.value, emailName: '', subject: '' }))}
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1">Subject</label>
-                <input
-                  type="text"
-                  className="border rounded px-4 py-2 w-full"
-                  placeholder="Enter Subject"
-                  value={archiveSearch.subject}
-                  onChange={e => setArchiveSearch(s => ({ ...s, subject: e.target.value, jobId: '', emailName: '' }))}
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1">Email Name</label>
-                <input
-                  type="text"
-                  className="border rounded px-4 py-2 w-full"
-                  placeholder="Enter Email Name"
-                  value={archiveSearch.emailName}
-                  onChange={e => setArchiveSearch(s => ({ ...s, emailName: e.target.value, jobId: '', subject: '' }))}
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1">Subscriber Key</label>
-                <input
-                  type="text"
-                  className="border rounded px-4 py-2 w-full"
-                  placeholder="Enter Subscriber Key (not yet implemented)"
-                  value={archiveSearch.subscriberKey || ''}
-                  onChange={e => setArchiveSearch(s => ({ ...s, subscriberKey: e.target.value, jobId: '', subject: '', emailName: '' }))}
-                  disabled
-                />
-              </div>
+              ))}
+              <button
+                onClick={downloadCSV}
+                className="bg-green-600 text-white px-3 py-1 rounded text-sm ml-2"
+              >
+                Download CSV
+              </button>
             </div>
-            {/* Top Navigation Bar */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-              {/* Buttons */}
-              <div className="flex gap-2 ml-auto">
-                <button className="bg-blue-500 text-white px-4 py-2 rounded flex items-center gap-2" onClick={fetchEmailArchive}>
-                  <span>🔁</span> Refresh
-                </button>
-                <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2" disabled>
-                  <span>📥</span> Export
-                </button>
-                <button className="bg-gray-200 text-gray-800 px-4 py-2 rounded flex items-center gap-2" disabled>
-                  <span>⚙️</span> Settings
-                </button>
-              </div>
-            </div>
-            {/* Results Table */}
-            <div className="bg-white border rounded p-0 overflow-x-auto">
-              {emailArchiveLoading ? (
-                <div className="p-8 text-center text-gray-500">Loading...</div>
-              ) : emailArchiveError ? (
-                <div className="p-8 text-center text-red-600">{emailArchiveError}</div>
-              ) : (
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      {['SentDate','EmailName','Subject','ID','MID','FromName','FromAddress','NumberSent','SubscriberKey'].map(col => (
-                        <th
-                          key={col}
-                          className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100"
-                          onClick={() => {
-                            setArchiveSort(s => ({
-                              key: col,
-                              direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc'
-                            }));
-                          }}
-                        >
-                          {col === 'ID' ? 'JobID' :
-                           col === 'MID' ? 'MID' :
-                           col === 'FromName' ? 'From Name' :
-                           col === 'FromAddress' ? 'From Email' :
-                           col === 'NumberSent' ? '# of emails Sent' :
-                           col === 'SubscriberKey' ? 'Subscriber Key' :
-                           col === 'SentDate' ? 'Sent Date' :
-                           col === 'EmailName' ? 'Email Name' :
-                           col === 'Subject' ? 'Subject' : col}
-                          {archiveSort.key === col && (archiveSort.direction === 'asc' ? ' ▲' : ' ▼')}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedArchiveResults.length === 0 ? (
-                      <tr><td colSpan={9} className="p-8 text-center text-gray-500">No results found.</td></tr>
-                    ) : pagedArchiveResults.map((row, idx) => (
-                      <tr key={idx} className="border-t">
-                        <td className="p-2">{row.SentDate || ''}</td>
-                        <td className="p-2">{row.EmailName || ''}</td>
-                        <td className="p-2">{row.Subject || ''}</td>
-                        <td className="p-2">{row.ID || ''}</td>
-                        <td className="p-2">{row.MID || ''}</td>
-                        <td className="p-2">{row.FromName || ''}</td>
-                        <td className="p-2">{row.FromAddress || ''}</td>
-                        <td className="p-2">
-                          {row.NumberSent ? (
-                            <button
-                              className="bg-yellow-400 text-black font-bold px-3 py-1 rounded shadow hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-600"
-                              onClick={() => { setSelectedSendId(row.ID); setSentEventPage(1); setSentEventSubscriberKey(''); }}
-                              title="Show sent events for this JobID"
-                            >
-                              {row.NumberSent}
-                            </button>
-                          ) : ''}
-                        </td>
-                        <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-            {/* Pagination Controls */}
-            {archiveTotalPages > 1 && (
-              <div className="flex justify-center items-center gap-2 mt-4">
-                <button
-                  className={`px-3 py-1 rounded border ${archivePage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                  onClick={() => setArchivePage(p => Math.max(1, p - 1))}
-                  disabled={archivePage === 1}
-                >
-                  Prev
-                </button>
-                <span>Page {archivePage} of {archiveTotalPages}</span>
-                <button
-                  className={`px-3 py-1 rounded border ${archivePage === archiveTotalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                  onClick={() => setArchivePage(p => Math.min(archiveTotalPages, p + 1))}
-                  disabled={archivePage === archiveTotalPages}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-            {/* SentEvent table */}
-            {selectedSendId && (
-              <div className="mt-8">
-                <h2 className="text-xl font-semibold mb-2">Sent Events for JobID: {selectedSendId}</h2>
-                <div className="mb-4 flex items-center gap-2">
-                  <label className="font-semibold">Subscriber Key:</label>
-                  <input
-                    type="text"
-                    className="border rounded px-2 py-1"
-                    placeholder="Search Subscriber Key"
-                    value={sentEventSubscriberKey}
-                    onChange={e => { setSentEventSubscriberKey(e.target.value); setSentEventPage(1); }}
-                  />
-                  <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 ml-4" onClick={() => {/* TODO: implement export logic */}}>
-                    <span>📥</span> Export
-                  </button>
-                </div>
-                {sentEventLoading ? (
-                  <div className="p-4 text-center text-gray-500">Loading sent events...</div>
-                ) : sentEventError ? (
-                  <div className="p-4 text-center text-red-600">{sentEventError}</div>
-                ) : (
+
+            <div className="overflow-x-auto bg-white shadow rounded">
+              {activeTab === 'emailsenddefinition' ? (
+                <div className="bg-white shadow rounded p-4 mt-4">
+                  <h2 className="text-xl font-bold mb-4 text-indigo-700">EmailSendDefinition Details</h2>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm border">
+                    <table className="min-w-full text-sm">
                       <thead>
-                        <tr className="bg-gray-100">
-                          {['SubscriberKey','EventDate','SendID','ListID','TriggeredSendDefinitionObjectID'].map(col => (
-                            <th
-                              key={col}
-                              className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100"
-                              onClick={() => {
-                                setSentEventSort(s => ({
-                                  key: col,
-                                  direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc'
-                                }));
-                              }}
-                            >
-                              {col === 'SendID' ? 'JobID (SendID)' :
-                               col === 'EventDate' ? 'Send Date' :
-                               col === 'TriggeredSendDefinitionObjectID' ? 'TriggeredSendDefinitionObjectID' :
-                               col === 'SubscriberKey' ? 'SubscriberKey' :
-                               col === 'ListID' ? 'ListID' : col}
-                              {sentEventSort.key === col && (sentEventSort.direction === 'asc' ? ' ▲' : ' ▼')}
-                            </th>
-                          ))}
-                          <th className="p-2 text-left">Preview</th>
-                          <th className="p-2 text-left">Download</th>
+                        <tr>
+                          <th className="p-2">
+                            <input type="checkbox" checked={allSelected} onChange={toggleSelectAllESD} />
+                          </th>
+                          <th className="text-left p-2">Name</th>
+                          <th className="text-left p-2">SendClassification</th>
+                          <th className="text-left p-2">SenderProfile</th>
+                          <th className="text-left p-2">DeliveryProfile</th>
+                          <th className="text-left p-2">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pagedSentEventResults.length === 0 ? (
-                          <tr><td colSpan={7} className="p-8 text-center text-gray-500">No results found.</td></tr>
-                        ) : pagedSentEventResults.map((row, idx) => (
-                          <tr key={idx} className="border-t">
-                            <td className="p-2">{row.SubscriberKey || ''}</td>
-                            <td className="p-2">{row.EventDate || ''}</td>
-                            <td className="p-2">{row.SendID || ''}</td>
-                            <td className="p-2">{row.ListID || ''}</td>
-                            <td className="p-2">{row.TriggeredSendDefinitionObjectID || ''}</td>
-                            <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
-                            <td className="p-2"><button className="text-green-600 hover:underline">⬇️ Download</button></td>
+                        {(searchTerm ? getFilteredData().filter(item => item._type === 'EmailSendDefinition') : resolvedEmailSendDefs).map((esd, idx) => (
+                          <tr key={esd.CustomerKey} className="border-t">
+                            <td className="p-2">
+                              <input type="checkbox" checked={selectedESDKeys.includes(esd.CustomerKey)} onChange={() => toggleSelectESD(esd.CustomerKey)} />
+                            </td>
+                            <td className="p-2 font-medium">{esd.Name}</td>
+                            <td className="p-2">{getProfileName(sendClassifications, esd.SendClassification?.CustomerKey)}</td>
+                            <td className="p-2">{getProfileName(senderProfiles, esd.SenderProfile?.CustomerKey)}</td>
+                            <td className="p-2">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
+                            <td className="p-2">
+                              <button className="text-blue-600 hover:underline mr-2" onClick={() => openEditESDModal(esd)}>
+                                <span role="img" aria-label="Edit">✏️</span>
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {/* Pagination for Table 2 */}
-                    {Math.ceil(sentEventResults.filter(row =>
-                      !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
-                    ).length / sentEventRowsPerPage) > 1 && (
-                      <div className="flex justify-center items-center gap-2 mt-4">
-                        <button
-                          className={`px-3 py-1 rounded border ${sentEventPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                          onClick={() => setSentEventPage(p => Math.max(1, p - 1))}
-                          disabled={sentEventPage === 1}
-                        >
-                          Prev
-                        </button>
-                        <span>Page {sentEventPage} of {Math.ceil(sentEventResults.filter(row =>
-                          !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
-                        ).length / sentEventRowsPerPage)}</span>
-                        <button
-                          className={`px-3 py-1 rounded border ${sentEventPage === Math.ceil(sentEventResults.filter(row =>
-                            !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
-                          ).length / sentEventRowsPerPage) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                          onClick={() => setSentEventPage(p => Math.min(Math.ceil(sentEventResults.filter(row =>
-                            !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
-                          ).length / sentEventRowsPerPage), p + 1))}
-                          disabled={sentEventPage === Math.ceil(sentEventResults.filter(row =>
-                            !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
-                          ).length / sentEventRowsPerPage)}
-                        >
-                          Next
-                        </button>
-                      </div>
-                    )}
                   </div>
-                )}
+                  {selectedESDKeys.length > 0 && (
+                    <button
+                      className="mt-2 px-4 py-2 bg-blue-700 text-white rounded font-semibold"
+                      onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })}
+                    >
+                      Bulk Edit Selected ({selectedESDKeys.length})
+                    </button>
+                  )}
+                  {/* Debug block and other details remain hidden */}
+                </div>
+              ) : activeTab === 'publication' ? (
+                <div className="bg-white shadow rounded p-4 mt-4">
+                  <h2 className="text-xl font-bold mb-4 text-indigo-700">Publication Details</h2>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr>
+                          <th className="text-left p-2">ID</th>
+                          <th className="text-left p-2">Name</th>
+                          <th className="text-left p-2">Category</th>
+                          <th className="text-left p-2">CustomerKey</th>
+                          <th className="text-left p-2">BusinessUnit</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(searchTerm ? getFilteredData().filter(item => item._type === 'Publication') : publications).map((pub, idx) => (
+                          <tr key={pub.id || idx} className="border-t">
+                            <td className="p-2">{pub.id}</td>
+                            <td className="p-2 font-medium">{pub.name}</td>
+                            <td className="p-2">{pub.category}</td>
+                            <td className="p-2">{pub.customerKey || ''}</td>
+                            <td className="p-2">{pub.businessUnit || ''}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                // ...existing code for other tabs and search...
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="text-left p-2">Type</th>
+                      <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
+                      {/* Remove Created column for Automations */}
+                      <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
+                      {/* Hide 'View in folder' column for Automation and Journey */}
+                      {!(activeTab === 'automation' || activeTab === 'journey') && (
+                        <th className="text-left p-2">View in folder</th>
+                      )}
+                      {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
+                        <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
+                      ) : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedData().map((item, idx) => (
+                      <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
+                        onClick={() => {
+                          if (item._type === 'Data Extension') fetchDeDetails(item.name);
+                          if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
+                        }}
+                      >
+                        <td className="p-2">{item._type}</td>
+                        <td className="p-2 font-medium">{item.name}</td>
+                        {/* Remove Created column for Automations */}
+                        <td className="p-2">{item.path || 'N/A'}</td>
+                        {/* Hide 'View in folder' cell for Automation and Journey */}
+                        {!(item._type === 'Automation' || item._type === 'Journey') && (
+                          <td className="p-2">
+                            {/* Existing View in folder links for DE and Data Filter */}
+                            {item._type === 'Data Extension' && item.categoryId && item.id && (
+                              <a
+                                href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 underline hover:text-blue-800"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                View
+                              </a>
+                            )}
+                            {item._type === 'Data Filter' && item.id && (
+                              <a
+                                href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 underline hover:text-blue-800 ml-2"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                View
+                              </a>
+                            )}
+                          </td>
+                        )}
+                        {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
+                          <td className="p-2">{item.status || 'N/A'}</td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center mt-4 text-sm">
+              <div>
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex gap-2">
+                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
+                <button disabled={currentPage === totalPages || totalPages <= 1} onClick={() => setCurrentPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
+              </div>
+            </div>
+
+            {/* Modal for DE details */}
+            {deDetailModal.open && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setDeDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
+                  <h2 className="text-lg font-bold mb-4 text-indigo-700">Data Extension Details: {deDetailModal.name}</h2>
+                  {deDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
+                  {deDetailModal.error && <div className="text-red-600">{deDetailModal.error}</div>}
+                  {deDetailModal.details && (
+                    <div className="space-y-2">
+                      <div><span className="font-semibold">Created By:</span> {deDetailModal.details.createdByName}</div>
+                      <div><span className="font-semibold">Modified By:</span> {deDetailModal.details.modifiedByName}</div>
+                      <div><span className="font-semibold">Row Count:</span> {deDetailModal.details.rowCount}</div>
+                      <div><span className="font-semibold">Is Sendable:</span> {deDetailModal.details.isSendable.toString()}</div>
+                      <div><span className="font-semibold">Is Testable:</span> {deDetailModal.details.isTestable.toString()}</div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
+
+            {/* Modal for Automation details */}
+            {automationDetailModal.open && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setAutomationDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
+                  <h2 className="text-lg font-bold mb-4 text-green-700">Automation Details: {automationDetailModal.name}</h2>
+                  {automationDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
+                  {automationDetailModal.error && <div className="text-red-600">{automationDetailModal.error}</div>}
+                  {automationDetailModal.details && (
+                    <div className="space-y-2">
+                      <div><span className="font-semibold">Start Date:</span> {automationDetailModal.details.startDate}</div>
+                      <div><span className="font-semibold">End Date:</span> {automationDetailModal.details.endDate}</div>
+                      <div><span className="font-semibold">Last Run Time:</span> {automationDetailModal.details.lastRunTime}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Modal for SendClassification details */}
+            {sendClassModal.open && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setSendClassModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
+                  <h2 className="text-lg font-bold mb-4 text-indigo-700">SendClassification Details: {sendClassModal.name}</h2>
+                  {sendClassModal.loading && <div className="text-center py-4">Loading details...</div>}
+                  {sendClassModal.error && <div className="text-red-600">{sendClassModal.error}</div>}
+                  {sendClassModal.details && Array.isArray(sendClassModal.details) && sendClassModal.details.length > 0 && (
+                    <div className="space-y-2">
+                      <div><span className="font-semibold">Name:</span> {sendClassModal.details[0].Name}</div>
+                      <div><span className="font-semibold">CustomerKey:</span> {sendClassModal.details[0].CustomerKey}</div>
+                      <div><span className="font-semibold">Description:</span> {sendClassModal.details[0].Description}</div>
+                    </div>
+                  )}
+                  {sendClassModal.details && Array.isArray(sendClassModal.details) && sendClassModal.details.length === 0 && (
+                    <div className="text-gray-600">No details found for this SendClassification.</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Modal for SenderProfile details */}
+            {senderProfileModal.open && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setSenderProfileModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
+                  <h2 className="text-lg font-bold mb-4 text-green-700">SenderProfile Details: {senderProfileModal.name}</h2>
+                  {senderProfileModal.loading && <div className="text-center py-4">Loading details...</div>}
+                  {senderProfileModal.error && <div className="text-red-600">{senderProfileModal.error}</div>}
+                  {senderProfileModal.details && Array.isArray(senderProfileModal.details) && senderProfileModal.details.length > 0 && (
+                    <div className="space-y-2">
+                      <div><span className="font-semibold">Name:</span> {senderProfileModal.details[0].Name}</div>
+                      <div><span className="font-semibold">CustomerKey:</span> {senderProfileModal.details[0].CustomerKey}</div>
+                      <div><span className="font-semibold">Description:</span> {senderProfileModal.details[0].Description}</div>
+                    </div>
+                  )}
+                  {senderProfileModal.details && Array.isArray(senderProfileModal.details) && senderProfileModal.details.length === 0 && (
+                    <div className="text-gray-600">No details found for this SenderProfile.</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Modal for updating SenderProfile */}
+            {updateSenderProfileModal.open && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setUpdateSenderProfileModal({ open: false, loading: false, error: null, customerKey: null, selectedKey: '', success: false })}>&#10005;</button>
+                  <h2 className="text-lg font-bold mb-4 text-yellow-700">Update SenderProfile</h2>
+                  {updateSenderProfileModal.loading && <div className="text-center py-4">Updating...</div>}
+                  {updateSenderProfileModal.error && <div className="text-red-600">{updateSenderProfileModal.error}</div>}
+                  {updateSenderProfileModal.success && <div className="text-green-600">SenderProfile updated successfully!</div>}
+                  <div className="mb-4">
+                    <label className="block mb-2 font-semibold">Select new SenderProfile:</label>
+                    <select
+                      className="border rounded px-3 py-2 w-full"
+                      value={updateSenderProfileModal.selectedKey}
+                      onChange={e => setUpdateSenderProfileModal(modal => ({ ...modal, selectedKey: e.target.value }))}
+                    >
+                      <option value="" disabled>Select SenderProfile...</option>
+                      {senderProfiles.map(profile => (
+                        <option key={profile.CustomerKey} value={profile.CustomerKey}>{profile.Name} ({profile.CustomerKey})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    className="bg-yellow-600 text-white px-4 py-2 rounded font-semibold hover:bg-yellow-700"
+                    onClick={handleUpdateSenderProfile}
+                    disabled={!updateSenderProfileModal.selectedKey || updateSenderProfileModal.loading}
+                  >
+                    Update
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Modal for editing EmailSendDefinition */}
+            {editESDModal.open && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+                <div className="bg-white rounded shadow-lg p-6 w-full max-w-md relative">
+                  <h2 className="text-lg font-bold mb-4">Edit EmailSendDefinition</h2>
+                  {editESDModal.error && <div className="text-red-600 mb-2">{editESDModal.error}</div>}
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Send Classification</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={editESDModal.sendClassification}
+                      onChange={e => handleEditESDChange('sendClassification', e.target.value)}
+                    >
+                      <option value="">Select SendClassification</option>
+                      {sendClassifications.map(sc => (
+                        <option key={sc.CustomerKey} value={sc.CustomerKey}>{sc.Name || sc.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Sender Profile</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={editESDModal.senderProfile}
+                      onChange={e => handleEditESDChange('senderProfile', e.target.value)}
+                    >
+                      <option value="">Select SenderProfile</option>
+                      {senderProfiles.map(sp => (
+                        <option key={sp.CustomerKey} value={sp.CustomerKey}>{sp.Name || sp.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Delivery Profile</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={editESDModal.deliveryProfile}
+                      onChange={e => handleEditESDChange('deliveryProfile', e.target.value)}
+                    >
+                      <option value="">Select DeliveryProfile</option>
+                      {deliveryProfiles.map(dp => (
+                        <option key={dp.CustomerKey} value={dp.CustomerKey}>{dp.Name || dp.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={closeEditESDModal} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                    <button onClick={submitEditESDModal} className="px-4 py-2 bg-blue-600 text-white rounded" disabled={editESDModal.loading}>
+                      {editESDModal.loading ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Bulk Edit Modal */}
+            {massEditModal.open && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+                <div className="bg-white rounded shadow-lg p-6 w-full max-w-md relative">
+                  <h2 className="text-lg font-bold mb-4">Bulk Edit EmailSendDefinitions</h2>
+                  {massEditModal.error && <div className="text-red-600 mb-2">{massEditModal.error}</div>}
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Send Classification</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={massEditModal.sendClassification}
+                      onChange={e => setMassEditModal(prev => ({ ...prev, sendClassification: e.target.value }))}
+                    >
+                      <option value="">(No Change)</option>
+                      {sendClassifications.map(sc => (
+                        <option key={sc.CustomerKey} value={sc.CustomerKey}>{sc.Name || sc.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Sender Profile</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={massEditModal.senderProfile}
+                      onChange={e => setMassEditModal(prev => ({ ...prev, senderProfile: e.target.value }))}
+                    >
+                      <option value="">(No Change)</option>
+                      {senderProfiles.map(sp => (
+                        <option key={sp.CustomerKey} value={sp.CustomerKey}>{sp.Name || sp.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">Delivery Profile</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={massEditModal.deliveryProfile}
+                      onChange={e => setMassEditModal(prev => ({ ...prev, deliveryProfile: e.target.value }))}
+                    >
+                      <option value="">(No Change)</option>
+                      {deliveryProfiles.map(dp => (
+                        <option key={dp.CustomerKey} value={dp.CustomerKey}>{dp.Name || dp.CustomerKey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                    <button onClick={submitMassEditModal} className="px-4 py-2 bg-blue-600 text-white rounded" disabled={massEditModal.loading}>
+                      {massEditModal.loading ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Show DE info block after creation */}
+            {dmDEPath && (() => {
+              let deName = '';
+              if (dmDEPath) {
+                const parts = dmDEPath.split('/');
+                deName = parts[parts.length - 1];
+              }
+              return (
+                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+                  <div className="text-green-800 font-bold mb-2">Data Extension created!</div>
+                  <div className="mb-2 text-gray-800">
+                    <span className="font-semibold">Your data extension name is:</span> <span className="font-mono text-blue-900">{deName || 'N/A'}</span>
+                  </div>
+                  <div className="mb-2 text-gray-800">
+                    <span className="font-semibold">The data extension path is:</span> <span className="font-mono text-blue-900">Data Extensions &gt; {deName || 'N/A'}</span>
+                  </div>
+                  <div className="mb-2 text-gray-800">
+                    <span className="font-semibold">We have set the below attributes in the data extension:</span>
+                    <ul className="list-disc ml-6 mt-1">
+                      <li><span className="font-semibold">USED FOR SENDING: Yes</span></li>
+                      <li><span className="font-semibold">USED FOR TESTING: Yes</span></li>
+                      <li><span className="font-semibold">SUBSCRIBER RELATIONSHIP: id relates to Subscribers on Subscriber Key</span></li>
+                    </ul>
+                  </div>
+                </div>
+              );
+            })()}
           </>
-        ) : null}
-        {parentNav === 'distributedMarketing' ? (
-          <div className="p-6">
-            <h2 className="text-2xl font-bold text-indigo-700 mb-4">Distributed Marketing</h2>
-            {/* Render the Distributed Marketing Wizard */}
-            <DMWizard />
+        ) : parentNav === 'preference' ? (
+          <div className="p-6 bg-white rounded shadow">
+            <h2 className="text-xl font-bold mb-4 text-indigo-700">How do you want your preference center to be set up?</h2>
+            <select
+              className="border rounded px-3 py-2 w-full mb-6"
+              value={guidedPrefOption || ''}
+              onChange={e => setGuidedPrefOption(e.target.value)}
+            >
+              <option value="" disabled>Select an option...</option>
+              <option value="no_sf_core">Marketing Cloud Preference Center with no Salesforce core integration</option>
+              <option value="sf_core_contact_lead">Marketing Cloud Preference Center with Salesforce core contact, Lead integration</option>
+              <option value="sf_core_consent">Marketing Cloud Preference Center with Salesforce core consent model</option>
+            </select>
+
+            {guidedPrefOption === 'no_sf_core' && (
+              <div className="mt-6 text-left">
+                <a
+                  href="/Custom%20Preference%20Center_No_SF_Integration.zip"
+                  download
+                  className="inline-block bg-indigo-600 text-white px-4 py-2 rounded font-semibold mb-4 hover:bg-indigo-700"
+                >
+                  Download Preference Center Package (ZIP)
+                </a>
+                <div className="bg-gray-50 border-l-4 border-indigo-400 p-4 rounded">
+                  <h3 className="font-bold mb-2 text-indigo-700">Instructions</h3>
+                  <ol className="list-decimal ml-6 text-sm text-gray-800 space-y-1">
+                    <li>In the <b>Package Manager</b> folder, deploy the JSON into SFMC via Package Manager.</li>
+                    <li>Go into the Cloud pages and do a search all and replace for the cloudpageURL IDs; there will be 2-3 that did not get deployed correctly.</li>
+                    <li>In <b>cpc_main</b> on line 301, ensure that the cloud page ID is for <b>cpc_main</b>.</li>
+                    <li>In <b>cpc_main</b> on line 331, ensure that the cloud page ID is for <b>cpc_handler</b>.</li>
+                    <li>In <b>cpc_handler</b>, every <b>CloudPagesURL</b> function should point to the cloud page ID for <b>cpc_main</b>.</li>
+                    <li>Test, validate, and add additional features as needed.</li>
+                    <li>To use the preference center, the url expects a <b>subkey</b> parameter at the end of the URL (e.g. <span className="break-all">https://mcf7bhdjzswk278tj2j38nqtlq2q.pub.sfmc-content.com/jqi02yqkmgp?subkey=TEST10001</span>).</li>
+                  </ol>
+                  <div className="mt-2 text-xs text-gray-600">
+                    <b>NOTE:</b> The preference center assumes that a record with email exists in All Subscribers.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {guidedPrefOption === 'sf_core_contact_lead' && (
+              <div className="mt-6 text-left text-gray-600">
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                  <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core contact, Lead integration is in development.
+                </div>
+              </div>
+            )}
+
+            {guidedPrefOption === 'sf_core_consent' && (
+              <div className="mt-6 text-left text-gray-600">
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                  <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core consent model is in development.
+                </div>
+              </div>
+            )}
+          </div>
+        ) : parentNav === 'distributedMarketing' ? (
+          <div className="bg-white shadow rounded p-6 max-w-xl mx-auto">
+            {renderDMQuickSend()}
           </div>
         ) : null}
-        {parentNav === 'preferencecenter' ? (
-          <div className="p-6">
-            <h2 className="text-2xl font-bold text-indigo-700 mb-4">Preference Center</h2>
-            {/* Render Preference Center Project Form by default, add logic to switch forms as needed */}
-            <PreferenceCenterProjectForm />
-            {/* Example: Uncomment and add logic to show these as needed */}
-            {/* <PreferenceCenterNoCoreForm /> */}
-            {/* <PreferenceCenterConfigForm /> */}
+
+        {/* Render content for Preference Center config */}
+        {parentNav === 'preferencecenter' && (
+          <div className="bg-white shadow rounded p-6 max-w-xl mx-auto" id="preferencecenter-success-section">
+            {qsStatus && qsStatus.startsWith('✅') && (
+              <div className="bg-green-50 border border-green-300 text-green-800 rounded p-4 mb-4" id="preferencecenter-success-message">
+                <div className="text-2xl mb-2">✅ Configuration Completed Successfully!</div>
+                <div className="mb-2 font-semibold">Your Preference Center setup is now complete.</div>
+                <ul className="mb-2 list-disc pl-6">
+                  <li><b>PC_Controller</b>: This Data Extension contains all the configuration values used to render your dynamic Preference Center (labels, instructions, integration type, branding, etc.).</li>
+                  <li><b>PC_Log</b>: This Data Extension automatically tracks all subscriber preference updates, including old vs. new values for audit and compliance.</li>
+                </ul>
+                <div className="mb-2">Both Data Extensions are created under your Data Extensions folder.</div>
+                <div className="mb-2 font-semibold">Below is your ready-to-use CloudPage code. You can paste this into a new CloudPage to get started. Feel free to customize the HTML layout and styling to match your brand.</div>
+                <CloudPageCodeSample />
+              </div>
+            )}
+            <PreferenceCenterConfigForm 
+              onSubmit={async config => {
+                setQSStatus('Submitting configuration...');
+                setQSLoading(true);
+                try {
+                  const res = await fetch(`${baseURL}/preference-center/configure`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                  });
+                  const json = await res.json();
+                  if (json.status === 'OK') {
+                    setQSStatus('✅ Configuration Completed Successfully!');
+                    setTimeout(() => {
+                      const el = document.getElementById('preferencecenter-success-section');
+
+
+
+
+
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
+                  } else {
+                    setQSStatus('❌ Failed to submit configuration: ' + (json.message || 'Unknown error'));
+                  }
+                } catch (e) {
+                  setQSStatus('❌ Error submitting configuration.');
+                } finally {
+                  setQSLoading(false);
+                }
+              }} 
+              submitting={qsLoading}
+            />
           </div>
-        ) : null}
-        {/* Add similar blocks for other parentNav values if needed */}
+        )}
       </div>
+    </div>
+  );
+}
+
+function formatDate(dateStr) {
+  if (!dateStr || dateStr === 'N/A' || dateStr === 'Not Available') return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleString('en-GB', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).replace(',', '');
+}
+
+function CloudPageCodeSample() {
+  const [codeSample, setCodeSample] = React.useState('');
+  const [copied, setCopied] = React.useState(false);
+
+  useEffect(() => {
+    fetch(process.env.PUBLIC_URL + '/MC_only_Preference_Code.html')
+      .then(res => res.text())
+      .then(setCodeSample);
+  }, []);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(codeSample);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([codeSample], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'PreferenceCenterCloudPage.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="mb-2">
+      <div className="flex items-center mb-1">
+        <span className="font-semibold mr-2">Show Code:</span>
+        <button onClick={handleCopy} className="bg-indigo-600 text-white px-2 py-1 rounded text-xs mr-2">{copied ? 'Copied!' : 'Copy'}</button>
+        <button onClick={handleDownload} className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs">Download as .html</button>
+      </div>
+      <textarea
+        className="w-full font-mono text-xs p-2 border rounded bg-gray-100"
+        rows={16}
+        value={codeSample}
+        readOnly
+      />
     </div>
   );
 }
