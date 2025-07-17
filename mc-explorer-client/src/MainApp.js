@@ -793,6 +793,9 @@ export default function MainApp() {
   });
   const pagedSentEventResults = sortedSentEventResults.slice((sentEventPage-1)*sentEventRowsPerPage, sentEventPage*sentEventRowsPerPage);
 
+  // Calculate total pages for archive table (Table 1)
+  const archiveTotalPages = Math.ceil(sortedArchiveResults.length / archiveRowsPerPage) || 1;
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
