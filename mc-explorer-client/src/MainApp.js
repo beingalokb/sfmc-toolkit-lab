@@ -3,6 +3,7 @@ import './App.css';
 import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
 import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
 import PreferenceCenterConfigForm from './PreferenceCenterConfigForm';
+import EmailsSendToSubscribers from './EmailsSendToSubscribers';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -68,6 +69,12 @@ export default function MainApp() {
   const [emailArchiveLoading, setEmailArchiveLoading] = useState(false);
   const [emailArchiveError, setEmailArchiveError] = useState('');
   const [archiveSearch, setArchiveSearch] = useState({ jobId: '', emailName: '', subject: '', sentDateFrom: '', sentDateTo: '' });
+
+  // Add state for selected SendID (JobID) for showing SentEvent table
+  const [selectedSendId, setSelectedSendId] = useState(null);
+  const [sentEventResults, setSentEventResults] = useState([]);
+  const [sentEventLoading, setSentEventLoading] = useState(false);
+  const [sentEventError, setSentEventError] = useState('');
 
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
@@ -740,6 +747,18 @@ export default function MainApp() {
   const archiveTotalPages = Math.ceil(emailArchiveResults.length / archivePageSize);
   const pagedArchiveResults = emailArchiveResults.slice((archivePage - 1) * archivePageSize, archivePage * archivePageSize);
 
+  // Helper to fetch sent events data
+  useEffect(() => {
+    if (!selectedSendId) return;
+    setSentEventLoading(true);
+    setSentEventError('');
+    fetch(`/api/email-archive/sent-events?jobId=${encodeURIComponent(selectedSendId)}`)
+      .then(res => res.json())
+      .then(data => setSentEventResults(Array.isArray(data) ? data : []))
+      .catch(() => setSentEventError('Failed to fetch sent events.'))
+      .finally(() => setSentEventLoading(false));
+  }, [selectedSendId]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -992,34 +1011,6 @@ export default function MainApp() {
                 </button>
               </div>
             </div>
-            {/* Filters */}
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              {/* Date Range */}
-              <div>
-                <label className="block font-semibold mb-1">Date Range 📆</label>
-                <input type="date" className="border rounded px-2 py-1 mr-2" value={archiveSearch.sentDateFrom} onChange={e => setArchiveSearch(s => ({ ...s, sentDateFrom: e.target.value }))} />
-                <span className="mx-1">to</span>
-                <input type="date" className="border rounded px-2 py-1" value={archiveSearch.sentDateTo} onChange={e => setArchiveSearch(s => ({ ...s, sentDateTo: e.target.value }))} />
-              </div>
-              {/* Business Unit */}
-              <div>
-                <label className="block font-semibold mb-1">Business Unit</label>
-                <select className="border rounded px-2 py-1" disabled>
-                  <option value="">All</option>
-                  {/* Map business units here */}
-                </select>
-              </div>
-              {/* Status */}
-              <div>
-                <label className="block font-semibold mb-1">Status</label>
-                <select className="border rounded px-2 py-1" disabled>
-                  <option value="">All</option>
-                  <option value="sent">Sent</option>
-                  <option value="canceled">Canceled</option>
-                  <option value="draft">Draft</option>
-                </select>
-              </div>
-            </div>
             {/* Results Table */}
             <div className="bg-white border rounded p-0 overflow-x-auto">
               {emailArchiveLoading ? (
@@ -1057,14 +1048,13 @@ export default function MainApp() {
                         <td className="p-2">{row.FromAddress || ''}</td>
                         <td className="p-2">
                           {row.NumberSent ? (
-                            <a
-                              href={`/EmailsSendToSubscribers.html?jobId=${encodeURIComponent(row.ID)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
                               className="text-blue-600 underline cursor-pointer"
+                              onClick={() => setSelectedSendId(row.ID)}
+                              title="Show sent events for this JobID"
                             >
                               {row.NumberSent}
-                            </a>
+                            </button>
                           ) : ''}
                         </td>
                         <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
@@ -1080,7 +1070,7 @@ export default function MainApp() {
             {archiveTotalPages > 1 && (
               <div className="flex justify-center items-center gap-2 mt-4">
                 <button
-                  className="px-3 py-1 rounded border bg-gray-100"
+                  className={`px-3 py-1 rounded border ${archivePage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                   onClick={() => setArchivePage(p => Math.max(1, p - 1))}
                   disabled={archivePage === 1}
                 >
@@ -1088,7 +1078,7 @@ export default function MainApp() {
                 </button>
                 <span>Page {archivePage} of {archiveTotalPages}</span>
                 <button
-                  className="px-3 py-1 rounded border bg-gray-100"
+                  className={`px-3 py-1 rounded border ${archivePage === archiveTotalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                   onClick={() => setArchivePage(p => Math.min(archiveTotalPages, p + 1))}
                   disabled={archivePage === archiveTotalPages}
                 >
@@ -1160,34 +1150,6 @@ export default function MainApp() {
                 </button>
               </div>
             </div>
-            {/* Filters */}
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              {/* Date Range */}
-              <div>
-                <label className="block font-semibold mb-1">Date Range 📆</label>
-                <input type="date" className="border rounded px-2 py-1 mr-2" value={archiveSearch.sentDateFrom} onChange={e => setArchiveSearch(s => ({ ...s, sentDateFrom: e.target.value }))} />
-                <span className="mx-1">to</span>
-                <input type="date" className="border rounded px-2 py-1" value={archiveSearch.sentDateTo} onChange={e => setArchiveSearch(s => ({ ...s, sentDateTo: e.target.value }))} />
-              </div>
-              {/* Business Unit */}
-              <div>
-                <label className="block font-semibold mb-1">Business Unit</label>
-                <select className="border rounded px-2 py-1" disabled>
-                  <option value="">All</option>
-                  {/* Map business units here */}
-                </select>
-              </div>
-              {/* Status */}
-              <div>
-                <label className="block font-semibold mb-1">Status</label>
-                <select className="border rounded px-2 py-1" disabled>
-                  <option value="">All</option>
-                  <option value="sent">Sent</option>
-                  <option value="canceled">Canceled</option>
-                  <option value="draft">Draft</option>
-                </select>
-              </div>
-            </div>
             {/* Results Table */}
             <div className="bg-white border rounded p-0 overflow-x-auto">
               {emailArchiveLoading ? (
@@ -1225,14 +1187,13 @@ export default function MainApp() {
                         <td className="p-2">{row.FromAddress || ''}</td>
                         <td className="p-2">
                           {row.NumberSent ? (
-                            <a
-                              href={`/EmailsSendToSubscribers.html?jobId=${encodeURIComponent(row.ID)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
                               className="text-blue-600 underline cursor-pointer"
+                              onClick={() => setSelectedSendId(row.ID)}
+                              title="Show sent events for this JobID"
                             >
                               {row.NumberSent}
-                            </a>
+                            </button>
                           ) : ''}
                         </td>
                         <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
@@ -1248,7 +1209,7 @@ export default function MainApp() {
             {archiveTotalPages > 1 && (
               <div className="flex justify-center items-center gap-2 mt-4">
                 <button
-                  className="px-3 py-1 rounded border bg-gray-100"
+                  className={`px-3 py-1 rounded border ${archivePage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                   onClick={() => setArchivePage(p => Math.max(1, p - 1))}
                   disabled={archivePage === 1}
                 >
@@ -1256,12 +1217,54 @@ export default function MainApp() {
                 </button>
                 <span>Page {archivePage} of {archiveTotalPages}</span>
                 <button
-                  className="px-3 py-1 rounded border bg-gray-100"
+                  className={`px-3 py-1 rounded border ${archivePage === archiveTotalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                   onClick={() => setArchivePage(p => Math.min(archiveTotalPages, p + 1))}
                   disabled={archivePage === archiveTotalPages}
                 >
                   Next
                 </button>
+              </div>
+            )}
+            {/* SentEvent table */}
+            {selectedSendId && (
+              <div className="mt-8">
+                <h2 className="text-xl font-semibold mb-2">Sent Events for JobID: {selectedSendId}</h2>
+                {sentEventLoading ? (
+                  <div className="p-4 text-center text-gray-500">Loading sent events...</div>
+                ) : sentEventError ? (
+                  <div className="p-4 text-center text-red-600">{sentEventError}</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm border">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          <th className="p-2 text-left">SubscriberKey</th>
+                          <th className="p-2 text-left">Send Date</th>
+                          <th className="p-2 text-left">JobID (SendID)</th>
+                          <th className="p-2 text-left">ListID</th>
+                          <th className="p-2 text-left">TriggeredSendDefinitionObjectID</th>
+                          <th className="p-2 text-left">Preview</th>
+                          <th className="p-2 text-left">Download</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sentEventResults.length === 0 ? (
+                          <tr><td colSpan={7} className="p-8 text-center text-gray-500">No results found.</td></tr>
+                        ) : sentEventResults.map((row, idx) => (
+                          <tr key={idx} className="border-t">
+                            <td className="p-2">{row.SubscriberKey || ''}</td>
+                            <td className="p-2">{row.EventDate || ''}</td>
+                            <td className="p-2">{row.SendID || ''}</td>
+                            <td className="p-2">{row.ListID || ''}</td>
+                            <td className="p-2">{row.TriggeredSendDefinitionObjectID || ''}</td>
+                            <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
+                            <td className="p-2"><button className="text-green-600 hover:underline">⬇️ Download</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </>
