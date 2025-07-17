@@ -68,13 +68,23 @@ export default function MainApp() {
   const [emailArchiveResults, setEmailArchiveResults] = useState([]);
   const [emailArchiveLoading, setEmailArchiveLoading] = useState(false);
   const [emailArchiveError, setEmailArchiveError] = useState('');
-  const [archiveSearch, setArchiveSearch] = useState({ jobId: '', emailName: '', subject: '', sentDateFrom: '', sentDateTo: '' });
+  const [archiveSearch, setArchiveSearch] = useState({ jobId: '', emailName: '', subject: '' });
+  const [archivePage, setArchivePage] = useState(1);
+  const [archiveRowsPerPage, setArchiveRowsPerPage] = useState(5); // Reduced for better visibility
 
-  // Add state for selected SendID (JobID) for showing SentEvent table
+  // SentEvent table state
   const [selectedSendId, setSelectedSendId] = useState(null);
   const [sentEventResults, setSentEventResults] = useState([]);
   const [sentEventLoading, setSentEventLoading] = useState(false);
   const [sentEventError, setSentEventError] = useState('');
+  const [sentEventPage, setSentEventPage] = useState(1);
+  const [sentEventRowsPerPage, setSentEventRowsPerPage] = useState(5); // Reduced for better visibility
+  const [sentEventSubscriberKey, setSentEventSubscriberKey] = useState('');
+
+  // Sorting state for Table 1 (Email Archiving)
+  const [archiveSort, setArchiveSort] = useState({ key: null, direction: 'asc' });
+  // Sorting state for Table 2 (SentEvent)
+  const [sentEventSort, setSentEventSort] = useState({ key: null, direction: 'asc' });
 
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
@@ -710,6 +720,9 @@ export default function MainApp() {
   const fetchEmailArchive = async () => {
     setEmailArchiveLoading(true);
     setEmailArchiveError('');
+    setSelectedSendId(null); // Reset Table 2
+    setSentEventResults([]);
+    setSentEventPage(1);
     try {
       const params = new URLSearchParams();
       if (archiveSearch.jobId) params.append('jobId', archiveSearch.jobId);
@@ -742,22 +755,33 @@ export default function MainApp() {
   };
 
   // Email Archiving pagination state (declare only once at the top)
-  const [archivePage, setArchivePage] = useState(1);
   const archivePageSize = 10;
   const archiveTotalPages = Math.ceil(emailArchiveResults.length / archivePageSize);
-  const pagedArchiveResults = emailArchiveResults.slice((archivePage - 1) * archivePageSize, archivePage * archivePageSize);
 
-  // Helper to fetch sent events data
-  useEffect(() => {
-    if (!selectedSendId) return;
-    setSentEventLoading(true);
-    setSentEventError('');
-    fetch(`/api/email-archive/sent-events?jobId=${encodeURIComponent(selectedSendId)}`)
-      .then(res => res.json())
-      .then(data => setSentEventResults(Array.isArray(data) ? data : []))
-      .catch(() => setSentEventError('Failed to fetch sent events.'))
-      .finally(() => setSentEventLoading(false));
-  }, [selectedSendId]);
+  // Sorting logic for Table 1
+  const sortedArchiveResults = [...emailArchiveResults].sort((a, b) => {
+    if (!archiveSort.key) return 0;
+    const aVal = a[archiveSort.key] || '';
+    const bVal = b[archiveSort.key] || '';
+    if (aVal < bVal) return archiveSort.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return archiveSort.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+  const pagedArchiveResults = sortedArchiveResults.slice((archivePage-1)*archiveRowsPerPage, archivePage*archiveRowsPerPage);
+
+  // Sorting logic for Table 2
+  const filteredSentEventResults = sentEventResults.filter(row =>
+    !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
+  );
+  const sortedSentEventResults = [...filteredSentEventResults].sort((a, b) => {
+    if (!sentEventSort.key) return 0;
+    const aVal = a[sentEventSort.key] || '';
+    const bVal = b[sentEventSort.key] || '';
+    if (aVal < bVal) return sentEventSort.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sentEventSort.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+  const pagedSentEventResults = sortedSentEventResults.slice((sentEventPage-1)*sentEventRowsPerPage, sentEventPage*sentEventRowsPerPage);
 
   if (loading) {
     return (
@@ -1021,22 +1045,34 @@ export default function MainApp() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="p-2 text-left">Sent Date</th>
-                      <th className="p-2 text-left">Email Name</th>
-                      <th className="p-2 text-left">Subject</th>
-                      <th className="p-2 text-left">JobID</th>
-                      <th className="p-2 text-left">MID</th>
-                      <th className="p-2 text-left">From Name</th>
-                      <th className="p-2 text-left">From Email</th>
-                      <th className="p-2 text-left"># of emails Sent</th>
-                      <th className="p-2 text-left">Subscriber Key</th>
-                      <th className="p-2 text-left">Preview</th>
-                      <th className="p-2 text-left">Download</th>
+                      {['SentDate','EmailName','Subject','ID','MID','FromName','FromAddress','NumberSent','SubscriberKey'].map(col => (
+                        <th
+                          key={col}
+                          className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100"
+                          onClick={() => {
+                            setArchiveSort(s => ({
+                              key: col,
+                              direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc'
+                            }));
+                          }}
+                        >
+                          {col === 'ID' ? 'JobID' :
+                           col === 'MID' ? 'MID' :
+                           col === 'FromName' ? 'From Name' :
+                           col === 'FromAddress' ? 'From Email' :
+                           col === 'NumberSent' ? '# of emails Sent' :
+                           col === 'SubscriberKey' ? 'Subscriber Key' :
+                           col === 'SentDate' ? 'Sent Date' :
+                           col === 'EmailName' ? 'Email Name' :
+                           col === 'Subject' ? 'Subject' : col}
+                          {archiveSort.key === col && (archiveSort.direction === 'asc' ? ' ▲' : ' ▼')}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {pagedArchiveResults.length === 0 ? (
-                      <tr><td colSpan={11} className="p-8 text-center text-gray-500">No results found.</td></tr>
+                      <tr><td colSpan={9} className="p-8 text-center text-gray-500">No results found.</td></tr>
                     ) : pagedArchiveResults.map((row, idx) => (
                       <tr key={idx} className="border-t">
                         <td className="p-2">{row.SentDate || ''}</td>
@@ -1049,8 +1085,8 @@ export default function MainApp() {
                         <td className="p-2">
                           {row.NumberSent ? (
                             <button
-                              className="text-blue-600 underline cursor-pointer"
-                              onClick={() => setSelectedSendId(row.ID)}
+                              className="bg-yellow-400 text-black font-bold px-3 py-1 rounded shadow hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-600"
+                              onClick={() => { setSelectedSendId(row.ID); setSentEventPage(1); setSentEventSubscriberKey(''); }}
                               title="Show sent events for this JobID"
                             >
                               {row.NumberSent}
@@ -1058,8 +1094,6 @@ export default function MainApp() {
                           ) : ''}
                         </td>
                         <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
-                        <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
-                        <td className="p-2"><button className="text-green-600 hover:underline">⬇️ HTML</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -1160,22 +1194,34 @@ export default function MainApp() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="p-2 text-left">Sent Date</th>
-                      <th className="p-2 text-left">Email Name</th>
-                      <th className="p-2 text-left">Subject</th>
-                      <th className="p-2 text-left">JobID</th>
-                      <th className="p-2 text-left">MID</th>
-                      <th className="p-2 text-left">From Name</th>
-                      <th className="p-2 text-left">From Email</th>
-                      <th className="p-2 text-left"># of emails Sent</th>
-                      <th className="p-2 text-left">Subscriber Key</th>
-                      <th className="p-2 text-left">Preview</th>
-                      <th className="p-2 text-left">Download</th>
+                      {['SentDate','EmailName','Subject','ID','MID','FromName','FromAddress','NumberSent','SubscriberKey'].map(col => (
+                        <th
+                          key={col}
+                          className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100"
+                          onClick={() => {
+                            setArchiveSort(s => ({
+                              key: col,
+                              direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc'
+                            }));
+                          }}
+                        >
+                          {col === 'ID' ? 'JobID' :
+                           col === 'MID' ? 'MID' :
+                           col === 'FromName' ? 'From Name' :
+                           col === 'FromAddress' ? 'From Email' :
+                           col === 'NumberSent' ? '# of emails Sent' :
+                           col === 'SubscriberKey' ? 'Subscriber Key' :
+                           col === 'SentDate' ? 'Sent Date' :
+                           col === 'EmailName' ? 'Email Name' :
+                           col === 'Subject' ? 'Subject' : col}
+                          {archiveSort.key === col && (archiveSort.direction === 'asc' ? ' ▲' : ' ▼')}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {pagedArchiveResults.length === 0 ? (
-                      <tr><td colSpan={11} className="p-8 text-center text-gray-500">No results found.</td></tr>
+                      <tr><td colSpan={9} className="p-8 text-center text-gray-500">No results found.</td></tr>
                     ) : pagedArchiveResults.map((row, idx) => (
                       <tr key={idx} className="border-t">
                         <td className="p-2">{row.SentDate || ''}</td>
@@ -1188,8 +1234,8 @@ export default function MainApp() {
                         <td className="p-2">
                           {row.NumberSent ? (
                             <button
-                              className="text-blue-600 underline cursor-pointer"
-                              onClick={() => setSelectedSendId(row.ID)}
+                              className="bg-yellow-400 text-black font-bold px-3 py-1 rounded shadow hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-600"
+                              onClick={() => { setSelectedSendId(row.ID); setSentEventPage(1); setSentEventSubscriberKey(''); }}
                               title="Show sent events for this JobID"
                             >
                               {row.NumberSent}
@@ -1197,8 +1243,6 @@ export default function MainApp() {
                           ) : ''}
                         </td>
                         <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
-                        <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
-                        <td className="p-2"><button className="text-green-600 hover:underline">⬇️ HTML</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -1229,6 +1273,19 @@ export default function MainApp() {
             {selectedSendId && (
               <div className="mt-8">
                 <h2 className="text-xl font-semibold mb-2">Sent Events for JobID: {selectedSendId}</h2>
+                <div className="mb-4 flex items-center gap-2">
+                  <label className="font-semibold">Subscriber Key:</label>
+                  <input
+                    type="text"
+                    className="border rounded px-2 py-1"
+                    placeholder="Search Subscriber Key"
+                    value={sentEventSubscriberKey}
+                    onChange={e => { setSentEventSubscriberKey(e.target.value); setSentEventPage(1); }}
+                  />
+                  <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 ml-4" onClick={() => {/* TODO: implement export logic */}}>
+                    <span>📥</span> Export
+                  </button>
+                </div>
                 {sentEventLoading ? (
                   <div className="p-4 text-center text-gray-500">Loading sent events...</div>
                 ) : sentEventError ? (
@@ -1238,19 +1295,33 @@ export default function MainApp() {
                     <table className="min-w-full text-sm border">
                       <thead>
                         <tr className="bg-gray-100">
-                          <th className="p-2 text-left">SubscriberKey</th>
-                          <th className="p-2 text-left">Send Date</th>
-                          <th className="p-2 text-left">JobID (SendID)</th>
-                          <th className="p-2 text-left">ListID</th>
-                          <th className="p-2 text-left">TriggeredSendDefinitionObjectID</th>
+                          {['SubscriberKey','EventDate','SendID','ListID','TriggeredSendDefinitionObjectID'].map(col => (
+                            <th
+                              key={col}
+                              className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100"
+                              onClick={() => {
+                                setSentEventSort(s => ({
+                                  key: col,
+                                  direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc'
+                                }));
+                              }}
+                            >
+                              {col === 'SendID' ? 'JobID (SendID)' :
+                               col === 'EventDate' ? 'Send Date' :
+                               col === 'TriggeredSendDefinitionObjectID' ? 'TriggeredSendDefinitionObjectID' :
+                               col === 'SubscriberKey' ? 'SubscriberKey' :
+                               col === 'ListID' ? 'ListID' : col}
+                              {sentEventSort.key === col && (sentEventSort.direction === 'asc' ? ' ▲' : ' ▼')}
+                            </th>
+                          ))}
                           <th className="p-2 text-left">Preview</th>
                           <th className="p-2 text-left">Download</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {sentEventResults.length === 0 ? (
+                        {pagedSentEventResults.length === 0 ? (
                           <tr><td colSpan={7} className="p-8 text-center text-gray-500">No results found.</td></tr>
-                        ) : sentEventResults.map((row, idx) => (
+                        ) : pagedSentEventResults.map((row, idx) => (
                           <tr key={idx} className="border-t">
                             <td className="p-2">{row.SubscriberKey || ''}</td>
                             <td className="p-2">{row.EventDate || ''}</td>
@@ -1263,6 +1334,36 @@ export default function MainApp() {
                         ))}
                       </tbody>
                     </table>
+                    {/* Pagination for Table 2 */}
+                    {Math.ceil(sentEventResults.filter(row =>
+                      !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
+                    ).length / sentEventRowsPerPage) > 1 && (
+                      <div className="flex justify-center items-center gap-2 mt-4">
+                        <button
+                          className={`px-3 py-1 rounded border ${sentEventPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                          onClick={() => setSentEventPage(p => Math.max(1, p - 1))}
+                          disabled={sentEventPage === 1}
+                        >
+                          Prev
+                        </button>
+                        <span>Page {sentEventPage} of {Math.ceil(sentEventResults.filter(row =>
+                          !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
+                        ).length / sentEventRowsPerPage)}</span>
+                        <button
+                          className={`px-3 py-1 rounded border ${sentEventPage === Math.ceil(sentEventResults.filter(row =>
+                            !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
+                          ).length / sentEventRowsPerPage) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                          onClick={() => setSentEventPage(p => Math.min(Math.ceil(sentEventResults.filter(row =>
+                            !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
+                          ).length / sentEventRowsPerPage), p + 1))}
+                          disabled={sentEventPage === Math.ceil(sentEventResults.filter(row =>
+                            !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
+                          ).length / sentEventRowsPerPage)}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
