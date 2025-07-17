@@ -927,385 +927,54 @@ export default function MainApp() {
               </div>
             </div>
 
-            {/* Responsive search bar row */}
-            <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-2">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="border px-3 py-2 rounded w-full sm:w-64"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                style={{ maxWidth: 320 }}
-              />
-            </div>
-            {/* Tab buttons and CSV download */}
-            <div className="flex flex-wrap gap-2 mb-4 items-center">
-              {['de', 'automation', 'datafilter', 'journey', 'emailsenddefinition', 'publication'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 rounded text-sm ${activeTab === tab ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-                >
-                  {tab === 'emailsenddefinition' ? 'EmailSendDefinition' : tab.toUpperCase()}
-                </button>
-              ))}
-              <button
-                onClick={downloadCSV}
-                className="bg-green-600 text-white px-3 py-1 rounded text-sm ml-2"
-              >
-                Download CSV
-              </button>
-            </div>
-
-            <div className="overflow-x-auto bg-white shadow rounded">
-              {activeTab === 'emailsenddefinition' ? (
-                <div className="bg-white shadow rounded p-4 mt-4">
-                  <h2 className="text-xl font-bold mb-4 text-indigo-700">EmailSendDefinition Details</h2>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr>
-                          <th className="p-2">
-                            <input type="checkbox" checked={allSelected} onChange={toggleSelectAllESD} />
-                          </th>
-                          <th className="text-left p-2">Name</th>
-                          <th className="text-left p-2">SendClassification</th>
-                          <th className="text-left p-2">SenderProfile</th>
-                          <th className="text-left p-2">DeliveryProfile</th>
-                          <th className="text-left p-2">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(searchTerm ? getFilteredData().filter(item => item._type === 'EmailSendDefinition') : resolvedEmailSendDefs).map((esd, idx) => (
-                          <tr key={esd.CustomerKey} className="border-t">
-                            <td className="p-2">
-                              <input type="checkbox" checked={selectedESDKeys.includes(esd.CustomerKey)} onChange={() => toggleSelectESD(esd.CustomerKey)} />
-                            </td>
-                            <td className="p-2 font-medium">{esd.Name}</td>
-                            <td className="p-2">{getProfileName(sendClassifications, esd.SendClassification?.CustomerKey)}</td>
-                            <td className="p-2">{getProfileName(senderProfiles, esd.SenderProfile?.CustomerKey)}</td>
-                            <td className="p-2">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
-                            <td className="p-2">
-                              <button className="text-blue-600 hover:underline mr-2" onClick={() => openEditESDModal(esd)}>
-                                <span role="img" aria-label="Edit">✏️</span>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {selectedESDKeys.length > 0 && (
-                    <button
-                      className="mt-2 px-4 py-2 bg-blue-700 text-white rounded font-semibold"
-                      onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })}
-                    >
-                      Bulk Edit Selected ({selectedESDKeys.length})
-                    </button>
-                  )}
-                  {/* Debug block and other details remain hidden */}
-                </div>
-              ) : activeTab === 'publication' ? (
-                <div className="bg-white shadow rounded p-4 mt-4">
-                  <h2 className="text-xl font-bold mb-4 text-indigo-700">Publication Details</h2>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr>
-                          <th className="text-left p-2">ID</th>
-                          <th className="text-left p-2">Name</th>
-                          <th className="text-left p-2">Category</th>
-                          <th className="text-left p-2">CustomerKey</th>
-                          <th className="text-left p-2">BusinessUnit</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(searchTerm ? getFilteredData().filter(item => item._type === 'Publication') : publications).map((pub, idx) => (
-                          <tr key={pub.id || idx} className="border-t">
-                            <td className="p-2">{pub.id}</td>
-                            <td className="p-2 font-medium">{pub.name}</td>
-                            <td className="p-2">{pub.category}</td>
-                            <td className="p-2">{pub.customerKey || ''}</td>
-                            <td className="p-2">{pub.businessUnit || ''}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : (
-                // ...existing code for other tabs and search...
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th className="text-left p-2">Type</th>
-                      <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
-                      {/* Remove Created column for Automations */}
-                      <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
-                      {/* Hide 'View in folder' column for Automation and Journey */}
-                      {!(activeTab === 'automation' || activeTab === 'journey') && (
-                        <th className="text-left p-2">View in folder</th>
-                      )}
-                      {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
-                        <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
-                      ) : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedData().map((item, idx) => (
-                      <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
-                        onClick={() => {
-                          if (item._type === 'Data Extension') fetchDeDetails(item.name);
-                          if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
-                        }}
-                      >
-                        <td className="p-2">{item._type}</td>
-                        <td className="p-2 font-medium">{item.name}</td>
-                        {/* Remove Created column for Automations */}
-                        <td className="p-2">{item.path || 'N/A'}</td>
-                        {/* Hide 'View in folder' cell for Automation and Journey */}
-                        {!(item._type === 'Automation' || item._type === 'Journey') && (
-                          <td className="p-2">
-                            {/* Existing View in folder links for DE and Data Filter */}
-                            {item._type === 'Data Extension' && item.categoryId && item.id && (
-                              <a
-                                href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 underline hover:text-blue-800"
-                                onClick={e => e.stopPropagation()}
-                              >
-                                View
-                              </a>
-                            )}
-                            {item._type === 'Data Filter' && item.id && (
-                              <a
-                                href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 underline hover:text-blue-800 ml-2"
-                                onClick={e => e.stopPropagation()}
-                              >
-                                View
-                              </a>
-                            )}
-                          </td>
-                        )}
-                        {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
-                          <td className="p-2">{item.status || 'N/A'}</td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            <div className="flex justify-between items-center mt-4 text-sm">
+            {/* Distinct Search Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div>
-                Page {currentPage} of {totalPages}
+                <label className="block font-semibold mb-1">Job ID</label>
+                <input
+                  type="text"
+                  className="border rounded px-4 py-2 w-full"
+                  placeholder="Enter Job ID"
+                  value={archiveSearch.jobId}
+                  onChange={e => setArchiveSearch(s => ({ ...s, jobId: e.target.value, emailName: '', subject: '' }))}
+                />
               </div>
-              <div className="flex gap-2">
-                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
-                <button disabled={currentPage === totalPages || totalPages <= 1} onClick={() => setCurrentPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
+              <div>
+                <label className="block font-semibold mb-1">Subject</label>
+                <input
+                  type="text"
+                  className="border rounded px-4 py-2 w-full"
+                  placeholder="Enter Subject"
+                  value={archiveSearch.subject}
+                  onChange={e => setArchiveSearch(s => ({ ...s, subject: e.target.value, jobId: '', emailName: '' }))}
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Email Name</label>
+                <input
+                  type="text"
+                  className="border rounded px-4 py-2 w-full"
+                  placeholder="Enter Email Name"
+                  value={archiveSearch.emailName}
+                  onChange={e => setArchiveSearch(s => ({ ...s, emailName: e.target.value, jobId: '', subject: '' }))}
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Subscriber Key</label>
+                <input
+                  type="text"
+                  className="border rounded px-4 py-2 w-full"
+                  placeholder="Enter Subscriber Key (not yet implemented)"
+                  value={archiveSearch.subscriberKey || ''}
+                  onChange={e => setArchiveSearch(s => ({ ...s, subscriberKey: e.target.value, jobId: '', subject: '', emailName: '' }))}
+                  disabled
+                />
               </div>
             </div>
-
-            {/* Modal for DE details */}
-            {deDetailModal.open && (
-              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
-                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setDeDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
-                  <h2 className="text-lg font-bold mb-4 text-indigo-700">Data Extension Details: {deDetailModal.name}</h2>
-                  {deDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
-                  {deDetailModal.error && <div className="text-red-600">{deDetailModal.error}</div>}
-                  {deDetailModal.details && (
-                    <div className="space-y-2">
-                      <div><span className="font-semibold">Created By:</span> {deDetailModal.details.createdByName}</div>
-                      <div><span className="font-semibold">Modified By:</span> {deDetailModal.details.modifiedByName}</div>
-                      <div><span className="font-semibold">Row Count:</span> {deDetailModal.details.rowCount}</div>
-                      <div><span className="font-semibold">Is Sendable:</span> {deDetailModal.details.isSendable.toString()}</div>
-                      <div><span className="font-semibold">Is Testable:</span> {deDetailModal.details.isTestable.toString()}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Modal for Automation details */}
-            {automationDetailModal.open && (
-              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
-                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setAutomationDetailModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
-                  <h2 className="text-lg font-bold mb-4 text-green-700">Automation Details: {automationDetailModal.name}</h2>
-                  {automationDetailModal.loading && <div className="text-center py-4">Loading details...</div>}
-                  {automationDetailModal.error && <div className="text-red-600">{automationDetailModal.error}</div>}
-                  {automationDetailModal.details && (
-                    <div className="space-y-2">
-                      <div><span className="font-semibold">Start Date:</span> {automationDetailModal.details.startDate}</div>
-                      <div><span className="font-semibold">End Date:</span> {automationDetailModal.details.endDate}</div>
-                      <div><span className="font-semibold">Last Run Time:</span> {automationDetailModal.details.lastRunTime}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Modal for SendClassification details */}
-            {sendClassModal.open && (
-              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
-                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setSendClassModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
-                  <h2 className="text-lg font-bold mb-4 text-indigo-700">SendClassification Details: {sendClassModal.name}</h2>
-                  {sendClassModal.loading && <div className="text-center py-4">Loading details...</div>}
-                  {sendClassModal.error && <div className="text-red-600">{sendClassModal.error}</div>}
-                  {sendClassModal.details && Array.isArray(sendClassModal.details) && sendClassModal.details.length > 0 && (
-                    <div className="space-y-2">
-                      <div><span className="font-semibold">Name:</span> {sendClassModal.details[0].Name}</div>
-                      <div><span className="font-semibold">CustomerKey:</span> {sendClassModal.details[0].CustomerKey}</div>
-                      <div><span className="font-semibold">Description:</span> {sendClassModal.details[0].Description}</div>
-                    </div>
-                  )}
-                  {sendClassModal.details && Array.isArray(sendClassModal.details) && sendClassModal.details.length === 0 && (
-                    <div className="text-gray-600">No details found for this SendClassification.</div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Modal for SenderProfile details */}
-            {senderProfileModal.open && (
-              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
-                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setSenderProfileModal({ open: false, loading: false, error: null, details: null, name: null })}>&#10005;</button>
-                  <h2 className="text-lg font-bold mb-4 text-green-700">SenderProfile Details: {senderProfileModal.name}</h2>
-                  {senderProfileModal.loading && <div className="text-center py-4">Loading details...</div>}
-                  {senderProfileModal.error && <div className="text-red-600">{senderProfileModal.error}</div>}
-                  {senderProfileModal.details && Array.isArray(senderProfileModal.details) && senderProfileModal.details.length > 0 && (
-                    <div className="space-y-2">
-                      <div><span className="font-semibold">Name:</span> {senderProfileModal.details[0].Name}</div>
-                      <div><span className="font-semibold">CustomerKey:</span> {senderProfileModal.details[0].CustomerKey}</div>
-                      <div><span className="font-semibold">Description:</span> {senderProfileModal.details[0].Description}</div>
-                    </div>
-                  )}
-                  {senderProfileModal.details && Array.isArray(senderProfileModal.details) && senderProfileModal.details.length === 0 && (
-                    <div className="text-gray-600">No details found for this SenderProfile.</div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Modal for updating SenderProfile */}
-            {updateSenderProfileModal.open && (
-              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
-                  <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setUpdateSenderProfileModal({ open: false, loading: false, error: null, customerKey: null, selectedKey: '', success: false })}>&#10005;</button>
-                  <h2 className="text-lg font-bold mb-4 text-yellow-700">Update SenderProfile</h2>
-                  {updateSenderProfileModal.loading && <div className="text-center py-4">Updating...</div>}
-                  {updateSenderProfileModal.error && <div className="text-red-600">{updateSenderProfileModal.error}</div>}
-                  {updateSenderProfileModal.success && <div className="text-green-600">SenderProfile updated successfully!</div>}
-                  <div className="mb-4">
-                    <label className="block mb-2 font-semibold">Select new SenderProfile:</label>
-                    <select
-                      className="border rounded px-3 py-2 w-full"
-                      value={updateSenderProfileModal.selectedKey}
-                      onChange={e => setUpdateSenderProfileModal(modal => ({ ...modal, selectedKey: e.target.value }))}
-                    >
-                      <option value="" disabled>Select SenderProfile...</option>
-                      {senderProfiles.map(profile => (
-                        <option key={profile.CustomerKey} value={profile.CustomerKey}>{profile.Name} ({profile.CustomerKey})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    className="bg-yellow-600 text-white px-4 py-2 rounded font-semibold hover:bg-yellow-700"
-                    onClick={handleUpdateSenderProfile}
-                    disabled={!updateSenderProfileModal.selectedKey || updateSenderProfileModal.loading}
-                  >
-                    Update
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Modal for editing EmailSendDefinition */}
-            {editESDModal.open && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-                <div className="bg-white rounded shadow-lg p-6 w-full max-w-md relative">
-                  <h2 className="text-lg font-bold mb-4">Edit EmailSendDefinition</h2>
-                  {editESDModal.error && <div className="text-red-600 mb-2">{editESDModal.error}</div>}
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">Send Classification</label>
-                    <select
-                      className="w-full border rounded p-2"
-                      value={editESDModal.sendClassification}
-                      onChange={e => handleEditESDChange('sendClassification', e.target.value)}
-                    >
-                      <option value="">Select SendClassification</option>
-                      {sendClassifications.map(sc => (
-                        <option key={sc.CustomerKey} value={sc.CustomerKey}>{sc.Name || sc.CustomerKey}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">Sender Profile</label>
-                    <select
-                      className="w-full border rounded p-2"
-                      value={editESDModal.senderProfile}
-                      onChange={e => handleEditESDChange('senderProfile', e.target.value)}
-                    >
-                      <option value="">Select SenderProfile</option>
-                      {senderProfiles.map(sp => (
-                        <option key={sp.CustomerKey} value={sp.CustomerKey}>{sp.Name || sp.CustomerKey}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">Delivery Profile</label>
-                    <select
-                      className="w-full border rounded p-2"
-                      value={editESDModal.deliveryProfile}
-                      onChange={e => handleEditESDChange('deliveryProfile', e.target.value)}
-                    >
-                      <option value="">Select DeliveryProfile</option>
-                      {deliveryProfiles.map(dp => (
-                        <option key={dp.CustomerKey} value={dp.CustomerKey}>{dp.Name || dp.CustomerKey}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={submitEditESDModal}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded font-semibold hover:bg-indigo-700"
-                    >
-                      Save Changes
-                    </button>
-                    <button
-                      onClick={closeEditESDModal}
-                      className="bg-gray-300 text-gray-800 px-4 py-2 rounded"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        ) : parentNav === 'emailArchiving' ? (
-          <div className="bg-white shadow rounded p-6 max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold text-indigo-700 mb-6">Email Archiving</h2>
             {/* Top Navigation Bar */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-              {/* Search Bar */}
-              <input
-                type="text"
-                className="border rounded px-4 py-2 w-full md:w-96"
-                placeholder="🔍 Enter Subject, Email Name, JobID, or Subscriber Key"
-                value={archiveSearch.subject || archiveSearch.emailName || archiveSearch.jobId || ''}
-                onChange={e => setArchiveSearch(s => ({ ...s, subject: e.target.value, emailName: '', jobId: '' }))}
-              />
               {/* Buttons */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 ml-auto">
                 <button className="bg-blue-500 text-white px-4 py-2 rounded flex items-center gap-2" onClick={fetchEmailArchive}>
                   <span>🔁</span> Refresh
                 </button>
@@ -1382,8 +1051,9 @@ export default function MainApp() {
                 </table>
               )}
             </div>
-          </div>
+          </>
         ) : null}
+        {/* Add similar blocks for other parentNav values if needed */}
       </div>
     </div>
   );
