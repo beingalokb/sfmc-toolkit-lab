@@ -821,12 +821,14 @@ export default function MainApp() {
           >
             Search Assets
           </button>
+          {/*
           <button
             className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'preference' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
             onClick={() => setParentNav('preference')}
           >
             Guided Preference Center
           </button>
+          */}
           <button
             className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'distributedMarketing' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
             onClick={() => setParentNav('distributedMarketing')}
@@ -838,6 +840,12 @@ export default function MainApp() {
             onClick={() => setParentNav('preferencecenter')}
           >
             Preference Center
+          </button>
+          <button
+            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'emailArchiving' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+            onClick={() => setParentNav('emailArchiving')}
+          >
+            Email Archiving
           </button>
         </div>
         {/* Render content based on parentNav */}
@@ -1317,66 +1325,103 @@ export default function MainApp() {
               );
             })()}
           </>
-        ) : parentNav === 'preference' ? (
-          <div className="p-6 bg-white rounded shadow">
-            <h2 className="text-xl font-bold mb-4 text-indigo-700">How do you want your preference center to be set up?</h2>
-            <select
-              className="border rounded px-3 py-2 w-full mb-6"
-              value={guidedPrefOption || ''}
-              onChange={e => setGuidedPrefOption(e.target.value)}
-            >
-              <option value="" disabled>Select an option...</option>
-              <option value="no_sf_core">Marketing Cloud Preference Center with no Salesforce core integration</option>
-              <option value="sf_core_contact_lead">Marketing Cloud Preference Center with Salesforce core contact, Lead integration</option>
-              <option value="sf_core_consent">Marketing Cloud Preference Center with Salesforce core consent model</option>
-            </select>
-
-            {guidedPrefOption === 'no_sf_core' && (
-              <div className="mt-6 text-left">
-                <a
-                  href="/Custom%20Preference%20Center_No_SF_Integration.zip"
-                  download
-                  className="inline-block bg-indigo-600 text-white px-4 py-2 rounded font-semibold mb-4 hover:bg-indigo-700"
-                >
-                  Download Preference Center Package (ZIP)
-                </a>
-                <div className="bg-gray-50 border-l-4 border-indigo-400 p-4 rounded">
-                  <h3 className="font-bold mb-2 text-indigo-700">Instructions</h3>
-                  <ol className="list-decimal ml-6 text-sm text-gray-800 space-y-1">
-                    <li>In the <b>Package Manager</b> folder, deploy the JSON into SFMC via Package Manager.</li>
-                    <li>Go into the Cloud pages and do a search all and replace for the cloudpageURL IDs; there will be 2-3 that did not get deployed correctly.</li>
-                    <li>In <b>cpc_main</b> on line 301, ensure that the cloud page ID is for <b>cpc_main</b>.</li>
-                    <li>In <b>cpc_main</b> on line 331, ensure that the cloud page ID is for <b>cpc_handler</b>.</li>
-                    <li>In <b>cpc_handler</b>, every <b>CloudPagesURL</b> function should point to the cloud page ID for <b>cpc_main</b>.</li>
-                    <li>Test, validate, and add additional features as needed.</li>
-                    <li>To use the preference center, the url expects a <b>subkey</b> parameter at the end of the URL (e.g. <span className="break-all">https://mcf7bhdjzswk278tj2j38nqtlq2q.pub.sfmc-content.com/jqi02yqkmgp?subkey=TEST10001</span>).</li>
-                  </ol>
-                  <div className="mt-2 text-xs text-gray-600">
-                    <b>NOTE:</b> The preference center assumes that a record with email exists in All Subscribers.
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {guidedPrefOption === 'sf_core_contact_lead' && (
-              <div className="mt-6 text-left text-gray-600">
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                  <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core contact, Lead integration is in development.
-                </div>
-              </div>
-            )}
-
-            {guidedPrefOption === 'sf_core_consent' && (
-              <div className="mt-6 text-left text-gray-600">
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                  <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core consent model is in development.
-                </div>
-              </div>
-            )}
-          </div>
-        ) : parentNav === 'distributedMarketing' ? (
+        ) : parentNav === 'preference' ? null
+        : parentNav === 'distributedMarketing' ? (
           <div className="bg-white shadow rounded p-6 max-w-xl mx-auto">
             {renderDMQuickSend()}
+          </div>
+        ) : parentNav === 'emailArchiving' ? (
+          <div className="bg-white shadow rounded p-6 max-w-4xl mx-auto">
+            <h2 className="text-2xl font-bold text-indigo-700 mb-6">Email Archiving</h2>
+            {/* Top Navigation Bar */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+              {/* Search Bar */}
+              <input
+                type="text"
+                className="border rounded px-4 py-2 w-full md:w-96"
+                placeholder="🔍 Enter Subject, Email Name, JobID, or Subscriber Key"
+                // value={searchTerm} // Add state if needed
+                // onChange={e => setSearchTerm(e.target.value)}
+              />
+              {/* Buttons */}
+              <div className="flex gap-2">
+                <button className="bg-blue-500 text-white px-4 py-2 rounded flex items-center gap-2">
+                  <span>🔁</span> Refresh
+                </button>
+                <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2">
+                  <span>📥</span> Export
+                </button>
+                <button className="bg-gray-200 text-gray-800 px-4 py-2 rounded flex items-center gap-2">
+                  <span>⚙️</span> Settings
+                </button>
+              </div>
+            </div>
+            {/* Filters */}
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+              {/* Date Range */}
+              <div>
+                <label className="block font-semibold mb-1">Date Range 📆</label>
+                <input type="date" className="border rounded px-2 py-1 mr-2" />
+                <span className="mx-1">to</span>
+                <input type="date" className="border rounded px-2 py-1" />
+              </div>
+              {/* Business Unit */}
+              <div>
+                <label className="block font-semibold mb-1">Business Unit</label>
+                <select className="border rounded px-2 py-1">
+                  <option value="">All</option>
+                  {/* Map business units here */}
+                </select>
+              </div>
+              {/* Status */}
+              <div>
+                <label className="block font-semibold mb-1">Status</label>
+                <select className="border rounded px-2 py-1">
+                  <option value="">All</option>
+                  <option value="sent">Sent</option>
+                  <option value="canceled">Canceled</option>
+                  <option value="draft">Draft</option>
+                </select>
+              </div>
+            </div>
+            {/* Placeholder for archived emails table/list */}
+            <div className="bg-white border rounded p-0 overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="p-2 text-left">Sent Date</th>
+                    <th className="p-2 text-left">Email Name</th>
+                    <th className="p-2 text-left">Subject</th>
+                    <th className="p-2 text-left">JobID</th>
+                    <th className="p-2 text-left">Subscriber Key</th>
+                    <th className="p-2 text-left">Preview</th>
+                    <th className="p-2 text-left">Download</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Example static rows, replace with dynamic data later */}
+                  <tr className="border-t">
+                    <td className="p-2">2025-07-10</td>
+                    <td className="p-2">July Newsletter</td>
+                    <td className="p-2">Big Summer Sale</td>
+                    <td className="p-2">123456789</td>
+                    <td className="p-2"><a href="mailto:john.doe@example.com" className="text-blue-600 underline">john.doe@example.com</a></td>
+                    <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
+                    <td className="p-2"><button className="text-green-600 hover:underline">⬇️ HTML</button></td>
+                  </tr>
+                  <tr className="border-t">
+                    <td className="p-2">2025-07-12</td>
+                    <td className="p-2">Product Launch</td>
+                    <td className="p-2">Introducing X2000</td>
+                    <td className="p-2">123456790</td>
+                    <td className="p-2"><a href="mailto:jane.smith@example.com" className="text-blue-600 underline">jane.smith@example.com</a></td>
+                    <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
+                    <td className="p-2"><button className="text-green-600 hover:underline">⬇️ HTML</button></td>
+                  </tr>
+                  {/* ...more rows as needed... */}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : null}
 
