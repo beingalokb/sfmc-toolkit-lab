@@ -4,6 +4,7 @@ import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
 import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
 import PreferenceCenterConfigForm from './PreferenceCenterConfigForm';
 import EmailsSendToSubscribers from './EmailsSendToSubscribers';
+import DMWizard from './components/DMWizard';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -1382,6 +1383,23 @@ export default function MainApp() {
               </div>
             )}
           </>
+        ) : null}
+        {parentNav === 'distributedMarketing' ? (
+          <div className="p-6">
+            <h2 className="text-2xl font-bold text-indigo-700 mb-4">Distributed Marketing</h2>
+            {/* Render the Distributed Marketing Wizard */}
+            <DMWizard />
+          </div>
+        ) : null}
+        {parentNav === 'preferencecenter' ? (
+          <div className="p-6">
+            <h2 className="text-2xl font-bold text-indigo-700 mb-4">Preference Center</h2>
+            {/* Render Preference Center Project Form by default, add logic to switch forms as needed */}
+            <PreferenceCenterProjectForm />
+            {/* Example: Uncomment and add logic to show these as needed */}
+            {/* <PreferenceCenterNoCoreForm /> */}
+            {/* <PreferenceCenterConfigForm /> */}
+          </div>
         ) : null}
         {/* Add similar blocks for other parentNav values if needed */}
       </div>
