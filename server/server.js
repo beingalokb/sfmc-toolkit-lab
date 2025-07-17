@@ -18,6 +18,8 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const upsertRow = require('./upsertRow');
+const retrieveSendByJobId = require('./retrieveSend');
+const { retrieveSendWithFilter } = require('./retrieveSend');
 
 const app = express();
 app.use(express.json());
@@ -2734,6 +2736,55 @@ async function createPublicationListSOAP(listName, accessToken, subdomain) {
   console.log(`[✔] Publication List '${listName}' created successfully.`);
   return true;
 }
+
+// Retrieve Send (Job) details by Job ID, EmailName, Subject, or SentDate range
+app.get('/api/email-archive/send', async (req, res) => {
+  try {
+    const { jobId, emailName, subject, sentDateFrom, sentDateTo } = req.query;
+    const subdomain = getSubdomainFromRequest(req);
+    const accessToken = getAccessTokenFromRequest(req);
+    if (!subdomain || !accessToken) return res.status(401).json({ error: 'Missing subdomain or access token' });
+
+    // Build filter
+    let filter = null;
+    if (jobId) {
+      filter = { property: 'ID', operator: 'equals', value: jobId };
+    } else if (emailName) {
+      filter = { property: 'EmailName', operator: 'equals', value: emailName };
+    } else if (subject) {
+      filter = { property: 'Subject', operator: 'equals', value: subject };
+    } else if (sentDateFrom && sentDateTo) {
+      filter = {
+        left: { property: 'SentDate', operator: 'greaterThanOrEqual', value: sentDateFrom },
+        logicalOperator: 'AND',
+        right: { property: 'SentDate', operator: 'lessThanOrEqual', value: sentDateTo }
+      };
+    } else {
+      return res.status(400).json({ error: 'Provide jobId, emailName, subject, or sentDateFrom & sentDateTo' });
+    }
+
+    const xml = await retrieveSendWithFilter(subdomain, accessToken, filter);
+    // Parse XML to JSON
+    const parsed = await xml2js.parseStringPromise(xml, { explicitArray: false });
+    // Extract results from SOAP response
+    let results = [];
+    try {
+      const retrieveResponse = parsed['soap:Envelope']['soap:Body']['RetrieveResponseMsg']['Results'];
+      if (Array.isArray(retrieveResponse)) {
+        results = retrieveResponse;
+      } else if (retrieveResponse) {
+        results = [retrieveResponse];
+      }
+    } catch (e) {
+      // fallback: return empty array if parsing fails
+      results = [];
+    }
+    res.json({ results });
+  } catch (err) {
+    console.error('❌ Error retrieving send:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 

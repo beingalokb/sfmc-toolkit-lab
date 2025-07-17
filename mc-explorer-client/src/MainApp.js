@@ -63,6 +63,12 @@ export default function MainApp() {
   // Add projectName state
   const [projectName, setProjectName] = useState('');
 
+  // Email Archiving state
+  const [emailArchiveResults, setEmailArchiveResults] = useState([]);
+  const [emailArchiveLoading, setEmailArchiveLoading] = useState(false);
+  const [emailArchiveError, setEmailArchiveError] = useState('');
+  const [archiveSearch, setArchiveSearch] = useState({ jobId: '', emailName: '', subject: '', sentDateFrom: '', sentDateTo: '' });
+
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
     if (!key) return '';
@@ -693,6 +699,41 @@ export default function MainApp() {
     }
   }
 
+  // Fetch email archive results
+  const fetchEmailArchive = async () => {
+    setEmailArchiveLoading(true);
+    setEmailArchiveError('');
+    try {
+      const params = new URLSearchParams();
+      if (archiveSearch.jobId) params.append('jobId', archiveSearch.jobId);
+      if (archiveSearch.emailName) params.append('emailName', archiveSearch.emailName);
+      if (archiveSearch.subject) params.append('subject', archiveSearch.subject);
+      if (archiveSearch.sentDateFrom && archiveSearch.sentDateTo) {
+        params.append('sentDateFrom', archiveSearch.sentDateFrom);
+        params.append('sentDateTo', archiveSearch.sentDateTo);
+      }
+      const res = await fetch(`/api/email-archive/send?${params.toString()}`);
+      const data = await res.json();
+      setEmailArchiveResults(data.results || []);
+    } catch (e) {
+      setEmailArchiveError('Failed to fetch email archive results.');
+    } finally {
+      setEmailArchiveLoading(false);
+    }
+  };
+
+  // Search handler for email archiving
+  const handleArchiveSearch = (e) => {
+    e.preventDefault();
+    fetchEmailArchive();
+  };
+
+  // Reset search form
+  const resetArchiveSearch = () => {
+    setArchiveSearch({ jobId: '', emailName: '', subject: '', sentDateFrom: '', sentDateTo: '' });
+    setEmailArchiveResults([]);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -1224,7 +1265,7 @@ export default function MainApp() {
                     <select
                       className="w-full border rounded p-2"
                       value={editESDModal.deliveryProfile}
-                      onChange={e => handleEditESDChange('deliveryProfile', e.target.value)}
+                      onChange={e => handleEditESDModal('deliveryProfile', e.target.value)}
                     >
                       <option value="">Select DeliveryProfile</option>
                       {deliveryProfiles.map(dp => (
@@ -1233,103 +1274,23 @@ export default function MainApp() {
                     </select>
                   </div>
                   <div className="flex justify-end gap-2">
-                    <button onClick={closeEditESDModal} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-                    <button onClick={submitEditESDModal} className="px-4 py-2 bg-blue-600 text-white rounded" disabled={editESDModal.loading}>
-                      {editESDModal.loading ? 'Saving...' : 'Save'}
+                    <button
+                      onClick={submitEditESDModal}
+                      className="bg-indigo-600 text-white px-4 py-2 rounded font-semibold hover:bg-indigo-700"
+                    >
+                      Save Changes
+                    </button>
+                    <button
+                      onClick={closeEditESDModal}
+                      className="bg-gray-300 text-gray-800 px-4 py-2 rounded"
+                    >
+                      Cancel
                     </button>
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Bulk Edit Modal */}
-            {massEditModal.open && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-                <div className="bg-white rounded shadow-lg p-6 w-full max-w-md relative">
-                  <h2 className="text-lg font-bold mb-4">Bulk Edit EmailSendDefinitions</h2>
-                  {massEditModal.error && <div className="text-red-600 mb-2">{massEditModal.error}</div>}
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">Send Classification</label>
-                    <select
-                      className="w-full border rounded p-2"
-                      value={massEditModal.sendClassification}
-                      onChange={e => setMassEditModal(prev => ({ ...prev, sendClassification: e.target.value }))}
-                    >
-                      <option value="">(No Change)</option>
-                      {sendClassifications.map(sc => (
-                        <option key={sc.CustomerKey} value={sc.CustomerKey}>{sc.Name || sc.CustomerKey}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">Sender Profile</label>
-                    <select
-                      className="w-full border rounded p-2"
-                      value={massEditModal.senderProfile}
-                      onChange={e => setMassEditModal(prev => ({ ...prev, senderProfile: e.target.value }))}
-                    >
-                      <option value="">(No Change)</option>
-                      {senderProfiles.map(sp => (
-                        <option key={sp.CustomerKey} value={sp.CustomerKey}>{sp.Name || sp.CustomerKey}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">Delivery Profile</label>
-                    <select
-                      className="w-full border rounded p-2"
-                      value={massEditModal.deliveryProfile}
-                      onChange={e => setMassEditModal(prev => ({ ...prev, deliveryProfile: e.target.value }))}
-                    >
-                      <option value="">(No Change)</option>
-                      {deliveryProfiles.map(dp => (
-                        <option key={dp.CustomerKey} value={dp.CustomerKey}>{dp.Name || dp.CustomerKey}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <button onClick={() => setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-                    <button onClick={submitMassEditModal} className="px-4 py-2 bg-blue-600 text-white rounded" disabled={massEditModal.loading}>
-                      {massEditModal.loading ? 'Saving...' : 'Save'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Show DE info block after creation */}
-            {dmDEPath && (() => {
-              let deName = '';
-              if (dmDEPath) {
-                const parts = dmDEPath.split('/');
-                deName = parts[parts.length - 1];
-              }
-              return (
-                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
-                  <div className="text-green-800 font-bold mb-2">Data Extension created!</div>
-                  <div className="mb-2 text-gray-800">
-                    <span className="font-semibold">Your data extension name is:</span> <span className="font-mono text-blue-900">{deName || 'N/A'}</span>
-                  </div>
-                  <div className="mb-2 text-gray-800">
-                    <span className="font-semibold">The data extension path is:</span> <span className="font-mono text-blue-900">Data Extensions &gt; {deName || 'N/A'}</span>
-                  </div>
-                  <div className="mb-2 text-gray-800">
-                    <span className="font-semibold">We have set the below attributes in the data extension:</span>
-                    <ul className="list-disc ml-6 mt-1">
-                      <li><span className="font-semibold">USED FOR SENDING: Yes</span></li>
-                      <li><span className="font-semibold">USED FOR TESTING: Yes</span></li>
-                      <li><span className="font-semibold">SUBSCRIBER RELATIONSHIP: id relates to Subscribers on Subscriber Key</span></li>
-                    </ul>
-                  </div>
-                </div>
-              );
-            })()}
           </>
-        ) : parentNav === 'preference' ? null
-        : parentNav === 'distributedMarketing' ? (
-          <div className="bg-white shadow rounded p-6 max-w-xl mx-auto">
-            {renderDMQuickSend()}
-          </div>
         ) : parentNav === 'emailArchiving' ? (
           <div className="bg-white shadow rounded p-6 max-w-4xl mx-auto">
             <h2 className="text-2xl font-bold text-indigo-700 mb-6">Email Archiving</h2>
@@ -1340,18 +1301,18 @@ export default function MainApp() {
                 type="text"
                 className="border rounded px-4 py-2 w-full md:w-96"
                 placeholder="🔍 Enter Subject, Email Name, JobID, or Subscriber Key"
-                // value={searchTerm} // Add state if needed
-                // onChange={e => setSearchTerm(e.target.value)}
+                value={archiveSearch.subject || archiveSearch.emailName || archiveSearch.jobId || ''}
+                onChange={e => setArchiveSearch(s => ({ ...s, subject: e.target.value, emailName: '', jobId: '' }))}
               />
               {/* Buttons */}
               <div className="flex gap-2">
-                <button className="bg-blue-500 text-white px-4 py-2 rounded flex items-center gap-2">
+                <button className="bg-blue-500 text-white px-4 py-2 rounded flex items-center gap-2" onClick={fetchEmailArchive}>
                   <span>🔁</span> Refresh
                 </button>
-                <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2">
+                <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2" disabled>
                   <span>📥</span> Export
                 </button>
-                <button className="bg-gray-200 text-gray-800 px-4 py-2 rounded flex items-center gap-2">
+                <button className="bg-gray-200 text-gray-800 px-4 py-2 rounded flex items-center gap-2" disabled>
                   <span>⚙️</span> Settings
                 </button>
               </div>
@@ -1361,14 +1322,14 @@ export default function MainApp() {
               {/* Date Range */}
               <div>
                 <label className="block font-semibold mb-1">Date Range 📆</label>
-                <input type="date" className="border rounded px-2 py-1 mr-2" />
+                <input type="date" className="border rounded px-2 py-1 mr-2" value={archiveSearch.sentDateFrom} onChange={e => setArchiveSearch(s => ({ ...s, sentDateFrom: e.target.value }))} />
                 <span className="mx-1">to</span>
-                <input type="date" className="border rounded px-2 py-1" />
+                <input type="date" className="border rounded px-2 py-1" value={archiveSearch.sentDateTo} onChange={e => setArchiveSearch(s => ({ ...s, sentDateTo: e.target.value }))} />
               </div>
               {/* Business Unit */}
               <div>
                 <label className="block font-semibold mb-1">Business Unit</label>
-                <select className="border rounded px-2 py-1">
+                <select className="border rounded px-2 py-1" disabled>
                   <option value="">All</option>
                   {/* Map business units here */}
                 </select>
@@ -1376,7 +1337,7 @@ export default function MainApp() {
               {/* Status */}
               <div>
                 <label className="block font-semibold mb-1">Status</label>
-                <select className="border rounded px-2 py-1">
+                <select className="border rounded px-2 py-1" disabled>
                   <option value="">All</option>
                   <option value="sent">Sent</option>
                   <option value="canceled">Canceled</option>
@@ -1384,155 +1345,46 @@ export default function MainApp() {
                 </select>
               </div>
             </div>
-            {/* Placeholder for archived emails table/list */}
+            {/* Results Table */}
             <div className="bg-white border rounded p-0 overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="p-2 text-left">Sent Date</th>
-                    <th className="p-2 text-left">Email Name</th>
-                    <th className="p-2 text-left">Subject</th>
-                    <th className="p-2 text-left">JobID</th>
-                    <th className="p-2 text-left">Subscriber Key</th>
-                    <th className="p-2 text-left">Preview</th>
-                    <th className="p-2 text-left">Download</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Example static rows, replace with dynamic data later */}
-                  <tr className="border-t">
-                    <td className="p-2">2025-07-10</td>
-                    <td className="p-2">July Newsletter</td>
-                    <td className="p-2">Big Summer Sale</td>
-                    <td className="p-2">123456789</td>
-                    <td className="p-2"><a href="mailto:john.doe@example.com" className="text-blue-600 underline">john.doe@example.com</a></td>
-                    <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
-                    <td className="p-2"><button className="text-green-600 hover:underline">⬇️ HTML</button></td>
-                  </tr>
-                  <tr className="border-t">
-                    <td className="p-2">2025-07-12</td>
-                    <td className="p-2">Product Launch</td>
-                    <td className="p-2">Introducing X2000</td>
-                    <td className="p-2">123456790</td>
-                    <td className="p-2"><a href="mailto:jane.smith@example.com" className="text-blue-600 underline">jane.smith@example.com</a></td>
-                    <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
-                    <td className="p-2"><button className="text-green-600 hover:underline">⬇️ HTML</button></td>
-                  </tr>
-                  {/* ...more rows as needed... */}
-                </tbody>
-              </table>
+              {emailArchiveLoading ? (
+                <div className="p-8 text-center text-gray-500">Loading...</div>
+              ) : emailArchiveError ? (
+                <div className="p-8 text-center text-red-600">{emailArchiveError}</div>
+              ) : (
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="p-2 text-left">Sent Date</th>
+                      <th className="p-2 text-left">Email Name</th>
+                      <th className="p-2 text-left">Subject</th>
+                      <th className="p-2 text-left">JobID</th>
+                      <th className="p-2 text-left">Subscriber Key</th>
+                      <th className="p-2 text-left">Preview</th>
+                      <th className="p-2 text-left">Download</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {emailArchiveResults.length === 0 ? (
+                      <tr><td colSpan={7} className="p-8 text-center text-gray-500">No results found.</td></tr>
+                    ) : emailArchiveResults.map((row, idx) => (
+                      <tr key={idx} className="border-t">
+                        <td className="p-2">{row.SentDate || ''}</td>
+                        <td className="p-2">{row.EmailName || ''}</td>
+                        <td className="p-2">{row.Subject || ''}</td>
+                        <td className="p-2">{row.ID || ''}</td>
+                        <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
+                        <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
+                        <td className="p-2"><button className="text-green-600 hover:underline">⬇️ HTML</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         ) : null}
-
-        {/* Render content for Preference Center config */}
-        {parentNav === 'preferencecenter' && (
-          <div className="bg-white shadow rounded p-6 max-w-xl mx-auto" id="preferencecenter-success-section">
-            {qsStatus && qsStatus.startsWith('✅') && (
-              <div className="bg-green-50 border border-green-300 text-green-800 rounded p-4 mb-4" id="preferencecenter-success-message">
-                <div className="text-2xl mb-2">✅ Configuration Completed Successfully!</div>
-                <div className="mb-2 font-semibold">Your Preference Center setup is now complete.</div>
-                <ul className="mb-2 list-disc pl-6">
-                  <li><b>PC_Controller</b>: This Data Extension contains all the configuration values used to render your dynamic Preference Center (labels, instructions, integration type, branding, etc.).</li>
-                  <li><b>PC_Log</b>: This Data Extension automatically tracks all subscriber preference updates, including old vs. new values for audit and compliance.</li>
-                </ul>
-                <div className="mb-2">Both Data Extensions are created under your Data Extensions folder.</div>
-                <div className="mb-2 font-semibold">Below is your ready-to-use CloudPage code. You can paste this into a new CloudPage to get started. Feel free to customize the HTML layout and styling to match your brand.</div>
-                <CloudPageCodeSample />
-              </div>
-            )}
-            <PreferenceCenterConfigForm 
-              onSubmit={async config => {
-                setQSStatus('Submitting configuration...');
-                setQSLoading(true);
-                try {
-                  const res = await fetch(`${baseURL}/preference-center/configure`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
-                  });
-                  const json = await res.json();
-                  if (json.status === 'OK') {
-                    setQSStatus('✅ Configuration Completed Successfully!');
-                    setTimeout(() => {
-                      const el = document.getElementById('preferencecenter-success-section');
-
-
-
-
-
-                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 100);
-                  } else {
-                    setQSStatus('❌ Failed to submit configuration: ' + (json.message || 'Unknown error'));
-                  }
-                } catch (e) {
-                  setQSStatus('❌ Error submitting configuration.');
-                } finally {
-                  setQSLoading(false);
-                }
-              }} 
-              submitting={qsLoading}
-            />
-          </div>
-        )}
       </div>
-    </div>
-  );
-}
-
-function formatDate(dateStr) {
-  if (!dateStr || dateStr === 'N/A' || dateStr === 'Not Available') return 'N/A';
-  const d = new Date(dateStr);
-  if (isNaN(d)) return dateStr;
-  return d.toLocaleString('en-GB', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).replace(',', '');
-}
-
-function CloudPageCodeSample() {
-  const [codeSample, setCodeSample] = React.useState('');
-  const [copied, setCopied] = React.useState(false);
-
-  useEffect(() => {
-    fetch(process.env.PUBLIC_URL + '/MC_only_Preference_Code.html')
-      .then(res => res.text())
-      .then(setCodeSample);
-  }, []);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(codeSample);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  const handleDownload = () => {
-    const blob = new Blob([codeSample], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'PreferenceCenterCloudPage.html';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className="mb-2">
-      <div className="flex items-center mb-1">
-        <span className="font-semibold mr-2">Show Code:</span>
-        <button onClick={handleCopy} className="bg-indigo-600 text-white px-2 py-1 rounded text-xs mr-2">{copied ? 'Copied!' : 'Copy'}</button>
-        <button onClick={handleDownload} className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs">Download as .html</button>
-      </div>
-      <textarea
-        className="w-full font-mono text-xs p-2 border rounded bg-gray-100"
-        rows={16}
-        value={codeSample}
-        readOnly
-      />
     </div>
   );
 }
