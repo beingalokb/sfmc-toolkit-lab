@@ -734,6 +734,12 @@ export default function MainApp() {
     setEmailArchiveResults([]);
   };
 
+  // Email Archiving pagination state (declare only once at the top)
+  const [archivePage, setArchivePage] = useState(1);
+  const archivePageSize = 10;
+  const archiveTotalPages = Math.ceil(emailArchiveResults.length / archivePageSize);
+  const pagedArchiveResults = emailArchiveResults.slice((archivePage - 1) * archivePageSize, archivePage * archivePageSize);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -1028,20 +1034,39 @@ export default function MainApp() {
                       <th className="p-2 text-left">Email Name</th>
                       <th className="p-2 text-left">Subject</th>
                       <th className="p-2 text-left">JobID</th>
+                      <th className="p-2 text-left">MID</th>
+                      <th className="p-2 text-left">From Name</th>
+                      <th className="p-2 text-left">From Email</th>
+                      <th className="p-2 text-left"># of emails Sent</th>
                       <th className="p-2 text-left">Subscriber Key</th>
                       <th className="p-2 text-left">Preview</th>
                       <th className="p-2 text-left">Download</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {emailArchiveResults.length === 0 ? (
-                      <tr><td colSpan={7} className="p-8 text-center text-gray-500">No results found.</td></tr>
-                    ) : emailArchiveResults.map((row, idx) => (
+                    {pagedArchiveResults.length === 0 ? (
+                      <tr><td colSpan={11} className="p-8 text-center text-gray-500">No results found.</td></tr>
+                    ) : pagedArchiveResults.map((row, idx) => (
                       <tr key={idx} className="border-t">
                         <td className="p-2">{row.SentDate || ''}</td>
                         <td className="p-2">{row.EmailName || ''}</td>
                         <td className="p-2">{row.Subject || ''}</td>
                         <td className="p-2">{row.ID || ''}</td>
+                        <td className="p-2">{row.MID || ''}</td>
+                        <td className="p-2">{row.FromName || ''}</td>
+                        <td className="p-2">{row.FromAddress || ''}</td>
+                        <td className="p-2">
+                          {row.NumberSent ? (
+                            <a
+                              href={`/EmailsSendToSubscribers.html?jobId=${encodeURIComponent(row.ID)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 underline cursor-pointer"
+                            >
+                              {row.NumberSent}
+                            </a>
+                          ) : ''}
+                        </td>
                         <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
                         <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
                         <td className="p-2"><button className="text-green-600 hover:underline">⬇️ HTML</button></td>
@@ -1051,6 +1076,26 @@ export default function MainApp() {
                 </table>
               )}
             </div>
+            {/* Pagination Controls */}
+            {archiveTotalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-4">
+                <button
+                  className="px-3 py-1 rounded border bg-gray-100"
+                  onClick={() => setArchivePage(p => Math.max(1, p - 1))}
+                  disabled={archivePage === 1}
+                >
+                  Prev
+                </button>
+                <span>Page {archivePage} of {archiveTotalPages}</span>
+                <button
+                  className="px-3 py-1 rounded border bg-gray-100"
+                  onClick={() => setArchivePage(p => Math.min(archiveTotalPages, p + 1))}
+                  disabled={archivePage === archiveTotalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </>
         ) : null}
         {parentNav === 'emailArchiving' ? (
@@ -1157,20 +1202,39 @@ export default function MainApp() {
                       <th className="p-2 text-left">Email Name</th>
                       <th className="p-2 text-left">Subject</th>
                       <th className="p-2 text-left">JobID</th>
+                      <th className="p-2 text-left">MID</th>
+                      <th className="p-2 text-left">From Name</th>
+                      <th className="p-2 text-left">From Email</th>
+                      <th className="p-2 text-left"># of emails Sent</th>
                       <th className="p-2 text-left">Subscriber Key</th>
                       <th className="p-2 text-left">Preview</th>
                       <th className="p-2 text-left">Download</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {emailArchiveResults.length === 0 ? (
-                      <tr><td colSpan={7} className="p-8 text-center text-gray-500">No results found.</td></tr>
-                    ) : emailArchiveResults.map((row, idx) => (
+                    {pagedArchiveResults.length === 0 ? (
+                      <tr><td colSpan={11} className="p-8 text-center text-gray-500">No results found.</td></tr>
+                    ) : pagedArchiveResults.map((row, idx) => (
                       <tr key={idx} className="border-t">
                         <td className="p-2">{row.SentDate || ''}</td>
                         <td className="p-2">{row.EmailName || ''}</td>
                         <td className="p-2">{row.Subject || ''}</td>
                         <td className="p-2">{row.ID || ''}</td>
+                        <td className="p-2">{row.MID || ''}</td>
+                        <td className="p-2">{row.FromName || ''}</td>
+                        <td className="p-2">{row.FromAddress || ''}</td>
+                        <td className="p-2">
+                          {row.NumberSent ? (
+                            <a
+                              href={`/EmailsSendToSubscribers.html?jobId=${encodeURIComponent(row.ID)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 underline cursor-pointer"
+                            >
+                              {row.NumberSent}
+                            </a>
+                          ) : ''}
+                        </td>
                         <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
                         <td className="p-2"><button className="text-indigo-600 hover:underline">👁️ View</button></td>
                         <td className="p-2"><button className="text-green-600 hover:underline">⬇️ HTML</button></td>
@@ -1180,6 +1244,26 @@ export default function MainApp() {
                 </table>
               )}
             </div>
+            {/* Pagination Controls */}
+            {archiveTotalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-4">
+                <button
+                  className="px-3 py-1 rounded border bg-gray-100"
+                  onClick={() => setArchivePage(p => Math.max(1, p - 1))}
+                  disabled={archivePage === 1}
+                >
+                  Prev
+                </button>
+                <span>Page {archivePage} of {archiveTotalPages}</span>
+                <button
+                  className="px-3 py-1 rounded border bg-gray-100"
+                  onClick={() => setArchivePage(p => Math.min(archiveTotalPages, p + 1))}
+                  disabled={archivePage === archiveTotalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </>
         ) : null}
         {/* Add similar blocks for other parentNav values if needed */}

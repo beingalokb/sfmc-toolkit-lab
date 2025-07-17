@@ -28,6 +28,7 @@ async function retrieveSendByJobId(subdomain, accessToken, jobId) {
             <ns:Properties>BccEmail</ns:Properties>
             <ns:Properties>CreatedDate</ns:Properties>
             <ns:Properties>NumberSent</ns:Properties>
+            <ns:Properties>Client.ID</ns:Properties>
             <ns:Filter xsi:type="ns:SimpleFilterPart" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
               <ns:Property>Email.ID</ns:Property>
               <ns:SimpleOperator>equals</ns:SimpleOperator>
@@ -101,7 +102,8 @@ async function retrieveSendWithFilter(subdomain, accessToken, filter) {
             <ns:Properties>BccEmail</ns:Properties>
             <ns:Properties>CreatedDate</ns:Properties>
             <ns:Properties>NumberSent</ns:Properties>
-            ${buildFilterXML(filter)}
+            <ns:Properties>Client.ID</ns:Properties>
+            ${filter ? buildFilterXML(filter) : ''}
           </ns:RetrieveRequest>
         </ns:RetrieveRequestMsg>
       </soapenv:Body>

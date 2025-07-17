@@ -2745,7 +2745,7 @@ app.get('/api/email-archive/send', async (req, res) => {
     const accessToken = getAccessTokenFromRequest(req);
     if (!subdomain || !accessToken) return res.status(401).json({ error: 'Missing subdomain or access token' });
 
-    // Build filter
+    // Build filter (null means fetch all)
     let filter = null;
     if (jobId) {
       filter = { property: 'ID', operator: 'equals', value: jobId };
@@ -2759,11 +2759,9 @@ app.get('/api/email-archive/send', async (req, res) => {
         logicalOperator: 'AND',
         right: { property: 'SentDate', operator: 'lessThanOrEqual', value: sentDateTo }
       };
-    } else {
-      return res.status(400).json({ error: 'Provide jobId, emailName, subject, or sentDateFrom & sentDateTo' });
-    }
+    } // else: filter remains null (fetch all)
 
-    const xml = await retrieveSendWithFilter(subdomain, accessToken, filter);
+    const xml = await require('./retrieveSend').retrieveSendWithFilter(subdomain, accessToken, filter);
     // Parse XML to JSON
     const parsed = await xml2js.parseStringPromise(xml, { explicitArray: false });
     // Extract results from SOAP response
@@ -2776,15 +2774,29 @@ app.get('/api/email-archive/send', async (req, res) => {
         results = [retrieveResponse];
       }
     } catch (e) {
-      // fallback: return empty array if parsing fails
       results = [];
     }
-    res.json({ results });
+    // Map to only relevant fields for frontend
+    const mapped = results.map(r => ({
+      SentDate: r.SentDate || '',
+      EmailName: r.EmailName || '',
+      Subject: r.Subject || '',
+      ID: r.ID || '',
+      SubscriberKey: r.SubscriberKey || '',
+      MID: r['Client']?.ID || r['Client.ID'] || '',
+      FromName: r.FromName || '',
+      FromAddress: r.FromAddress || '',
+      NumberSent: r.NumberSent || '',
+    }));
+    res.json({ results: mapped });
   } catch (err) {
     console.error('❌ Error retrieving send:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
+
+// Register the SentEvent endpoint
+require('./emailArchiveSentEventsEndpoint')(app);
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
