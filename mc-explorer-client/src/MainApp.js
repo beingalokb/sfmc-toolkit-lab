@@ -1265,7 +1265,7 @@ export default function MainApp() {
                     <select
                       className="w-full border rounded p-2"
                       value={editESDModal.deliveryProfile}
-                      onChange={e => handleEditESDModal('deliveryProfile', e.target.value)}
+                      onChange={e => handleEditESDChange('deliveryProfile', e.target.value)}
                     >
                       <option value="">Select DeliveryProfile</option>
                       {deliveryProfiles.map(dp => (
