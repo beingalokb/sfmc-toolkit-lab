@@ -716,7 +716,7 @@ export default function MainApp() {
     }
   }
 
-  // Fetch email archive results
+  // --- FIX: Robust fetch and display for Table 1 (Email Archiving) ---
   const fetchEmailArchive = async () => {
     setEmailArchiveLoading(true);
     setEmailArchiveError('');
@@ -728,55 +728,65 @@ export default function MainApp() {
       if (archiveSearch.jobId) params.append('jobId', archiveSearch.jobId);
       if (archiveSearch.emailName) params.append('emailName', archiveSearch.emailName);
       if (archiveSearch.subject) params.append('subject', archiveSearch.subject);
-      if (archiveSearch.sentDateFrom && archiveSearch.sentDateTo) {
-        params.append('sentDateFrom', archiveSearch.sentDateFrom);
-        params.append('sentDateTo', archiveSearch.sentDateTo);
-      }
       const res = await fetch(`/api/email-archive/send?${params.toString()}`);
       const data = await res.json();
-      setEmailArchiveResults(data.results || []);
+      // Accept both {results: [...]} and [...] as valid responses
+      let arr = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+      setEmailArchiveResults(arr);
+      setArchivePage(1);
     } catch (e) {
       setEmailArchiveError('Failed to fetch email archive results.');
+      setEmailArchiveResults([]);
     } finally {
       setEmailArchiveLoading(false);
     }
   };
 
-  // Search handler for email archiving
-  const handleArchiveSearch = (e) => {
-    e.preventDefault();
-    fetchEmailArchive();
-  };
+  // --- FIX: Robust fetch and display for Table 2 (SentEvent) ---
+  useEffect(() => {
+    if (!selectedSendId) return;
+    setSentEventLoading(true);
+    setSentEventError('');
+    fetch(`/api/email-archive/sent-events?jobId=${encodeURIComponent(selectedSendId)}`)
+      .then(res => res.json())
+      .then(data => {
+        let arr = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+        setSentEventResults(arr);
+        setSentEventPage(1);
+      })
+      .catch(() => setSentEventError('Failed to fetch sent events.'))
+      .finally(() => setSentEventLoading(false));
+  }, [selectedSendId]);
 
-  // Reset search form
-  const resetArchiveSearch = () => {
-    setArchiveSearch({ jobId: '', emailName: '', subject: '', sentDateFrom: '', sentDateTo: '' });
-    setEmailArchiveResults([]);
-  };
-
-  // Email Archiving pagination state (declare only once at the top)
-  const archivePageSize = 10;
-  const archiveTotalPages = Math.ceil(emailArchiveResults.length / archivePageSize);
-
-  // Sorting logic for Table 1
+  // --- FIX: Sorting logic for Table 1 ---
   const sortedArchiveResults = [...emailArchiveResults].sort((a, b) => {
     if (!archiveSort.key) return 0;
-    const aVal = a[archiveSort.key] || '';
-    const bVal = b[archiveSort.key] || '';
+    let aVal = a[archiveSort.key] || '';
+    let bVal = b[archiveSort.key] || '';
+    // Numeric sort for NumberSent, otherwise string
+    if (archiveSort.key === 'NumberSent') {
+      aVal = parseInt(aVal, 10) || 0;
+      bVal = parseInt(bVal, 10) || 0;
+    } else {
+      aVal = aVal.toString().toLowerCase();
+      bVal = bVal.toString().toLowerCase();
+    }
     if (aVal < bVal) return archiveSort.direction === 'asc' ? -1 : 1;
     if (aVal > bVal) return archiveSort.direction === 'asc' ? 1 : -1;
     return 0;
   });
   const pagedArchiveResults = sortedArchiveResults.slice((archivePage-1)*archiveRowsPerPage, archivePage*archiveRowsPerPage);
 
-  // Sorting logic for Table 2
+  // --- FIX: Sorting logic for Table 2 ---
   const filteredSentEventResults = sentEventResults.filter(row =>
     !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))
   );
   const sortedSentEventResults = [...filteredSentEventResults].sort((a, b) => {
     if (!sentEventSort.key) return 0;
-    const aVal = a[sentEventSort.key] || '';
-    const bVal = b[sentEventSort.key] || '';
+    let aVal = a[sentEventSort.key] || '';
+    let bVal = b[sentEventSort.key] || '';
+    aVal = aVal.toString().toLowerCase();
+    bVal = bVal.toString().toLowerCase();
     if (aVal < bVal) return sentEventSort.direction === 'asc' ? -1 : 1;
     if (aVal > bVal) return sentEventSort.direction === 'asc' ? 1 : -1;
     return 0;
