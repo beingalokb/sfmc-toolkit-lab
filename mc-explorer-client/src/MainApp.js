@@ -63,6 +63,23 @@ export default function MainApp() {
   // Add projectName state
   const [projectName, setProjectName] = useState('');
 
+  // --- Email Archiving State ---
+  const [emailArchiveResults, setEmailArchiveResults] = useState([]);
+  const [emailArchiveLoading, setEmailArchiveLoading] = useState(false);
+  const [emailArchiveError, setEmailArchiveError] = useState('');
+  const [archiveSearch, setArchiveSearch] = useState({ jobId: '', emailName: '', subject: '' });
+  const [archivePage, setArchivePage] = useState(1);
+  const [archiveRowsPerPage, setArchiveRowsPerPage] = useState(5);
+  const [selectedSendId, setSelectedSendId] = useState(null);
+  const [sentEventResults, setSentEventResults] = useState([]);
+  const [sentEventLoading, setSentEventLoading] = useState(false);
+  const [sentEventError, setSentEventError] = useState('');
+  const [sentEventPage, setSentEventPage] = useState(1);
+  const [sentEventRowsPerPage, setSentEventRowsPerPage] = useState(5);
+  const [sentEventSubscriberKey, setSentEventSubscriberKey] = useState('');
+  const [archiveSort, setArchiveSort] = useState({ key: null, direction: 'asc' });
+  const [sentEventSort, setSentEventSort] = useState({ key: null, direction: 'asc' });
+
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
     if (!key) return '';
@@ -693,6 +710,45 @@ export default function MainApp() {
     }
   }
 
+  // --- Email Archiving Fetch Logic ---
+  const fetchEmailArchive = async () => {
+    setEmailArchiveLoading(true);
+    setEmailArchiveError('');
+    setSelectedSendId(null);
+    setSentEventResults([]);
+    setSentEventPage(1);
+    try {
+      const params = new URLSearchParams();
+      if (archiveSearch.jobId) params.append('jobId', archiveSearch.jobId);
+      if (archiveSearch.emailName) params.append('emailName', archiveSearch.emailName);
+      if (archiveSearch.subject) params.append('subject', archiveSearch.subject);
+      const res = await fetch(`/api/email-archive/send?${params.toString()}`);
+      const data = await res.json();
+      let arr = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+      setEmailArchiveResults(arr);
+      setArchivePage(1);
+    } catch (e) {
+      setEmailArchiveError('Failed to fetch email archive results.');
+      setEmailArchiveResults([]);
+    } finally {
+      setEmailArchiveLoading(false);
+    }
+  };
+  useEffect(() => {
+    if (!selectedSendId) return;
+    setSentEventLoading(true);
+    setSentEventError('');
+    fetch(`/api/email-archive/sent-events?jobId=${encodeURIComponent(selectedSendId)}`)
+      .then(res => res.json())
+      .then(data => {
+        let arr = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+        setSentEventResults(arr);
+        setSentEventPage(1);
+      })
+      .catch(() => setSentEventError('Failed to fetch sent events.'))
+      .finally(() => setSentEventLoading(false));
+  }, [selectedSendId]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -838,6 +894,12 @@ export default function MainApp() {
             onClick={() => setParentNav('preferencecenter')}
           >
             Preference Center
+          </button>
+          <button
+            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'emailArchiving' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+            onClick={() => setParentNav('emailArchiving')}
+          >
+            Email Archiving
           </button>
         </div>
         {/* Render content based on parentNav */}
@@ -1349,8 +1411,7 @@ export default function MainApp() {
                     <li>In <b>cpc_main</b> on line 331, ensure that the cloud page ID is for <b>cpc_handler</b>.</li>
                     <li>In <b>cpc_handler</b>, every <b>CloudPagesURL</b> function should point to the cloud page ID for <b>cpc_main</b>.</li>
                     <li>Test, validate, and add additional features as needed.</li>
-                    <li>To use the preference center, the url expects a <b>subkey</b> parameter at the end of the URL (e.g. <span className="break-all">https://mcf7bhdjzswk278tj2j38nqtlq2q.pub.sfmc-content.com/jqi02yqkmgp?subkey=TEST10001</span>).</li>
-                  </ol>
+                    <li>To use the preference center, the url expects a <b>subkey</b> parameter at the end of the URL (e.g. <span className="break-all">https://mcf7bhdjzswk278tj2j38nqtlq2q.pub.sfmc-content.com/jqi02yqkmgp?subkey=TEST10001</span>).</li>                  </ol>
                   <div className="mt-2 text-xs text-gray-600">
                     <b>NOTE:</b> The preference center assumes that a record with email exists in All Subscribers.
                   </div>
@@ -1412,10 +1473,6 @@ export default function MainApp() {
                     setTimeout(() => {
                       const el = document.getElementById('preferencecenter-success-section');
 
-
-
-
-
                       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }, 100);
                   } else {
@@ -1429,6 +1486,114 @@ export default function MainApp() {
               }} 
               submitting={qsLoading}
             />
+          </div>
+        )}
+
+        {/* Email Archiving content */}
+        {parentNav === 'emailArchiving' && (
+          <div className="bg-white shadow rounded p-6 max-w-6xl mx-auto">
+            <h2 className="text-2xl font-bold text-indigo-700 mb-4">Email Archiving</h2>
+            {/* Search Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div>
+                <label className="block font-semibold mb-1">Job ID</label>
+                <input type="text" className="border rounded px-4 py-2 w-full" placeholder="Enter Job ID" value={archiveSearch.jobId} onChange={e => setArchiveSearch(s => ({ ...s, jobId: e.target.value, emailName: '', subject: '' }))} />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Subject</label>
+                <input type="text" className="border rounded px-4 py-2 w-full" placeholder="Enter Subject" value={archiveSearch.subject} onChange={e => setArchiveSearch(s => ({ ...s, subject: e.target.value, jobId: '', emailName: '' }))} />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Email Name</label>
+                <input type="text" className="border rounded px-4 py-2 w-full" placeholder="Enter Email Name" value={archiveSearch.emailName} onChange={e => setArchiveSearch(s => ({ ...s, emailName: e.target.value, jobId: '', subject: '' }))} />
+              </div>
+            </div>
+            <div className="flex gap-2 mb-4">
+              <button className="bg-blue-500 text-white px-4 py-2 rounded" onClick={fetchEmailArchive}>Search</button>
+            </div>
+            {/* Results Table */}
+            <div className="bg-white border rounded p-0 overflow-x-auto">
+              {emailArchiveLoading ? (
+                <div className="p-8 text-center text-gray-500">Loading...</div>
+              ) : emailArchiveError ? (
+                <div className="p-8 text-center text-red-600">{emailArchiveError}</div>
+              ) : (
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      {["SentDate","EmailName","Subject","ID","MID","FromName","FromAddress","NumberSent","SubscriberKey"].map(col => (
+                        <th key={col} className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100" onClick={() => setArchiveSort(s => ({ key: col, direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc' }))}>
+                          {col === 'ID' ? 'JobID' : col === 'MID' ? 'MID' : col === 'FromName' ? 'From Name' : col === 'FromAddress' ? 'From Email' : col === 'NumberSent' ? '# of emails Sent' : col === 'SubscriberKey' ? 'Subscriber Key' : col === 'SentDate' ? 'Sent Date' : col === 'EmailName' ? 'Email Name' : col}
+                          {archiveSort.key === col && (archiveSort.direction === 'asc' ? ' ▲' : ' ▼')}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {emailArchiveResults.length === 0 ? (
+                      <tr><td colSpan={9} className="p-8 text-center text-gray-500">No results found.</td></tr>
+                    ) : emailArchiveResults.map((row, idx) => (
+                      <tr key={idx} className="border-t">
+                        <td className="p-2">{row.SentDate || ''}</td>
+                        <td className="p-2">{row.EmailName || ''}</td>
+                        <td className="p-2">{row.Subject || ''}</td>
+                        <td className="p-2">{row.ID || ''}</td>
+                        <td className="p-2">{row.MID || ''}</td>
+                        <td className="p-2">{row.FromName || ''}</td>
+                        <td className="p-2">{row.FromAddress || ''}</td>
+                        <td className="p-2">{row.NumberSent ? (
+                          <button className="bg-yellow-400 text-black font-bold px-3 py-1 rounded shadow hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-600" onClick={() => { setSelectedSendId(row.ID); setSentEventPage(1); setSentEventSubscriberKey(''); }} title="Show sent events for this JobID">{row.NumberSent}</button>
+                        ) : ''}</td>
+                        <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            {/* SentEvent Table */}
+            {selectedSendId && (
+              <div className="mt-8">
+                <h2 className="text-xl font-semibold mb-2">Sent Events for JobID: {selectedSendId}</h2>
+                <div className="mb-4 flex items-center gap-2">
+                  <label className="font-semibold">Subscriber Key:</label>
+                  <input type="text" className="border rounded px-2 py-1" placeholder="Search Subscriber Key" value={sentEventSubscriberKey} onChange={e => { setSentEventSubscriberKey(e.target.value); setSentEventPage(1); }} />
+                </div>
+                {sentEventLoading ? (
+                  <div className="p-4 text-center text-gray-500">Loading sent events...</div>
+                ) : sentEventError ? (
+                  <div className="p-4 text-center text-red-600">{sentEventError}</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm border">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          {["SubscriberKey","EventDate","SendID","ListID","TriggeredSendDefinitionObjectID"].map(col => (
+                            <th key={col} className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100" onClick={() => setSentEventSort(s => ({ key: col, direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc' }))}>
+                              {col === 'SendID' ? 'JobID (SendID)' : col === 'EventDate' ? 'Send Date' : col === 'TriggeredSendDefinitionObjectID' ? 'TriggeredSendDefinitionObjectID' : col === 'SubscriberKey' ? 'SubscriberKey' : col === 'ListID' ? 'ListID' : col}
+                              {sentEventSort.key === col && (sentEventSort.direction === 'asc' ? ' ▲' : ' ▼')}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).length === 0 ? (
+                          <tr><td colSpan={5} className="p-8 text-center text-gray-500">No results found.</td></tr>
+                        ) : sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).map((row, idx) => (
+                          <tr key={idx} className="border-t">
+                            <td className="p-2">{row.SubscriberKey || ''}</td>
+                            <td className="p-2">{row.EventDate || ''}</td>
+                            <td className="p-2">{row.SendID || ''}</td>
+                            <td className="p-2">{row.ListID || ''}</td>
+                            <td className="p-2">{row.TriggeredSendDefinitionObjectID || ''}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
