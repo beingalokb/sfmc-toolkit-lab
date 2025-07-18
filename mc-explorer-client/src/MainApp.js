@@ -69,13 +69,13 @@ export default function MainApp() {
   const [emailArchiveError, setEmailArchiveError] = useState('');
   const [archiveSearch, setArchiveSearch] = useState({ jobId: '', emailName: '', subject: '' });
   const [archivePage, setArchivePage] = useState(1);
-  const [archiveRowsPerPage, setArchiveRowsPerPage] = useState(5);
+  const [archiveRowsPerPage, setArchiveRowsPerPage] = useState(10); // Set pagination to 10 for Table 1
   const [selectedSendId, setSelectedSendId] = useState(null);
   const [sentEventResults, setSentEventResults] = useState([]);
   const [sentEventLoading, setSentEventLoading] = useState(false);
   const [sentEventError, setSentEventError] = useState('');
   const [sentEventPage, setSentEventPage] = useState(1);
-  const [sentEventRowsPerPage, setSentEventRowsPerPage] = useState(5);
+  const [sentEventRowsPerPage, setSentEventRowsPerPage] = useState(10); // Set pagination to 10 for Table 2
   const [sentEventSubscriberKey, setSentEventSubscriberKey] = useState('');
   const [archiveSort, setArchiveSort] = useState({ key: null, direction: 'asc' });
   const [sentEventSort, setSentEventSort] = useState({ key: null, direction: 'asc' });
@@ -1542,7 +1542,21 @@ export default function MainApp() {
                         <td className="p-2">{row.FromName || ''}</td>
                         <td className="p-2">{row.FromAddress || ''}</td>
                         <td className="p-2">{row.NumberSent ? (
-                          <button className="bg-yellow-400 text-black font-bold px-3 py-1 rounded shadow hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-600" onClick={() => { setSelectedSendId(row.ID); setSentEventPage(1); setSentEventSubscriberKey(''); }} title="Show sent events for this JobID">{row.NumberSent}</button>
+                          <button
+                            className="bg-yellow-400 text-black font-bold px-3 py-1 rounded shadow hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-600"
+                            onClick={() => {
+                              setSelectedSendId(row.ID);
+                              setSentEventPage(1);
+                              setSentEventSubscriberKey('');
+                              setTimeout(() => {
+                                const el = document.getElementById('sent-events-table');
+                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }, 100);
+                            }}
+                            title="Show sent events for this JobID"
+                          >
+                            {row.NumberSent}
+                          </button>
                         ) : ''}</td>
                         <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
                       </tr>
@@ -1553,7 +1567,7 @@ export default function MainApp() {
             </div>
             {/* SentEvent Table */}
             {selectedSendId && (
-              <div className="mt-8">
+              <div className="mt-8" id="sent-events-table">
                 <h2 className="text-xl font-semibold mb-2">Sent Events for JobID: {selectedSendId}</h2>
                 <div className="mb-4 flex items-center gap-2">
                   <label className="font-semibold">Subscriber Key:</label>
