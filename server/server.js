@@ -1480,7 +1480,7 @@ app.post('/update/emailsenddefinition-senderprofile', async (req, res) => {
 
 // Update EmailSendDefinition (single record, SOAP)
 app.post('/update/emailsenddefinition', async (req, res) => {
-  const { CustomerKey, SendClassification, SenderProfile, DeliveryProfile } = req.body;
+  const { CustomerKey, SendClassification, SenderProfile, DeliveryProfile, BccEmail, CCEmail } = req.body;
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
   if (!accessToken || !subdomain) return res.status(401).json({ error: 'Unauthorized' });
@@ -1500,6 +1500,8 @@ app.post('/update/emailsenddefinition', async (req, res) => {
               ${SendClassification ? `<SendClassification><CustomerKey>${SendClassification}</CustomerKey></SendClassification>` : ''}
               ${SenderProfile ? `<SenderProfile><CustomerKey>${SenderProfile}</CustomerKey></SenderProfile>` : ''}
               ${DeliveryProfile ? `<DeliveryProfile><CustomerKey>${DeliveryProfile}</CustomerKey></DeliveryProfile>` : ''}
+              ${BccEmail ? `<BccEmail>${BccEmail}</BccEmail>` : ''}
+              ${CCEmail ? `<CCEmail>${CCEmail}</CCEmail>` : ''}
             </Objects>
           </UpdateRequest>
         </soapenv:Body>
@@ -1544,7 +1546,7 @@ app.post('/update/emailsenddefinition', async (req, res) => {
 
 // Bulk update EmailSendDefinition (SOAP)
 app.post('/update/emailsenddefinition-mass', async (req, res) => {
-  const { CustomerKeys, SendClassification, SenderProfile, DeliveryProfile } = req.body;
+  const { CustomerKeys, SendClassification, SenderProfile, DeliveryProfile, BccEmail, CCEmail } = req.body;
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
   if (!accessToken || !subdomain) return res.status(401).json({ error: 'Unauthorized' });
@@ -1557,6 +1559,8 @@ app.post('/update/emailsenddefinition-mass', async (req, res) => {
         ${SendClassification ? `<SendClassification><CustomerKey>${SendClassification}</CustomerKey></SendClassification>` : ''}
         ${SenderProfile ? `<SenderProfile><CustomerKey>${SenderProfile}</CustomerKey></SenderProfile>` : ''}
         ${DeliveryProfile ? `<DeliveryProfile><CustomerKey>${DeliveryProfile}</CustomerKey></DeliveryProfile>` : ''}
+        ${BccEmail ? `<BccEmail>${BccEmail}</BccEmail>` : ''}
+        ${CCEmail ? `<CCEmail>${CCEmail}</CCEmail>` : ''}
       </Objects>
     `).join('');
     const soapEnvelope = `
@@ -1649,6 +1653,7 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
   if (!accessToken || !subdomain) return res.status(401).json([]);
   try {
     // Helper to fetch SOAP objects by CustomerKey
+   
     async function fetchSoapByCustomerKeys(objectType, properties, customerKeys) {
       if (!customerKeys.length) return {};
       // Batch in groups of 20 (SOAP limit)
