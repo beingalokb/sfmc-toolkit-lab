@@ -37,14 +37,14 @@ export default function MainApp() {
   const [resolvedError, setResolvedError] = useState('');
 
   // Add new state for edit modal
-  const [editESDModal, setEditESDModal] = useState({ open: false, loading: false, error: null, esd: null, sendClassification: '', senderProfile: '', deliveryProfile: '' });
+  const [editESDModal, setEditESDModal] = useState({ open: false, loading: false, error: null, esd: null, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '' });
 
   // State for mass selection
   const [selectedESDKeys, setSelectedESDKeys] = useState([]);
   const allSelected = resolvedEmailSendDefs.length > 0 && selectedESDKeys.length === resolvedEmailSendDefs.length;
 
   // State for mass edit modal
-  const [massEditModal, setMassEditModal] = useState({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null });
+  const [massEditModal, setMassEditModal] = useState({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '', loading: false, error: null });
 
   // Publications state
   const [publications, setPublications] = useState([]);
@@ -522,15 +522,17 @@ export default function MainApp() {
       loading: false,
       error: null,
       esd,
-      sendClassification: esd.SendClassification.CustomerKey,
-      senderProfile: esd.SenderProfile.CustomerKey,
-      deliveryProfile: esd.DeliveryProfile.CustomerKey
+      sendClassification: esd.SendClassification?.CustomerKey || '',
+      senderProfile: esd.SenderProfile?.CustomerKey || '',
+      deliveryProfile: esd.DeliveryProfile?.CustomerKey || '',
+      bccEmail: esd.BccEmail || '',
+      ccEmail: esd.CCEmail || ''
     });
   }
 
   // Handler to close edit modal
   function closeEditESDModal() {
-    setEditESDModal({ open: false, loading: false, error: null, esd: null, sendClassification: '', senderProfile: '', deliveryProfile: '' });
+    setEditESDModal({ open: false, loading: false, error: null, esd: null, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '' });
   }
 
   // Handler for dropdown changes
@@ -554,7 +556,6 @@ export default function MainApp() {
     try {
       const accessToken = localStorage.getItem('accessToken');
       const subdomain = localStorage.getItem('subdomain');
-      // Always use CustomerKey for these fields
       const sendClassificationKey = getCustomerKey(sendClassifications, editESDModal.sendClassification);
       const senderProfileKey = getCustomerKey(senderProfiles, editESDModal.senderProfile);
       const deliveryProfileKey = getCustomerKey(deliveryProfiles, editESDModal.deliveryProfile);
@@ -569,7 +570,9 @@ export default function MainApp() {
           CustomerKey: editESDModal.esd.CustomerKey,
           SendClassification: sendClassificationKey,
           SenderProfile: senderProfileKey,
-          DeliveryProfile: deliveryProfileKey
+          DeliveryProfile: deliveryProfileKey,
+          BccEmail: editESDModal.bccEmail,
+          CCEmail: editESDModal.ccEmail
         })
       });
       const data = await res.json();
@@ -676,7 +679,6 @@ export default function MainApp() {
     try {
       const accessToken = localStorage.getItem('accessToken');
       const subdomain = localStorage.getItem('subdomain');
-      // Always use CustomerKey for these fields
       const sendClassificationKey = getCustomerKey(sendClassifications, massEditModal.sendClassification);
       const senderProfileKey = getCustomerKey(senderProfiles, massEditModal.senderProfile);
       const deliveryProfileKey = getCustomerKey(deliveryProfiles, massEditModal.deliveryProfile);
@@ -691,12 +693,14 @@ export default function MainApp() {
           CustomerKeys: selectedESDKeys,
           SendClassification: sendClassificationKey,
           SenderProfile: senderProfileKey,
-          DeliveryProfile: deliveryProfileKey
+          DeliveryProfile: deliveryProfileKey,
+          BccEmail: massEditModal.bccEmail,
+          CCEmail: massEditModal.ccEmail
         })
       });
       const data = await res.json();
       if (data.status === 'OK') {
-        setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null });
+        setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '', loading: false, error: null });
         setSelectedESDKeys([]);
         alert('✅ Bulk update successful');
         await refreshResolvedEmailSendDefs();
@@ -1011,7 +1015,7 @@ export default function MainApp() {
                   {selectedESDKeys.length > 0 && (
                     <button
                       className="mt-2 px-4 py-2 bg-blue-700 text-white rounded font-semibold"
-                      onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })}
+                      onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '', loading: false, error: null })}
                     >
                       Bulk Edit Selected ({selectedESDKeys.length})
                     </button>
@@ -1286,6 +1290,26 @@ export default function MainApp() {
                       ))}
                     </select>
                   </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">BCC Email</label>
+                    <input
+                      type="text"
+                      className="w-full border rounded p-2"
+                      value={editESDModal.bccEmail}
+                      onChange={e => handleEditESDChange('bccEmail', e.target.value)}
+                      placeholder="Enter BCC email(s), comma separated"
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">CC Email</label>
+                    <input
+                      type="text"
+                      className="w-full border rounded p-2"
+                      value={editESDModal.ccEmail}
+                      onChange={e => handleEditESDChange('ccEmail', e.target.value)}
+                      placeholder="Enter CC email(s), comma separated"
+                    />
+                  </div>
                   <div className="flex justify-end gap-2">
                     <button onClick={closeEditESDModal} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
                     <button onClick={submitEditESDModal} className="px-4 py-2 bg-blue-600 text-white rounded" disabled={editESDModal.loading}>
@@ -1341,8 +1365,28 @@ export default function MainApp() {
                       ))}
                     </select>
                   </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">BCC Email</label>
+                    <input
+                      type="text"
+                      className="w-full border rounded p-2"
+                      value={massEditModal.bccEmail}
+                      onChange={e => handleMassEditChange('bccEmail', e.target.value)}
+                      placeholder="(No Change)"
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-1 font-semibold">CC Email</label>
+                    <input
+                      type="text"
+                      className="w-full border rounded p-2"
+                      value={massEditModal.ccEmail}
+                      onChange={e => handleMassEditChange('ccEmail', e.target.value)}
+                      placeholder="(No Change)"
+                    />
+                  </div>
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', loading: false, error: null })} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                    <button onClick={() => setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '', loading: false, error: null })} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
                     <button onClick={submitMassEditModal} className="px-4 py-2 bg-blue-600 text-white rounded" disabled={massEditModal.loading}>
                       {massEditModal.loading ? 'Saving...' : 'Save'}
                     </button>
