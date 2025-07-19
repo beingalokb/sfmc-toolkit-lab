@@ -989,8 +989,6 @@ export default function MainApp() {
                           <th className="text-left p-2">SendClassification</th>
                           <th className="text-left p-2">SenderProfile</th>
                           <th className="text-left p-2">DeliveryProfile</th>
-                          <th className="text-left p-2">BCC Email</th>
-                          <th className="text-left p-2">CC Email</th>
                           <th className="text-left p-2">Actions</th>
                         </tr>
                       </thead>
@@ -1004,8 +1002,6 @@ export default function MainApp() {
                             <td className="p-2">{getProfileName(sendClassifications, esd.SendClassification?.CustomerKey)}</td>
                             <td className="p-2">{getProfileName(senderProfiles, esd.SenderProfile?.CustomerKey)}</td>
                             <td className="p-2">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
-                            <td className="p-2">{esd.BccEmail || ''}</td>
-                            <td className="p-2">{esd.CCEmail || ''}</td>
                             <td className="p-2">
                               <button className="text-blue-600 hover:underline mr-2" onClick={() => openEditESDModal(esd)}>
                                 <span role="img" aria-label="Edit">✏️</span>
