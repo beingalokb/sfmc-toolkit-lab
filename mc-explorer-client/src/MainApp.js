@@ -989,6 +989,8 @@ export default function MainApp() {
                           <th className="text-left p-2">SendClassification</th>
                           <th className="text-left p-2">SenderProfile</th>
                           <th className="text-left p-2">DeliveryProfile</th>
+                          <th className="text-left p-2">BCC Email</th>
+                          <th className="text-left p-2">CC Email</th>
                           <th className="text-left p-2">Actions</th>
                         </tr>
                       </thead>
@@ -1002,6 +1004,8 @@ export default function MainApp() {
                             <td className="p-2">{getProfileName(sendClassifications, esd.SendClassification?.CustomerKey)}</td>
                             <td className="p-2">{getProfileName(senderProfiles, esd.SenderProfile?.CustomerKey)}</td>
                             <td className="p-2">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
+                            <td className="p-2">{esd.BccEmail || ''}</td>
+                            <td className="p-2">{esd.CCEmail || ''}</td>
                             <td className="p-2">
                               <button className="text-blue-600 hover:underline mr-2" onClick={() => openEditESDModal(esd)}>
                                 <span role="img" aria-label="Edit">✏️</span>
@@ -1297,7 +1301,7 @@ export default function MainApp() {
                       className="w-full border rounded p-2"
                       value={editESDModal.bccEmail}
                       onChange={e => handleEditESDChange('bccEmail', e.target.value)}
-                      placeholder="Enter BCC email(s), comma separated"
+                      placeholder="Enter BCC email(s), semicolon separated"
                     />
                   </div>
                   <div className="mb-4">
@@ -1307,7 +1311,7 @@ export default function MainApp() {
                       className="w-full border rounded p-2"
                       value={editESDModal.ccEmail}
                       onChange={e => handleEditESDChange('ccEmail', e.target.value)}
-                      placeholder="Enter CC email(s), comma separated"
+                      placeholder="Enter CC email(s), semicolon separated"
                     />
                   </div>
                   <div className="flex justify-end gap-2">
@@ -1567,7 +1571,7 @@ export default function MainApp() {
                     <tr className="bg-gray-100">
                       {["SentDate","EmailName","Subject","ID","MID","FromName","FromAddress","NumberSent","SubscriberKey"].map(col => (
                         <th key={col} className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100" onClick={() => setArchiveSort(s => ({ key: col, direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc' }))}>
-                          {col === 'ID' ? 'JobID' : col === 'MID' ? 'MID' : col === 'FromName' ? 'From Name' : col === 'FromAddress' ? 'From Email' : col === 'NumberSent' ? '# of emails Sent' : col === 'SubscriberKey' ? 'Subscriber Key' : col === 'SentDate' ? 'Sent Date' : col === 'EmailName' ? 'Email Name' : col}
+                          {col === 'ID' ? 'JobID' : col === 'MID' ? 'MID' : col === 'FromName' ? 'From Name' : col === 'FromAddress' ? 'From Email' : col === 'NumberSent' ? '# of emails Sent' : col === 'SubscriberKey' ? 'Subscriber Key' : col === 'SentDate' ? 'Sent Date' : col}
                           {archiveSort.key === col && (archiveSort.direction === 'asc' ? ' ▲' : ' ▼')}
                         </th>
                       ))}
