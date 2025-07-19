@@ -1192,7 +1192,9 @@ app.get('/search/emailsenddefinition', async (req, res) => {
       'ModifiedDate',
       'SendClassification.CustomerKey',
       'SenderProfile.CustomerKey',
-      'DeliveryProfile.CustomerKey'
+      'DeliveryProfile.CustomerKey',
+      'BccEmail',
+      'CCEmail'
     ];
     const propsXml = props.map(p => `<Properties>${p}</Properties>`).join('');
     const soapEnvelope = `
@@ -1652,7 +1654,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
   const subdomain = getSubdomainFromRequest(req);
   if (!accessToken || !subdomain) return res.status(401).json([]);
   try {
-    // Helper to fetch SOAP objects by CustomerKey
+      
+       // Helper to fetch SOAP objects by CustomerKey
    
     async function fetchSoapByCustomerKeys(objectType, properties, customerKeys) {
       if (!customerKeys.length) return {};
@@ -1714,7 +1717,9 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         'ModifiedDate',
         'SendClassification.CustomerKey',
         'SenderProfile.CustomerKey',
-        'DeliveryProfile.CustomerKey'
+        'DeliveryProfile.CustomerKey',
+        'BccEmail',
+        'CCEmail'
       ];
       const propsXml = props.map(p => `<Properties>${p}</Properties>`).join('');
       const soapEnvelope = `
@@ -1750,8 +1755,10 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         CategoryID: item.CategoryID,
         ModifiedDate: item.ModifiedDate,
         SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
-        SenderProfileKey: item.SenderProfile?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
-        DeliveryProfileKey: item.DeliveryProfile?.CustomerKey || item['DeliveryProfile.CustomerKey'] || ''
+        SenderProfileKey: item['SenderProfile']?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
+        DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || '',
+        BccEmail: item.BccEmail || '',
+        CCEmail: item.CCEmail || ''
       }));
     })();
 
@@ -1777,6 +1784,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         CustomerKey: def.CustomerKey,
         CategoryID: def.CategoryID,
         ModifiedDate: def.ModifiedDate || '',
+        BccEmail: def.BccEmail || '',
+        CCEmail: def.CCEmail || '',
         SendClassification: {
           CustomerKey: def.SendClassificationKey,
           Name: sendClass.Name || '',
