@@ -1502,8 +1502,8 @@ app.post('/update/emailsenddefinition', async (req, res) => {
               ${SendClassification ? `<SendClassification><CustomerKey>${SendClassification}</CustomerKey></SendClassification>` : ''}
               ${SenderProfile ? `<SenderProfile><CustomerKey>${SenderProfile}</CustomerKey></SenderProfile>` : ''}
               ${DeliveryProfile ? `<DeliveryProfile><CustomerKey>${DeliveryProfile}</CustomerKey></DeliveryProfile>` : ''}
-              ${BccEmail ? `<BccEmail>${BccEmail}</BccEmail>` : ''}
-              ${CCEmail ? `<CCEmail>${CCEmail}</CCEmail>` : ''}
+              <BccEmail>${BccEmail || ''}</BccEmail>
+              <CCEmail>${CCEmail || ''}</CCEmail>
             </Objects>
           </UpdateRequest>
         </soapenv:Body>
@@ -1561,8 +1561,8 @@ app.post('/update/emailsenddefinition-mass', async (req, res) => {
         ${SendClassification ? `<SendClassification><CustomerKey>${SendClassification}</CustomerKey></SendClassification>` : ''}
         ${SenderProfile ? `<SenderProfile><CustomerKey>${SenderProfile}</CustomerKey></SenderProfile>` : ''}
         ${DeliveryProfile ? `<DeliveryProfile><CustomerKey>${DeliveryProfile}</CustomerKey></DeliveryProfile>` : ''}
-        ${BccEmail ? `<BccEmail>${BccEmail}</BccEmail>` : ''}
-        ${CCEmail ? `<CCEmail>${CCEmail}</CCEmail>` : ''}
+        <BccEmail>${BccEmail || ''}</BccEmail>
+        <CCEmail>${CCEmail || ''}</CCEmail>
       </Objects>
     `).join('');
     const soapEnvelope = `
