@@ -753,6 +753,10 @@ export default function MainApp() {
       .finally(() => setSentEventLoading(false));
   }, [selectedSendId]);
 
+  // Pagination logic for Email Archiving table
+  const paginatedArchiveResults = emailArchiveResults.slice((archivePage - 1) * archiveRowsPerPage, archivePage * archiveRowsPerPage);
+  const totalArchivePages = Math.ceil(emailArchiveResults.length / archiveRowsPerPage);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -1562,10 +1566,11 @@ export default function MainApp() {
               ) : emailArchiveError ? (
                 <div className="p-8 text-center text-red-600">{emailArchiveError}</div>
               ) : (
+                <>
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="bg-gray-100">
-                      {["SentDate","EmailName","Subject","ID","MID","FromName","FromAddress","NumberSent","SubscriberKey"].map(col => (
+                      {["SentDate","EmailName","Subject","ID","FromName","FromAddress","NumberSent","SubscriberKey","MID"].map(col => (
                         <th key={col} className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100" onClick={() => setArchiveSort(s => ({ key: col, direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc' }))}>
                           {col === 'ID' ? 'JobID' : col === 'MID' ? 'MID' : col === 'FromName' ? 'From Name' : col === 'FromAddress' ? 'From Email' : col === 'NumberSent' ? '# of emails Sent' : col === 'SubscriberKey' ? 'Subscriber Key' : col === 'SentDate' ? 'Sent Date' : col}
                           {archiveSort.key === col && (archiveSort.direction === 'asc' ? ' ▲' : ' ▼')}
@@ -1574,15 +1579,14 @@ export default function MainApp() {
                     </tr>
                   </thead>
                   <tbody>
-                    {emailArchiveResults.length === 0 ? (
+                    {paginatedArchiveResults.length === 0 ? (
                       <tr><td colSpan={9} className="p-8 text-center text-gray-500">No results found.</td></tr>
-                    ) : emailArchiveResults.map((row, idx) => (
+                    ) : paginatedArchiveResults.map((row, idx) => (
                       <tr key={idx} className="border-t">
                         <td className="p-2">{row.SentDate || ''}</td>
                         <td className="p-2">{row.EmailName || ''}</td>
                         <td className="p-2">{row.Subject || ''}</td>
                         <td className="p-2">{row.ID || ''}</td>
-                        <td className="p-2">{row.MID || ''}</td>
                         <td className="p-2">{row.FromName || ''}</td>
                         <td className="p-2">{row.FromAddress || ''}</td>
                         <td className="p-2">{row.NumberSent ? (
@@ -1603,10 +1607,21 @@ export default function MainApp() {
                           </button>
                         ) : ''}</td>
                         <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
+                        <td className="p-2">{row.MID || ''}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                <div className="flex justify-between items-center mt-4 text-sm">
+                  <div>
+                    Page {archivePage} of {totalArchivePages}
+                  </div>
+                  <div className="flex gap-2">
+                    <button disabled={archivePage === 1} onClick={() => setArchivePage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
+                    <button disabled={archivePage === totalArchivePages || totalArchivePages <= 1} onClick={() => setArchivePage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
+                  </div>
+                </div>
+                </>
               )}
             </div>
             {/* SentEvent Table */}
