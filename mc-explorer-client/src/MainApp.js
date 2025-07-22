@@ -329,50 +329,53 @@ export default function MainApp() {
     let headers = [];
     let rows = [];
     if (activeTab === 'de') {
-      headers = ['Name', 'Created', 'Path', 'Category', 'Is Sendable', 'Is Testable'];
+      headers = ['Type', 'Name', 'Path', 'Created By', 'Modified By', 'Row Count', 'Is Sendable', 'Is Testable'];
       rows = (searchTerm ? getFilteredData().filter(item => item._type === 'Data Extension') : dataExtensions).map(item => [
-        '"' + (item.Name || '').replace(/"/g, '""') + '"',
-        '"' + (item.CreatedDate || '').replace(/"/g, '""') + '"',
-        '"' + (item.Path || '').replace(/"/g, '""') + '"',
-        '"' + (item.Category || '').replace(/"/g, '""') + '"',
-        '"' + (item.IsSendable ? 'Yes' : 'No') + '"',
-        '"' + (item.IsTestable ? 'Yes' : 'No') + '"'
+        '"' + (item._type || 'Data Extension') + '"',
+        '"' + (item.name || item.Name || '') + '"',
+        '"' + (item.path || item.Path || '') + '"',
+        '"' + (item.createdByName || item.CreatedByName || '') + '"',
+        '"' + (item.modifiedByName || item.ModifiedByName || '') + '"',
+        '"' + (item.rowCount != null ? item.rowCount : (item.RowCount != null ? item.RowCount : '')) + '"',
+        '"' + (item.isSendable != null ? (item.isSendable ? 'Yes' : 'No') : (item.IsSendable ? 'Yes' : 'No')) + '"',
+        '"' + (item.isTestable != null ? (item.isTestable ? 'Yes' : 'No') : (item.IsTestable ? 'Yes' : 'No')) + '"'
       ]);
     } else if (activeTab === 'automation') {
-      headers = ['Name', 'Status', 'Created', 'Path'];
+      headers = ['Type', 'Name', 'Path', 'Status', 'Start Date', 'End Date', 'Last Run Time'];
       rows = (searchTerm ? getFilteredData().filter(item => item._type === 'Automation') : automations).map(item => [
-        '"' + (item.Name || '').replace(/"/g, '""') + '"',
-        '"' + (item.Status || '').replace(/"/g, '""') + '"',
-        '"' + (item.CreatedDate || '').replace(/"/g, '""') + '"',
-        '"' + (item.Path || '').replace(/"/g, '""') + '"'
+        '"' + (item._type || 'Automation') + '"',
+        '"' + (item.name || item.Name || '') + '"',
+        '"' + (item.path || item.Path || '') + '"',
+        '"' + (item.status || item.Status || '') + '"',
+        '"' + (item.startDate || item.StartDate || '') + '"',
+        '"' + (item.endDate || item.EndDate || '') + '"',
+        '"' + (item.lastRunTime || item.LastRunTime || '') + '"'
       ]);
     } else if (activeTab === 'datafilter') {
-      headers = ['Name', 'Created', 'Path'];
+      headers = ['Type', 'Name', 'Path'];
       rows = (searchTerm ? getFilteredData().filter(item => item._type === 'Data Filter') : dataFilters).map(item => [
-        '"' + (item.Name || '').replace(/"/g, '""') + '"',
-        '"' + (item.CreatedDate || '').replace(/"/g, '""') + '"',
-        '"' + (item.Path || '').replace(/"/g, '""') + '"'
+        '"' + (item._type || 'Data Filter') + '"',
+        '"' + (item.name || item.Name || '') + '"',
+        '"' + (item.path || item.Path || '') + '"'
       ]);
     } else if (activeTab === 'journey') {
-      headers = ['Name', 'Status', 'Created', 'Path'];
+      headers = ['Type', 'Name', 'Path', 'Status'];
       rows = (searchTerm ? getFilteredData().filter(item => item._type === 'Journey') : journeys).map(item => [
-        '"' + (item.Name || '').replace(/"/g, '""') + '"',
-        '"' + (item.Status || '').replace(/"/g, '""') + '"',
-        '"' + (item.CreatedDate || '').replace(/"/g, '""') + '"',
-        '"' + (item.Path || '').replace(/"/g, '""') + '"'
+        '"' + (item._type || 'Journey') + '"',
+        '"' + (item.name || item.Name || '') + '"',
+        '"' + (item.path || item.Path || '') + '"',
+        '"' + (item.status || item.Status || '') + '"'
       ]);
     } else if (activeTab === 'emailsenddefinition') {
-      headers = ['Name', 'SendClassification', 'SenderProfile', 'DeliveryProfile', 'BCC', 'CC'];
+      headers = ['Name', 'Send Classification', 'Sender Profile', 'Delivery Profile'];
       rows = (searchTerm ? getFilteredData().filter(item => item._type === 'EmailSendDefinition') : resolvedEmailSendDefs).map(esd => [
-        '"' + (esd.Name || '').replace(/"/g, '""') + '"',
+        '"' + (esd.Name || '') + '"',
         '"' + (esd.SendClassification?.CustomerKey || '') + '"',
         '"' + (esd.SenderProfile?.CustomerKey || '') + '"',
-        '"' + (esd.DeliveryProfile?.CustomerKey || '') + '"',
-        '"' + (esd.BccEmail || '') + '"',
-        '"' + (esd.CCEmail || '') + '"'
+        '"' + (esd.DeliveryProfile?.CustomerKey || '') + '"'
       ]);
     } else if (activeTab === 'publication') {
-      headers = ['ID', 'Name', 'Category', 'CustomerKey', 'BusinessUnit'];
+      headers = ['ID', 'Name', 'Category', 'Customer Key', 'Business Unit'];
       rows = (searchTerm ? getFilteredData().filter(item => item._type === 'Publication') : publications).map(pub => [
         '"' + (pub.id || '') + '"',
         '"' + (pub.name || '') + '"',
@@ -1637,7 +1640,7 @@ export default function MainApp() {
                     {paginatedArchiveResults.length === 0 ? (
                       <tr><td colSpan={8} className="p-8 text-center text-gray-500">No results found.</td></tr>
                     ) : paginatedArchiveResults.map((row, idx) => (
-                      <tr key={idx} className="border-t">
+                      <tr key={row.ID} className="border-t">
                         <td className="p-2">{row.SentDate || ''}</td>
                         <td className="p-2">{row.EmailName || ''}</td>
                         <td className="p-2">{row.Subject || ''}</td>
