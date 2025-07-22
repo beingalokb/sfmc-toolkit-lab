@@ -324,15 +324,70 @@ export default function MainApp() {
 
   const totalPages = Math.ceil(getFilteredData().length / itemsPerPage);
 
-  // CSV download functionality
+  // CSV download functionality (dynamic columns per tab)
   const downloadCSV = () => {
-    const filtered = getFilteredData();
-    const headers = ['Name', 'Created', 'Path'];
-    const rows = filtered.map(item => [
-      '"' + (item.name || '').replace(/"/g, '""') + '"',
-      '"' + (item.createdDate || 'N/A').replace(/"/g, '""') + '"',
-      '"' + (item.path || 'N/A').replace(/"/g, '""') + '"'
-    ]);
+    let headers = [];
+    let rows = [];
+    if (activeTab === 'de') {
+      headers = ['Name', 'Created', 'Path', 'Category', 'Is Sendable', 'Is Testable'];
+      rows = (searchTerm ? getFilteredData().filter(item => item._type === 'Data Extension') : dataExtensions).map(item => [
+        '"' + (item.Name || '').replace(/"/g, '""') + '"',
+        '"' + (item.CreatedDate || '').replace(/"/g, '""') + '"',
+        '"' + (item.Path || '').replace(/"/g, '""') + '"',
+        '"' + (item.Category || '').replace(/"/g, '""') + '"',
+        '"' + (item.IsSendable ? 'Yes' : 'No') + '"',
+        '"' + (item.IsTestable ? 'Yes' : 'No') + '"'
+      ]);
+    } else if (activeTab === 'automation') {
+      headers = ['Name', 'Status', 'Created', 'Path'];
+      rows = (searchTerm ? getFilteredData().filter(item => item._type === 'Automation') : automations).map(item => [
+        '"' + (item.Name || '').replace(/"/g, '""') + '"',
+        '"' + (item.Status || '').replace(/"/g, '""') + '"',
+        '"' + (item.CreatedDate || '').replace(/"/g, '""') + '"',
+        '"' + (item.Path || '').replace(/"/g, '""') + '"'
+      ]);
+    } else if (activeTab === 'datafilter') {
+      headers = ['Name', 'Created', 'Path'];
+      rows = (searchTerm ? getFilteredData().filter(item => item._type === 'Data Filter') : dataFilters).map(item => [
+        '"' + (item.Name || '').replace(/"/g, '""') + '"',
+        '"' + (item.CreatedDate || '').replace(/"/g, '""') + '"',
+        '"' + (item.Path || '').replace(/"/g, '""') + '"'
+      ]);
+    } else if (activeTab === 'journey') {
+      headers = ['Name', 'Status', 'Created', 'Path'];
+      rows = (searchTerm ? getFilteredData().filter(item => item._type === 'Journey') : journeys).map(item => [
+        '"' + (item.Name || '').replace(/"/g, '""') + '"',
+        '"' + (item.Status || '').replace(/"/g, '""') + '"',
+        '"' + (item.CreatedDate || '').replace(/"/g, '""') + '"',
+        '"' + (item.Path || '').replace(/"/g, '""') + '"'
+      ]);
+    } else if (activeTab === 'emailsenddefinition') {
+      headers = ['Name', 'SendClassification', 'SenderProfile', 'DeliveryProfile', 'BCC', 'CC'];
+      rows = (searchTerm ? getFilteredData().filter(item => item._type === 'EmailSendDefinition') : resolvedEmailSendDefs).map(esd => [
+        '"' + (esd.Name || '').replace(/"/g, '""') + '"',
+        '"' + (esd.SendClassification?.CustomerKey || '') + '"',
+        '"' + (esd.SenderProfile?.CustomerKey || '') + '"',
+        '"' + (esd.DeliveryProfile?.CustomerKey || '') + '"',
+        '"' + (esd.BccEmail || '') + '"',
+        '"' + (esd.CCEmail || '') + '"'
+      ]);
+    } else if (activeTab === 'publication') {
+      headers = ['ID', 'Name', 'Category', 'CustomerKey', 'BusinessUnit'];
+      rows = (searchTerm ? getFilteredData().filter(item => item._type === 'Publication') : publications).map(pub => [
+        '"' + (pub.id || '') + '"',
+        '"' + (pub.name || '') + '"',
+        '"' + (pub.category || '') + '"',
+        '"' + (pub.customerKey || '') + '"',
+        '"' + (pub.businessUnit || '') + '"'
+      ]);
+    } else {
+      // fallback: export whatever is in getFilteredData()
+      const filtered = getFilteredData();
+      if (filtered.length > 0) {
+        headers = Object.keys(filtered[0]);
+        rows = filtered.map(item => headers.map(h => '"' + (item[h] || '').toString().replace(/"/g, '""') + '"'));
+      }
+    }
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -1570,9 +1625,9 @@ export default function MainApp() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="bg-gray-100">
-                      {["SentDate","EmailName","Subject","ID","FromName","FromAddress","NumberSent","SubscriberKey","MID"].map(col => (
+                      {["SentDate","EmailName","Subject","ID","FromName","FromAddress","NumberSent","MID"].map(col => (
                         <th key={col} className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100" onClick={() => setArchiveSort(s => ({ key: col, direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc' }))}>
-                          {col === 'ID' ? 'JobID' : col === 'MID' ? 'MID' : col === 'FromName' ? 'From Name' : col === 'FromAddress' ? 'From Email' : col === 'NumberSent' ? '# of emails Sent' : col === 'SubscriberKey' ? 'Subscriber Key' : col === 'SentDate' ? 'Sent Date' : col}
+                          {col === 'ID' ? 'JobID' : col === 'MID' ? 'MID' : col === 'FromName' ? 'From Name' : col === 'FromAddress' ? 'From Email' : col === 'NumberSent' ? '# of emails Sent' : col === 'SentDate' ? 'Sent Date' : col}
                           {archiveSort.key === col && (archiveSort.direction === 'asc' ? ' ▲' : ' ▼')}
                         </th>
                       ))}
@@ -1580,7 +1635,7 @@ export default function MainApp() {
                   </thead>
                   <tbody>
                     {paginatedArchiveResults.length === 0 ? (
-                      <tr><td colSpan={9} className="p-8 text-center text-gray-500">No results found.</td></tr>
+                      <tr><td colSpan={8} className="p-8 text-center text-gray-500">No results found.</td></tr>
                     ) : paginatedArchiveResults.map((row, idx) => (
                       <tr key={idx} className="border-t">
                         <td className="p-2">{row.SentDate || ''}</td>
@@ -1606,7 +1661,6 @@ export default function MainApp() {
                             {row.NumberSent}
                           </button>
                         ) : ''}</td>
-                        <td className="p-2">{row.SubscriberKey ? <a href={`mailto:${row.SubscriberKey}`} className="text-blue-600 underline">{row.SubscriberKey}</a> : ''}</td>
                         <td className="p-2">{row.MID || ''}</td>
                       </tr>
                     ))}
