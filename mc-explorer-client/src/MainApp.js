@@ -80,6 +80,14 @@ export default function MainApp() {
   const [archiveSort, setArchiveSort] = useState({ key: null, direction: 'asc' });
   const [sentEventSort, setSentEventSort] = useState({ key: null, direction: 'asc' });
 
+  // --- Email Archiving Setup State ---
+  const [archivingStep, setArchivingStep] = useState(0);
+  const [archivingStatus, setArchivingStatus] = useState("");
+  const [archivingDEName, setArchivingDEName] = useState("");
+  const [archivingBlockName, setArchivingBlockName] = useState("");
+  const [archivingSelectedEmails, setArchivingSelectedEmails] = useState([]);
+  const [archivingAllSelected, setArchivingAllSelected] = useState(false);
+
   // Helper to get human-readable name for related fields
   function getProfileName(profiles, key) {
     if (!key) return '';
@@ -870,6 +878,12 @@ export default function MainApp() {
         onClick={() => setActiveTab('preferencecenter')}
       >
         Preference Center
+      </button>
+      <button
+        className={`px-4 py-2 rounded-lg ${activeTab === 'emailarchiving' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+        onClick={() => setActiveTab('emailarchiving')}
+      >
+        Email Archiving
       </button>
     </div>
   );
