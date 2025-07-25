@@ -943,12 +943,13 @@ export default function MainApp() {
           >
             Search Assets
           </button>
-          <button
+          {/* Guided Preference Center tab hidden as requested */}
+          {/* <button
             className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'preference' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
             onClick={() => setParentNav('preference')}
           >
             Guided Preference Center
-          </button>
+          </button> */}
           <button
             className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'distributedMarketing' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
             onClick={() => setParentNav('distributedMarketing')}
@@ -1719,7 +1720,7 @@ export default function MainApp() {
                       <tbody>
                         {(() => {
   const filtered = sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase())));
-  const totalPages = Math.ceil(filtered.length / sentEventRowsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / sentEventRowsPerPage));
   const paginated = filtered.slice((sentEventPage - 1) * sentEventRowsPerPage, sentEventPage * sentEventRowsPerPage);
   return paginated.length === 0 ? (
     <tr><td colSpan={5} className="p-8 text-center text-gray-500">No results found.</td></tr>
@@ -1740,8 +1741,8 @@ export default function MainApp() {
                         Page {sentEventPage} of {Math.ceil(sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).length / sentEventRowsPerPage) || 1}
                       </div>
                       <div className="flex gap-2">
-                        <button disabled={sentEventPage === 1} onClick={() => setSentEventPage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
-                        <button disabled={sentEventPage === Math.ceil(sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).length / sentEventRowsPerPage) || sentEventPage === 1} onClick={() => setSentEventPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
+                        <button disabled={sentEventPage <= 1} onClick={() => setSentEventPage(p => Math.max(1, p - 1))} className="px-2 py-1 border rounded">Prev</button>
+                        <button disabled={sentEventPage >= totalPages} onClick={() => setSentEventPage(p => Math.min(totalPages, p + 1))} className="px-2 py-1 border rounded">Next</button>
                       </div>
                     </div>
                   </div>
