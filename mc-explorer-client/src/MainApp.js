@@ -1738,11 +1738,11 @@ export default function MainApp() {
                     </table>
                     <div className="flex justify-between items-center mt-4 text-sm">
                       <div>
-                        Page {sentEventPage} of {Math.ceil(sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).length / sentEventRowsPerPage) || 1}
+                        Page {sentEventPage} of {Math.max(1, Math.ceil(sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).length / sentEventRowsPerPage))}
                       </div>
                       <div className="flex gap-2">
                         <button disabled={sentEventPage <= 1} onClick={() => setSentEventPage(p => Math.max(1, p - 1))} className="px-2 py-1 border rounded">Prev</button>
-                        <button disabled={sentEventPage >= totalPages} onClick={() => setSentEventPage(p => Math.min(totalPages, p + 1))} className="px-2 py-1 border rounded">Next</button>
+                        <button disabled={sentEventPage >= Math.max(1, Math.ceil(sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).length / sentEventRowsPerPage))} onClick={() => setSentEventPage(p => Math.min(Math.max(1, Math.ceil(sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).length / sentEventRowsPerPage)), p + 1))} className="px-2 py-1 border rounded">Next</button>
                       </div>
                     </div>
                   </div>
