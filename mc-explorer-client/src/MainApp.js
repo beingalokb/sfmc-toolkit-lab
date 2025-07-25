@@ -63,7 +63,7 @@ export default function MainApp() {
   // Add projectName state
   const [projectName, setProjectName] = useState('');
 
-  // --- Email Archiving State ---
+  // --- Email Auditing State ---
   const [emailArchiveResults, setEmailArchiveResults] = useState([]);
   const [emailArchiveLoading, setEmailArchiveLoading] = useState(false);
   const [emailArchiveError, setEmailArchiveError] = useState('');
@@ -772,7 +772,7 @@ export default function MainApp() {
     }
   }
 
-  // --- Email Archiving Fetch Logic ---
+  // --- Email Auditing Fetch Logic ---
   const fetchEmailArchive = async () => {
     setEmailArchiveLoading(true);
     setEmailArchiveError('');
@@ -811,7 +811,7 @@ export default function MainApp() {
       .finally(() => setSentEventLoading(false));
   }, [selectedSendId]);
 
-  // Pagination logic for Email Archiving table
+  // Pagination logic for Email Auditing table
   const paginatedArchiveResults = emailArchiveResults.slice((archivePage - 1) * archiveRowsPerPage, archivePage * archiveRowsPerPage);
   const totalArchivePages = Math.ceil(emailArchiveResults.length / archiveRowsPerPage);
 
@@ -966,7 +966,7 @@ export default function MainApp() {
             className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'emailArchiving' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
             onClick={() => setParentNav('emailArchiving')}
           >
-            Email Archiving
+            Email Auditing
           </button>
         </div>
         {/* Render content based on parentNav */}
@@ -1596,10 +1596,10 @@ export default function MainApp() {
           </div>
         )}
 
-        {/* Email Archiving content */}
+        {/* Email Auditing content */}
         {parentNav === 'emailArchiving' && (
           <div className="bg-white shadow rounded p-6 max-w-6xl mx-auto">
-            <h2 className="text-2xl font-bold text-indigo-700 mb-4">Email Archiving</h2>
+            <h2 className="text-2xl font-bold text-indigo-700 mb-4">Email Auditing</h2>
             {/* Search Fields */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div>
