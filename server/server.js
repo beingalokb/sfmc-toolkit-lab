@@ -2792,7 +2792,7 @@ app.get('/api/email-archive/send', async (req, res) => {
     }
     // Map to only relevant fields for frontend
     const mapped = results.map(r => ({
-      SentDate: r.SentDate || '',
+      SendDate: r.SendDate || r.SentDate || '',
       EmailName: r.EmailName || '',
       Subject: r.Subject || '',
       ID: r.ID || '',
@@ -2801,6 +2801,16 @@ app.get('/api/email-archive/send', async (req, res) => {
       FromName: r.FromName || '',
       FromAddress: r.FromAddress || '',
       NumberSent: r.NumberSent || '',
+      NumberTargeted: r.NumberTargeted || '',
+      NumberDelivered: r.NumberDelivered || '',
+      NumberErrored: r.NumberErrored || '',
+      NumberExcluded: r.NumberExcluded || '',
+      SoftBounces: r.SoftBounces || '',
+      UniqueClicks: r.UniqueClicks || '',
+      UniqueOpens: r.UniqueOpens || '',
+      Unsubscribes: r.Unsubscribes || '',
+      Duplicates: r.Duplicates || '',
+      BccEmail: r.BccEmail || '',
     }));
     res.json({ results: mapped });
   } catch (err) {

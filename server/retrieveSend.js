@@ -96,12 +96,21 @@ async function retrieveSendWithFilter(subdomain, accessToken, filter) {
             <ns:Properties>Status</ns:Properties>
             <ns:Properties>Subject</ns:Properties>
             <ns:Properties>Email.ID</ns:Properties>
-            <ns:Properties>SentDate</ns:Properties>
+            <ns:Properties>SendDate</ns:Properties>
             <ns:Properties>FromAddress</ns:Properties>
             <ns:Properties>FromName</ns:Properties>
             <ns:Properties>BccEmail</ns:Properties>
             <ns:Properties>CreatedDate</ns:Properties>
             <ns:Properties>NumberSent</ns:Properties>
+            <ns:Properties>NumberTargeted</ns:Properties>
+            <ns:Properties>NumberDelivered</ns:Properties>
+            <ns:Properties>NumberErrored</ns:Properties>
+            <ns:Properties>NumberExcluded</ns:Properties>
+            <ns:Properties>SoftBounces</ns:Properties>
+            <ns:Properties>UniqueClicks</ns:Properties>
+            <ns:Properties>UniqueOpens</ns:Properties>
+            <ns:Properties>Unsubscribes</ns:Properties>
+            <ns:Properties>Duplicates</ns:Properties>
             <ns:Properties>Client.ID</ns:Properties>
             ${filter ? buildFilterXML(filter) : ''}
           </ns:RetrieveRequest>

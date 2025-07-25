@@ -1625,12 +1625,12 @@ export default function MainApp() {
                 <div className="p-8 text-center text-red-600">{emailArchiveError}</div>
               ) : (
                 <>
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-sm" style={{ minWidth: '1800px' }}>
                   <thead>
                     <tr className="bg-gray-100">
-                      {["SentDate","EmailName","Subject","ID","FromName","FromAddress","NumberSent","MID"].map(col => (
+                      {["SendDate","EmailName","Subject","ID","FromName","FromAddress","NumberSent","NumberTargeted","NumberDelivered","NumberErrored","NumberExcluded","SoftBounces","UniqueClicks","UniqueOpens","Unsubscribes","Duplicates","BccEmail","MID"].map(col => (
                         <th key={col} className="p-2 text-left cursor-pointer select-none hover:bg-indigo-100" onClick={() => setArchiveSort(s => ({ key: col, direction: s.key === col && s.direction === 'asc' ? 'desc' : 'asc' }))}>
-                          {col === 'ID' ? 'JobID' : col === 'MID' ? 'MID' : col === 'FromName' ? 'From Name' : col === 'FromAddress' ? 'From Email' : col === 'NumberSent' ? '# of emails Sent' : col === 'SentDate' ? 'Sent Date' : col}
+                          {col === 'ID' ? 'JobID' : col === 'MID' ? 'MID' : col === 'FromName' ? 'From Name' : col === 'FromAddress' ? 'From Email' : col === 'NumberSent' ? '# of emails Sent' : col === 'SendDate' ? 'Send Date' : col}
                           {archiveSort.key === col && (archiveSort.direction === 'asc' ? ' ▲' : ' ▼')}
                         </th>
                       ))}
@@ -1638,10 +1638,10 @@ export default function MainApp() {
                   </thead>
                   <tbody>
                     {paginatedArchiveResults.length === 0 ? (
-                      <tr><td colSpan={8} className="p-8 text-center text-gray-500">No results found.</td></tr>
+                      <tr><td colSpan={17} className="p-8 text-center text-gray-500">No results found.</td></tr>
                     ) : paginatedArchiveResults.map((row, idx) => (
                       <tr key={row.ID} className="border-t">
-                        <td className="p-2">{row.SentDate || ''}</td>
+                        <td className="p-2">{row.SendDate || ''}</td>
                         <td className="p-2">{row.EmailName || ''}</td>
                         <td className="p-2">{row.Subject || ''}</td>
                         <td className="p-2">{row.ID || ''}</td>
@@ -1664,6 +1664,16 @@ export default function MainApp() {
                             {row.NumberSent}
                           </button>
                         ) : ''}</td>
+                        <td className="p-2">{row.NumberTargeted || ''}</td>
+                        <td className="p-2">{row.NumberDelivered || ''}</td>
+                        <td className="p-2">{row.NumberErrored || ''}</td>
+                        <td className="p-2">{row.NumberExcluded || ''}</td>
+                        <td className="p-2">{row.SoftBounces || ''}</td>
+                        <td className="p-2">{row.UniqueClicks || ''}</td>
+                        <td className="p-2">{row.UniqueOpens || ''}</td>
+                        <td className="p-2">{row.Unsubscribes || ''}</td>
+                        <td className="p-2">{row.Duplicates || ''}</td>
+                        <td className="p-2">{row.BccEmail || ''}</td>
                         <td className="p-2">{row.MID || ''}</td>
                       </tr>
                     ))}
