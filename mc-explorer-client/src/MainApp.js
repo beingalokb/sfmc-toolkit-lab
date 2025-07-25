@@ -1717,19 +1717,33 @@ export default function MainApp() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).length === 0 ? (
-                          <tr><td colSpan={5} className="p-8 text-center text-gray-500">No results found.</td></tr>
-                        ) : sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).map((row, idx) => (
-                          <tr key={idx} className="border-t">
-                            <td className="p-2">{row.SubscriberKey || ''}</td>
-                            <td className="p-2">{row.EventDate || ''}</td>
-                            <td className="p-2">{row.SendID || ''}</td>
-                            <td className="p-2">{row.ListID || ''}</td>
-                            <td className="p-2">{row.TriggeredSendDefinitionObjectID || ''}</td>
-                          </tr>
-                        ))}
+                        {(() => {
+  const filtered = sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase())));
+  const totalPages = Math.ceil(filtered.length / sentEventRowsPerPage);
+  const paginated = filtered.slice((sentEventPage - 1) * sentEventRowsPerPage, sentEventPage * sentEventRowsPerPage);
+  return paginated.length === 0 ? (
+    <tr><td colSpan={5} className="p-8 text-center text-gray-500">No results found.</td></tr>
+  ) : paginated.map((row, idx) => (
+    <tr key={idx} className="border-t">
+      <td className="p-2">{row.SubscriberKey || ''}</td>
+      <td className="p-2">{row.EventDate || ''}</td>
+      <td className="p-2">{row.SendID || ''}</td>
+      <td className="p-2">{row.ListID || ''}</td>
+      <td className="p-2">{row.TriggeredSendDefinitionObjectID || ''}</td>
+    </tr>
+  ));
+})()}
                       </tbody>
                     </table>
+                    <div className="flex justify-between items-center mt-4 text-sm">
+                      <div>
+                        Page {sentEventPage} of {Math.ceil(sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).length / sentEventRowsPerPage) || 1}
+                      </div>
+                      <div className="flex gap-2">
+                        <button disabled={sentEventPage === 1} onClick={() => setSentEventPage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
+                        <button disabled={sentEventPage === Math.ceil(sentEventResults.filter(row => !sentEventSubscriberKey || (row.SubscriberKey && row.SubscriberKey.toLowerCase().includes(sentEventSubscriberKey.toLowerCase()))).length / sentEventRowsPerPage) || sentEventPage === 1} onClick={() => setSentEventPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
