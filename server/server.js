@@ -2883,36 +2883,78 @@ app.post('/createEmailArchiveDE', async (req, res) => {
       return res.status(500).json({ status: 'ERROR', message: 'Root folder for dataextensions not found' });
     }
 
-    // Step 2: Create the folder for Email Archive
-    const createFolderSoap = `
+    // Step 2: Create the folder for Email Archive (or get existing one)
+    let folderId;
+    
+    // First, try to find if the folder already exists
+    const findFolderSoap = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <soapenv:Header>
-          <fueloauth>${accessToken}</fueloauth>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
         </soapenv:Header>
         <soapenv:Body>
-          <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
-            <Options />
-            <Objects xsi:type="DataFolder">
-              <n>${folderName}</n>
-              <Description>Folder for Email Archive Data Extensions</Description>
-              <ContentType>dataextension</ContentType>
-              <ParentFolder>
-                <ID>${parentId}</ID>
-              </ParentFolder>
-            </Objects>
-          </CreateRequest>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataFolder</ObjectType>
+              <Properties>ID</Properties>
+              <Properties>Name</Properties>
+              <Properties>ContentType</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>Name</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>${folderName}</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
         </soapenv:Body>
       </soapenv:Envelope>
     `;
 
-    const folderResp = await axios.post(
+    const findFolderResp = await axios.post(
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-      createFolderSoap,
-      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
+      findFolderSoap,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
     );
 
-    const folderParsed = await parser.parseStringPromise(folderResp.data);
-    const folderId = folderParsed['soap:Envelope']['soap:Body']['CreateResponse']['Results']?.NewID;
+    const findFolderParsed = await parser.parseStringPromise(findFolderResp.data);
+    const existingFolder = findFolderParsed['soap:Envelope']['soap:Body']['RetrieveResponseMsg']['Results'];
+    
+    if (existingFolder && existingFolder.ID) {
+      folderId = existingFolder.ID;
+      console.log(`📁 [Email Archive DE] Using existing folder: ${folderId}`);
+    } else {
+      // Create new folder if it doesn't exist
+      const createFolderSoap = `
+        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <soapenv:Header>
+            <fueloauth>${accessToken}</fueloauth>
+          </soapenv:Header>
+          <soapenv:Body>
+            <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <Options />
+              <Objects xsi:type="DataFolder">
+                <n>${folderName}</n>
+                <Description>Folder for Email Archive Data Extensions</Description>
+                <ContentType>dataextension</ContentType>
+                <ParentFolder>
+                  <ID>${parentId}</ID>
+                </ParentFolder>
+              </Objects>
+            </CreateRequest>
+          </soapenv:Body>
+        </soapenv:Envelope>
+      `;
+
+      const folderResp = await axios.post(
+        `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+        createFolderSoap,
+        { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
+      );
+
+      const folderParsed = await parser.parseStringPromise(folderResp.data);
+      folderId = folderParsed['soap:Envelope']['soap:Body']['CreateResponse']['Results']?.NewID;
+      console.log(`📁 [Email Archive DE] Created new folder: ${folderId}`);
+    }
 
     if (!folderId) {
       return res.status(500).json({ status: 'ERROR', message: 'Failed to create folder' });
@@ -2921,9 +2963,15 @@ app.post('/createEmailArchiveDE', async (req, res) => {
     // Step 3: Create the Data Extension with specified fields
     const fieldXml = fields.map(field => {
       let fieldDef = `<Field><n>${field.name}</n><FieldType>${field.fieldType}</FieldType>`;
-      if (field.length) {
+      
+      // Handle MaxLength for text fields
+      if (field.fieldType === 'Text') {
+        const maxLength = field.length || (field.name === 'HTML' ? 4000 : 254);
+        fieldDef += `<MaxLength>${maxLength}</MaxLength>`;
+      } else if (field.length) {
         fieldDef += `<MaxLength>${field.length}</MaxLength>`;
       }
+      
       if (field.isPrimaryKey) {
         fieldDef += `<IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired>`;
       } else {
