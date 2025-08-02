@@ -60,6 +60,9 @@ export default function MainApp() {
   const [qsDetails, setQSDetails] = useState(null);
   const [qsLoading, setQSLoading] = useState(false);
 
+  // Add separate state for Preference Center success
+  const [preferenceCenterStatus, setPreferenceCenterStatus] = useState("");
+
   // Add projectName state
   const [projectName, setProjectName] = useState('');
 
@@ -897,7 +900,7 @@ export default function MainApp() {
       <button
         onClick={async () => {
           setQSLoading(true);
-          setQSStatus("Creating Quick Send DE, Event, Journey...");
+          setQSStatus(""); // Only clear DM QS status
           setQSDetails(null);
           try {
             const res = await fetch(`${baseURL}/create/dm-dataextension`, { method: 'POST' });
@@ -1406,6 +1409,8 @@ export default function MainApp() {
                   <div className="mb-4">
                     <label className="block mb-1 font-semibold">Send Classification</label>
                     <select
+                     
+
                       className="w-full border rounded p-2"
                       value={massEditModal.sendClassification}
                       onChange={e => setMassEditModal(prev => ({ ...prev, sendClassification: e.target.value }))}
@@ -1565,7 +1570,8 @@ export default function MainApp() {
         {/* Render content for Preference Center config */}
         {parentNav === 'preferencecenter' && (
           <div className="bg-white shadow rounded p-6 max-w-xl mx-auto" id="preferencecenter-success-section">
-            {qsStatus && qsStatus.startsWith('✅') && (
+            {/* Only show success message for Preference Center flow */}
+            {preferenceCenterStatus && preferenceCenterStatus.startsWith('✅') && (
               <div className="bg-green-50 border border-green-300 text-green-800 rounded p-4 mb-4" id="preferencecenter-success-message">
                 <div className="text-2xl mb-2">✅ Configuration Completed Successfully!</div>
                 <div className="mb-2 font-semibold">Your Preference Center setup is now complete.</div>
@@ -1580,7 +1586,7 @@ export default function MainApp() {
             )}
             <PreferenceCenterConfigForm 
               onSubmit={async config => {
-                setQSStatus('Submitting configuration...');
+                setPreferenceCenterStatus('Submitting configuration...');
                 setQSLoading(true);
                 try {
                   const res = await fetch(`${baseURL}/preference-center/configure`, {
@@ -1590,22 +1596,20 @@ export default function MainApp() {
                   });
                   const json = await res.json();
                   if (json.status === 'OK') {
-                    setQSStatus('✅ Configuration Completed Successfully!');
+                    setPreferenceCenterStatus('✅ Configuration Completed Successfully!');
                     setTimeout(() => {
                       const el = document.getElementById('preferencecenter-success-section');
-
                       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }, 100);
                   } else {
-                    setQSStatus('❌ Failed to submit configuration: ' + (json.message || 'Unknown error'));
+                    setPreferenceCenterStatus('❌ Failed to submit configuration: ' + (json.message || 'Unknown error'));
                   }
                 } catch (e) {
-                  setQSStatus('❌ Error submitting configuration.');
+                  setPreferenceCenterStatus('❌ Failed to submit configuration: ' + e.message);
                 } finally {
                   setQSLoading(false);
                 }
-              }} 
-              submitting={qsLoading}
+              }}
             />
           </div>
         )}
