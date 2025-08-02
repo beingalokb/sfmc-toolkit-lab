@@ -1416,8 +1416,6 @@ export default function MainApp() {
                   <div className="mb-4">
                     <label className="block mb-1 font-semibold">Send Classification</label>
                     <select
-                     
-
                       className="w-full border rounded p-2"
                       value={massEditModal.sendClassification}
                       onChange={e => setMassEditModal(prev => ({ ...prev, sendClassification: e.target.value }))}
@@ -1775,6 +1773,11 @@ export default function MainApp() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Email Archiving content */}
+        {parentNav === 'emailArchivingSetup' && (
+          <EmailArchiving />
         )}
       </div>
     </div>

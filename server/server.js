@@ -2819,6 +2819,182 @@ app.get('/api/email-archive/send', async (req, res) => {
   }
 });
 
+// Create Email Archive Data Extension
+app.post('/createEmailArchiveDE', async (req, res) => {
+  try {
+    const { folderName, deName, description, isSendable, fields } = req.body;
+    
+    // Get credentials and access token
+    const creds = getMCCreds(req);
+    const subdomain = creds.subdomain;
+    const accessToken = getAccessTokenFromRequest(req);
+    
+    if (!accessToken || !subdomain) {
+      return res.status(401).json({ status: 'ERROR', message: 'Missing Marketing Cloud credentials' });
+    }
+
+    const axios = require('axios');
+    const xml2js = require('xml2js');
+    const parser = new xml2js.Parser({ explicitArray: false });
+
+    // Step 1: Get root folder for Data Extensions
+    const getRootFolderSoap = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataFolder</ObjectType>
+              <Properties>ID</Properties>
+              <Properties>Name</Properties>
+              <Properties>ContentType</Properties>
+              <Properties>ParentFolder.ID</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>ContentType</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>dataextension</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+
+    const rootResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      getRootFolderSoap,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+
+    const rootParsed = await parser.parseStringPromise(rootResp.data);
+    const rootFolders = rootParsed['soap:Envelope']['soap:Body']['RetrieveResponseMsg']['Results'];
+    
+    let parentId;
+    if (Array.isArray(rootFolders)) {
+      const rootDEFolder = rootFolders.find(f => f.ContentType === 'dataextension' && f['ParentFolder']?.ID === '0');
+      parentId = rootDEFolder?.ID;
+    } else if (rootFolders?.ContentType === 'dataextension' && rootFolders?.ParentFolder?.ID === '0') {
+      parentId = rootFolders.ID;
+    }
+
+    if (!parentId) {
+      return res.status(500).json({ status: 'ERROR', message: 'Root folder for dataextensions not found' });
+    }
+
+    // Step 2: Create the folder for Email Archive
+    const createFolderSoap = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <soapenv:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <Options />
+            <Objects xsi:type="DataFolder">
+              <n>${folderName}</n>
+              <Description>Folder for Email Archive Data Extensions</Description>
+              <ContentType>dataextension</ContentType>
+              <ParentFolder>
+                <ID>${parentId}</ID>
+              </ParentFolder>
+            </Objects>
+          </CreateRequest>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+
+    const folderResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      createFolderSoap,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
+    );
+
+    const folderParsed = await parser.parseStringPromise(folderResp.data);
+    const folderId = folderParsed['soap:Envelope']['soap:Body']['CreateResponse']['Results']?.NewID;
+
+    if (!folderId) {
+      return res.status(500).json({ status: 'ERROR', message: 'Failed to create folder' });
+    }
+
+    // Step 3: Create the Data Extension with specified fields
+    const fieldXml = fields.map(field => {
+      let fieldDef = `<Field><n>${field.name}</n><FieldType>${field.fieldType}</FieldType>`;
+      if (field.length) fieldDef += `<MaxLength>${field.length}</MaxLength>`;
+      if (field.isPrimaryKey) fieldDef += `<IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired>`;
+      else fieldDef += `<IsRequired>false</IsRequired>`;
+      fieldDef += `</Field>`;
+      return fieldDef;
+    }).join('');
+
+    const sendableField = fields.find(f => f.isPrimaryKey);
+    const sendableXml = sendableField ? `
+      <SendableDataExtensionField>
+        <n>${sendableField.name}</n>
+      </SendableDataExtensionField>
+      <SendableSubscriberField>
+        <n>Subscriber Key</n>
+      </SendableSubscriberField>
+    ` : '';
+
+    const deSoap = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <soapenv:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <Options />
+            <Objects xmlns:ns1="http://exacttarget.com/wsdl/partnerAPI" xsi:type="ns1:DataExtension">
+              <n>${deName}</n>
+              <CustomerKey>${deName}</CustomerKey>
+              <Description>${description}</Description>
+              <CategoryID>${folderId}</CategoryID>
+              <IsSendable>${isSendable}</IsSendable>
+              <IsTestable>false</IsTestable>
+              <Fields>
+                ${fieldXml}
+              </Fields>
+              ${sendableXml}
+            </Objects>
+          </CreateRequest>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+
+    const deResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      deSoap,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
+    );
+
+    const deParsed = await parser.parseStringPromise(deResp.data);
+    const deResult = deParsed['soap:Envelope']['soap:Body']['CreateResponse']['Results'];
+
+    if (deResult?.StatusCode === 'OK') {
+      return res.json({
+        status: 'OK',
+        deName: deName,
+        folderName: folderName,
+        description: description,
+        dePath: `/Data Extensions / ${folderName}`,
+        objectId: deResult.NewID
+      });
+    } else {
+      return res.status(500).json({ 
+        status: 'ERROR', 
+        message: 'Failed to create Data Extension',
+        details: deResult?.StatusMessage 
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ [Email Archive DE Creation] Error:', error.message);
+    res.status(500).json({ status: 'ERROR', message: error.message });
+  }
+});
+
 // Register the SentEvent endpoint
 require('./emailArchiveSentEventsEndpoint')(app);
 

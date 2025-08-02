@@ -10,7 +10,7 @@ const baseURL = process.env.REACT_APP_BASE_URL;
 export default function MainApp() {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [activeTab, setActiveTab] = useState('de');
+  const [activeTab, setActiveTab] = useState('search');
   const [parentNav, setParentNav] = useState('main');
   const [dmStep, setDMStep] = useState(1);
   const [deCreated, setDECreated] = useState(false);
@@ -23,16 +23,28 @@ export default function MainApp() {
     return (
       <div className="flex space-x-4 mb-6">
         <button
-          className={`px-4 py-2 rounded-lg ${activeTab === 'de' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
-          onClick={() => setActiveTab('de')}
+          className={`px-4 py-2 rounded-lg ${activeTab === 'search' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+          onClick={() => setActiveTab('search')}
         >
-          Data Extensions
+          Search Assets
         </button>
         <button
           className={`px-4 py-2 rounded-lg ${activeTab === 'dm' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
           onClick={() => setActiveTab('dm')}
         >
           Distributed Marketing
+        </button>
+        <button
+          className={`px-4 py-2 rounded-lg ${activeTab === 'preferencecenter' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+          onClick={() => setActiveTab('preferencecenter')}
+        >
+          Preference Center
+        </button>
+        <button
+          className={`px-4 py-2 rounded-lg ${activeTab === 'emailauditing' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+          onClick={() => setActiveTab('emailauditing')}
+        >
+          Email Auditing
         </button>
         <button
           className={`px-4 py-2 rounded-lg ${activeTab === 'emailarchiving' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
@@ -118,13 +130,49 @@ export default function MainApp() {
       );
     }
     
+    if (activeTab === 'search') {
+      return (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-2xl font-semibold text-indigo-700 mb-6">
+            Search Assets (Data Extensions)
+          </h2>
+          <p className="text-gray-700">Search and manage your Marketing Cloud assets here.</p>
+        </div>
+      );
+    }
+    
+    if (activeTab === 'preferencecenter') {
+      return (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-2xl font-semibold text-indigo-700 mb-6">
+            Preference Center
+          </h2>
+          <p className="text-gray-700">Manage preference center configurations.</p>
+        </div>
+      );
+    }
+    
+    if (activeTab === 'emailauditing') {
+      return (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-2xl font-semibold text-indigo-700 mb-6">
+            Email Auditing
+          </h2>
+          <p className="text-gray-700">Audit and review email campaigns.</p>
+        </div>
+      );
+    }
+    
     if (activeTab === 'emailarchiving') {
       return <EmailArchiving />;
     }
     
     return (
-      <div className="bg-white rounded-lg shadow">
-        {/* Existing content rendering logic */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-2xl font-semibold text-indigo-700 mb-6">
+          Welcome to MC Explorer
+        </h2>
+        <p className="text-gray-700">Select a tab above to get started.</p>
       </div>
     );
   };
