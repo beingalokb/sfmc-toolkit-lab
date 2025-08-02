@@ -3,6 +3,8 @@ import './App.css';
 import DMWizard from './components/DMWizard';
 import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
 import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
+import EmailArchiving from './EmailArchiving';
+import OnDemandEmailArchive from './OnDemandEmailArchive';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -32,6 +34,18 @@ export default function MainApp() {
           onClick={() => setActiveTab('dm')}
         >
           Distributed Marketing
+        </button>
+        <button
+          className={`px-4 py-2 rounded-lg ${activeTab === 'emailarchiving' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+          onClick={() => setActiveTab('emailarchiving')}
+        >
+          Email Archiving
+        </button>
+        <button
+          className={`px-4 py-2 rounded-lg ${activeTab === 'ondemandarchive' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+          onClick={() => setActiveTab('ondemandarchive')}
+        >
+          On Demand Email Archive
         </button>
       </div>
     );
@@ -110,6 +124,15 @@ export default function MainApp() {
         </div>
       );
     }
+    
+    if (activeTab === 'emailarchiving') {
+      return <EmailArchiving />;
+    }
+    
+    if (activeTab === 'ondemandarchive') {
+      return <OnDemandEmailArchive />;
+    }
+    
     return (
       <div className="bg-white rounded-lg shadow">
         {/* Existing content rendering logic */}

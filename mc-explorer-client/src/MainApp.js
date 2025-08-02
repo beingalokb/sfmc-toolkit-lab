@@ -3,6 +3,7 @@ import './App.css';
 import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
 import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
 import PreferenceCenterConfigForm from './PreferenceCenterConfigForm';
+import EmailArchiving from './EmailArchiving';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -984,6 +985,12 @@ export default function MainApp() {
             onClick={() => setParentNav('emailArchiving')}
           >
             Email Auditing
+          </button>
+          <button
+            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'emailArchivingSetup' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+            onClick={() => setParentNav('emailArchivingSetup')}
+          >
+            Email Archiving
           </button>
         </div>
         {/* Render content based on parentNav */}
