@@ -2921,22 +2921,20 @@ app.post('/createEmailArchiveDE', async (req, res) => {
     // Step 3: Create the Data Extension with specified fields
     const fieldXml = fields.map(field => {
       let fieldDef = `<Field><n>${field.name}</n><FieldType>${field.fieldType}</FieldType>`;
-      if (field.length) fieldDef += `<MaxLength>${field.length}</MaxLength>`;
-      if (field.isPrimaryKey) fieldDef += `<IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired>`;
-      else fieldDef += `<IsRequired>false</IsRequired>`;
+      if (field.length) {
+        fieldDef += `<MaxLength>${field.length}</MaxLength>`;
+      }
+      if (field.isPrimaryKey) {
+        fieldDef += `<IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired>`;
+      } else {
+        fieldDef += `<IsPrimaryKey>false</IsPrimaryKey><IsRequired>false</IsRequired>`;
+      }
       fieldDef += `</Field>`;
       return fieldDef;
     }).join('');
 
-    const sendableField = fields.find(f => f.isPrimaryKey);
-    const sendableXml = sendableField ? `
-      <SendableDataExtensionField>
-        <n>${sendableField.name}</n>
-      </SendableDataExtensionField>
-      <SendableSubscriberField>
-        <n>Subscriber Key</n>
-      </SendableSubscriberField>
-    ` : '';
+    // Since isSendable is false, we don't need sendable configuration
+    const sendableXml = '';
 
     const deSoap = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -2956,7 +2954,6 @@ app.post('/createEmailArchiveDE', async (req, res) => {
               <Fields>
                 ${fieldXml}
               </Fields>
-              ${sendableXml}
             </Objects>
           </CreateRequest>
         </soapenv:Body>
@@ -2968,6 +2965,9 @@ app.post('/createEmailArchiveDE', async (req, res) => {
       deSoap,
       { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
     );
+
+    console.log('📧 [Email Archive DE] SOAP Request:', deSoap);
+    console.log('📧 [Email Archive DE] SOAP Response:', deResp.data);
 
     const deParsed = await parser.parseStringPromise(deResp.data);
     const deResult = deParsed['soap:Envelope']['soap:Body']['CreateResponse']['Results'];
