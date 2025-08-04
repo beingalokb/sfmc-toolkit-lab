@@ -2960,26 +2960,16 @@ app.post('/createEmailArchiveDE', async (req, res) => {
       return res.status(500).json({ status: 'ERROR', message: 'Failed to create folder' });
     }
 
-    // Step 3: Create the Data Extension with specified fields
-    const fieldXml = fields.map(field => {
-      let fieldDef = `<Field><n>${field.name}</n><FieldType>${field.fieldType}</FieldType>`;
-      
-      // Handle MaxLength for text fields
-      if (field.fieldType === 'Text') {
-        const maxLength = field.length || (field.name === 'HTML' ? 4000 : 254);
-        fieldDef += `<MaxLength>${maxLength}</MaxLength>`;
-      } else if (field.length) {
-        fieldDef += `<MaxLength>${field.length}</MaxLength>`;
-      }
-      
-      if (field.isPrimaryKey) {
-        fieldDef += `<IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired>`;
-      } else {
-        fieldDef += `<IsPrimaryKey>false</IsPrimaryKey><IsRequired>false</IsRequired>`;
-      }
-      fieldDef += `</Field>`;
-      return fieldDef;
-    }).join('');
+    // Step 3: Create the Data Extension with specified fields - hardcode like DM QS
+    const fieldXml = `
+                <Field><Name>EmailAddress</Name><FieldType>EmailAddress</FieldType><IsRequired>false</IsRequired></Field>
+                <Field><Name>JobID</Name><FieldType>Number</FieldType><IsPrimaryKey>true</IsPrimaryKey><IsRequired>true</IsRequired></Field>
+                <Field><Name>SendTime</Name><FieldType>Date</FieldType><IsRequired>false</IsRequired></Field>
+                <Field><Name>EmailName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>HTML</Name><FieldType>Text</FieldType><MaxLength>4000</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>ListID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
+                <Field><Name>SendID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
+                <Field><Name>BatchID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>`;
 
     // Since isSendable is false, we don't need sendable configuration
     const sendableXml = '';
@@ -2993,11 +2983,10 @@ app.post('/createEmailArchiveDE', async (req, res) => {
           <CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
             <Options />
             <Objects xmlns:ns1="http://exacttarget.com/wsdl/partnerAPI" xsi:type="ns1:DataExtension">
-              <n>${deName}</n>
+              <Name>${deName}</Name>
               <CustomerKey>${deName}</CustomerKey>
-              <Description>${description}</Description>
               <CategoryID>${folderId}</CategoryID>
-              <IsSendable>${isSendable}</IsSendable>
+              <IsSendable>false</IsSendable>
               <IsTestable>false</IsTestable>
               <Fields>
                 ${fieldXml}
