@@ -2964,6 +2964,8 @@ app.post('/createEmailArchiveDE', async (req, res) => {
       return res.status(500).json({ status: 'ERROR', message: 'Failed to create folder' });
     }
 
+    console.log(`📁 [Email Archive] Using folder ID: ${folderId} for DE creation`);
+
     // Step 3: Create the Data Extension with specified fields - hardcode like DM QS
     const fieldXml = `
                 <Field><Name>EmailAddress</Name><FieldType>EmailAddress</FieldType><IsRequired>false</IsRequired></Field>
@@ -3007,6 +3009,7 @@ app.post('/createEmailArchiveDE', async (req, res) => {
       { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' } }
     );
 
+    console.log(`📧 [Email Archive DE] Using CategoryID (folder): ${folderId}`);
     console.log('📧 [Email Archive DE] SOAP Request:', deSoap);
     console.log('📧 [Email Archive DE] SOAP Response:', deResp.data);
 
