@@ -2970,7 +2970,7 @@ app.post('/createEmailArchiveDE', async (req, res) => {
                 <Field><Name>JobID</Name><FieldType>Number</FieldType><IsRequired>true</IsRequired></Field>
                 <Field><Name>SendTime</Name><FieldType>Date</FieldType><IsRequired>false</IsRequired></Field>
                 <Field><Name>EmailName</Name><FieldType>Text</FieldType><MaxLength>500</MaxLength><IsRequired>false</IsRequired></Field>
-                <Field><Name>HTML</Name><FieldType>Text</FieldType><MaxLength>40000</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>HTML</Name><FieldType>Text</FieldType><MaxLength>4000</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>ListID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
                 <Field><Name>SendID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
                 <Field><Name>BatchID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>`;
