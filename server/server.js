@@ -3104,11 +3104,20 @@ app.post('/createEmailArchiveDE', async (req, res) => {
         
         if (!contentFolderId) {
           console.log('📁 [Content Builder] Folder does not exist, creating it (DE exists case)');
+          
+          // Find the Content Builder root folder ID
+          const contentBuilderRoot = checkContentFolderResp.data.items.find(folder => 
+            folder.name === 'Content Builder' && folder.parentId === 0
+          );
+          const rootFolderId = contentBuilderRoot ? contentBuilderRoot.id : 432292; // Fallback to known ID
+          
+          console.log(`📁 [Content Builder] Using parent folder ID: ${rootFolderId} for new folder creation`);
+          
           // Create Content Builder folder if it doesn't exist
           const createContentFolderPayload = {
             name: contentFolderName,
             description: "Folder for MCX archiving block",
-            parentId: 0
+            parentId: rootFolderId
           };
           
           const createContentFolderResp = await axios.post(
@@ -3401,12 +3410,20 @@ ENDIF
         if (!contentFolderId) {
           console.log('📁 [Content Builder] Folder does not exist, creating it');
           
+          // Find the Content Builder root folder ID
+          const contentBuilderRoot = checkContentFolderResp.data.items.find(folder => 
+            folder.name === 'Content Builder' && folder.parentId === 0
+          );
+          const rootFolderId = contentBuilderRoot ? contentBuilderRoot.id : 432292; // Fallback to known ID
+          
+          console.log(`📁 [Content Builder] Using parent folder ID: ${rootFolderId} for new folder creation`);
+          
           // Step 6: Create Content Builder folder
           try {
             const createContentFolderPayload = {
               name: contentFolderName,
               description: "Folder for MCX archiving block",
-              parentId: 0  // Root folder
+              parentId: rootFolderId
             };
             
             const createContentFolderResp = await axios.post(
