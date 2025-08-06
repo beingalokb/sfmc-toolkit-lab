@@ -3051,20 +3051,59 @@ app.post('/createEmailArchiveDE', async (req, res) => {
       console.log(`📁 [Content Builder] Checking if folder '${contentFolderName}' exists (DE already exists case)`);
       
       try {
-        const checkContentFolderResp = await axios.get(
-          `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories?$filter=name eq '${contentFolderName}'`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
+        console.log(`📁 [Content Builder] Making request to: https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories?$filter=name eq '${contentFolderName}' (DE exists case)`);
+        console.log(`📁 [Content Builder] Using access token: ${accessToken ? accessToken.substring(0, 20) + '...' : 'NULL'}`);
+        
+        // Try without filter first to see if basic endpoint works
+        let checkContentFolderResp;
+        try {
+          // Try with properly encoded filter
+          const filterParam = encodeURIComponent(`name eq '${contentFolderName}'`);
+          checkContentFolderResp = await axios.get(
+            `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories?$filter=${filterParam}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
             }
-          }
-        );
+          );
+        } catch (filterError) {
+          console.log('📁 [Content Builder] Encoded filter query failed in DE exists case, trying without filter...');
+          console.log('📁 [Content Builder] Filter error details:', filterError.response?.status, filterError.response?.data);
+          // If filter fails, try getting all categories and filter manually
+          checkContentFolderResp = await axios.get(
+            `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+        
+        console.log('📁 [Content Builder] Folder check response (DE exists case):', JSON.stringify(checkContentFolderResp.data, null, 2));
         
         let contentFolderId = null;
         if (checkContentFolderResp.data && checkContentFolderResp.data.items && checkContentFolderResp.data.items.length > 0) {
-          contentFolderId = checkContentFolderResp.data.items[0].id;
+          // Find the folder by name (either from filtered result or manual search)
+          const targetFolder = checkContentFolderResp.data.items.find(folder => 
+            folder.name === contentFolderName
+          );
+          
+          if (targetFolder) {
+            contentFolderId = targetFolder.id;
+            console.log(`📁 [Content Builder] Found existing folder with ID: ${contentFolderId} (DE exists case)`);
+          } else {
+            console.log(`📁 [Content Builder] Folder '${contentFolderName}' not found in ${checkContentFolderResp.data.items.length} categories (DE exists case)`);
+          }
         } else {
+          console.log('📁 [Content Builder] No categories found or empty response (DE exists case)');
+        }
+        
+        if (!contentFolderId) {
+          console.log('📁 [Content Builder] Folder does not exist, creating it (DE exists case)');
           // Create Content Builder folder if it doesn't exist
           const createContentFolderPayload = {
             name: contentFolderName,
@@ -3222,6 +3261,18 @@ ENDIF
         
       } catch (contentError) {
         console.error('❌ [Content Builder] Error in DE exists case:', contentError.message);
+        if (contentError.response) {
+          console.error('❌ [Content Builder] Error status (DE exists):', contentError.response.status);
+          console.error('❌ [Content Builder] Error data (DE exists):', JSON.stringify(contentError.response.data, null, 2));
+          console.error('❌ [Content Builder] Error headers (DE exists):', contentError.response.headers);
+        }
+        if (contentError.config) {
+          console.error('❌ [Content Builder] Request config (DE exists):', {
+            url: contentError.config.url,
+            method: contentError.config.method,
+            headers: contentError.config.headers
+          });
+        }
         return res.json({
           status: 'OK',
           deName: deName,
@@ -3229,6 +3280,8 @@ ENDIF
           description: description,
           dePath: `/Data Extensions / ${folderName}`,
           objectId: existingDE.ObjectID,
+          warning: 'Content Builder operations failed',
+          contentError: contentError.message,
           message: 'Data Extension already exists, but content block operations failed'
         });
       }
@@ -3300,8 +3353,10 @@ ENDIF
         // Try without filter first to see if basic endpoint works
         let checkContentFolderResp;
         try {
+          // Try with properly encoded filter
+          const filterParam = encodeURIComponent(`name eq '${contentFolderName}'`);
           checkContentFolderResp = await axios.get(
-            `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories?$filter=name eq '${contentFolderName}'`,
+            `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories?$filter=${filterParam}`,
             {
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -3310,7 +3365,8 @@ ENDIF
             }
           );
         } catch (filterError) {
-          console.log('📁 [Content Builder] Filter query failed, trying without filter...');
+          console.log('📁 [Content Builder] Encoded filter query failed, trying without filter...');
+          console.log('📁 [Content Builder] Filter error details:', filterError.response?.status, filterError.response?.data);
           // If filter fails, try getting all categories and filter manually
           checkContentFolderResp = await axios.get(
             `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories`,
