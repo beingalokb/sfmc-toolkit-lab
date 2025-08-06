@@ -2958,6 +2958,50 @@ app.post('/createEmailArchiveDE', async (req, res) => {
       console.log('[SOAP Folder Create Raw]', createFolderResp.data);
       const createFolderResult = await parser.parseStringPromise(createFolderResp.data);
       folderId = createFolderResult?.['soap:Envelope']?.['soap:Body']?.['CreateResponse']?.['Results']?.['NewID'];
+      
+      // If folder creation failed (e.g., already exists), try to find the existing folder
+      if (!folderId || folderId === '0') {
+        console.log('[Folder creation failed, searching for existing folder]');
+        const findExistingFolderSoap = `
+          <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <soapenv:Header>
+              <fueloauth>${accessToken}</fueloauth>
+            </soapenv:Header>
+            <soapenv:Body>
+              <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                <RetrieveRequest>
+                  <ObjectType>DataFolder</ObjectType>
+                  <Properties>ID</Properties>
+                  <Properties>Name</Properties>
+                  <Properties>ContentType</Properties>
+                  <Filter xsi:type="SimpleFilterPart">
+                    <Property>Name</Property>
+                    <SimpleOperator>equals</SimpleOperator>
+                    <Value>${folderName}</Value>
+                  </Filter>
+                </RetrieveRequest>
+              </RetrieveRequestMsg>
+            </soapenv:Body>
+          </soapenv:Envelope>
+        `;
+        
+        const findExistingResp = await axios.post(
+          `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+          findExistingFolderSoap,
+          { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+        );
+        
+        const findExistingParsed = await parser.parseStringPromise(findExistingResp.data);
+        const existingFolderResults = findExistingParsed?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        
+        if (existingFolderResults && existingFolderResults.ID) {
+          folderId = existingFolderResults.ID;
+          console.log(`[Found existing folder with ID: ${folderId}]`);
+        } else if (Array.isArray(existingFolderResults) && existingFolderResults.length > 0) {
+          folderId = existingFolderResults[0].ID;
+          console.log(`[Found existing folder with ID: ${folderId}]`);
+        }
+      }
     }
 
     if (!folderId) {
