@@ -2966,7 +2966,55 @@ app.post('/createEmailArchiveDE', async (req, res) => {
 
     console.log(`📁 [Email Archive] Using folder ID: ${folderId} for DE creation`);
 
-    // Step 3: Create the Data Extension with specified fields - hardcode like DM QS
+    // Step 3: Check if Data Extension already exists
+    const checkDESoap = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <soapenv:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataExtension</ObjectType>
+              <Properties>CustomerKey</Properties>
+              <Properties>ObjectID</Properties>
+              <Properties>Name</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>CustomerKey</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>${deName}</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+
+    const checkDEResp = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      checkDESoap,
+      { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+    );
+
+    const checkDEParsed = await parser.parseStringPromise(checkDEResp.data);
+    const existingDE = checkDEParsed?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+
+    if (existingDE && existingDE.CustomerKey) {
+      console.log(`📧 [Email Archive] Data Extension ${deName} already exists, skipping creation`);
+      return res.json({
+        status: 'OK',
+        deName: deName,
+        folderName: folderName,
+        description: description,
+        dePath: `/Data Extensions / ${folderName}`,
+        objectId: existingDE.ObjectID,
+        message: 'Data Extension already exists'
+      });
+    }
+
+    console.log(`📧 [Email Archive] Data Extension ${deName} does not exist, creating new one`);
+
+    // Step 4: Create the Data Extension with specified fields - hardcode like DM QS
     const fieldXml = `
                 <Field><Name>EmailAddress</Name><FieldType>EmailAddress</FieldType><IsRequired>false</IsRequired></Field>
                 <Field><Name>JobID</Name><FieldType>Number</FieldType><IsRequired>true</IsRequired></Field>
