@@ -3044,16 +3044,194 @@ app.post('/createEmailArchiveDE', async (req, res) => {
     const existingDE = checkDEParsed?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
 
     if (existingDE && existingDE.CustomerKey) {
-      console.log(`📧 [Email Archive] Data Extension ${deName} already exists, skipping creation`);
-      return res.json({
-        status: 'OK',
-        deName: deName,
-        folderName: folderName,
-        description: description,
-        dePath: `/Data Extensions / ${folderName}`,
-        objectId: existingDE.ObjectID,
-        message: 'Data Extension already exists'
-      });
+      console.log(`📧 [Email Archive] Data Extension ${deName} already exists, proceeding to Content Builder operations`);
+      
+      // Even though DE exists, we still need to handle Content Builder setup
+      const contentFolderName = 'MC_Explorer_Email_Archive_Content';
+      console.log(`📁 [Content Builder] Checking if folder '${contentFolderName}' exists (DE already exists case)`);
+      
+      try {
+        const checkContentFolderResp = await axios.get(
+          `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories?$filter=name eq '${contentFolderName}'`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        let contentFolderId = null;
+        if (checkContentFolderResp.data && checkContentFolderResp.data.items && checkContentFolderResp.data.items.length > 0) {
+          contentFolderId = checkContentFolderResp.data.items[0].id;
+        } else {
+          // Create Content Builder folder if it doesn't exist
+          const createContentFolderPayload = {
+            name: contentFolderName,
+            description: "Folder for MCX archiving block",
+            parentId: 0
+          };
+          
+          const createContentFolderResp = await axios.post(
+            `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories`,
+            createContentFolderPayload,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          if (createContentFolderResp.data && createContentFolderResp.data.id) {
+            contentFolderId = createContentFolderResp.data.id;
+          }
+        }
+        
+        // Handle content block operations (same logic as after DE creation)
+        let contentBlockId = null;
+        let contentBlockName = 'MCX_ArchivingBlock';
+        let contentBlockAction = 'none';
+        
+        if (contentFolderId) {
+          // Search for existing content block
+          const searchContentBlockResp = await axios.get(
+            `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$filter=name eq '${contentBlockName}'`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          let existingBlock = null;
+          if (searchContentBlockResp.data && searchContentBlockResp.data.items && searchContentBlockResp.data.items.length > 0) {
+            existingBlock = searchContentBlockResp.data.items.find(block => 
+              block.category && block.category.id === contentFolderId
+            );
+            
+            if (!existingBlock) {
+              existingBlock = searchContentBlockResp.data.items[0];
+            }
+          }
+          
+          const archiveBlockContent = `%%[
+/* MC Explorer Email Archive Block - MCX_ArchivingBlock */
+/* This block logs email HTML to the HTML_Log Data Extension */
+
+SET @SendID = SendID()
+SET @JobID = JobID()
+SET @SubscriberKey = _subscriberkey
+SET @EmailAddress = emailaddr
+SET @EmailName = EmailName_
+SET @ListID = ListID()
+SET @SendTime = Now()
+
+/* Get the email HTML from the send */
+SET @EmailHTML = GetEmailHTML(@JobID)
+
+/* Log to HTML_Log Data Extension */
+IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@SubscriberKey) THEN
+  InsertDE("HTML_Log", 
+    "EmailAddress", @EmailAddress,
+    "JobID", @JobID,
+    "SendTime", @SendTime,
+    "EmailName", @EmailName,
+    "HTML", @EmailHTML,
+    "ListID", @ListID,
+    "SendID", @SendID,
+    "BatchID", ""
+  )
+ENDIF
+]%%`;
+          
+          if (existingBlock) {
+            // Update existing content block
+            contentBlockId = existingBlock.id;
+            const updateContentBlockPayload = {
+              name: contentBlockName,
+              content: archiveBlockContent,
+              description: 'AMPscript block for archiving email HTML to HTML_Log Data Extension (updated by MC Explorer)',
+              category: { id: contentFolderId }
+            };
+            
+            try {
+              await axios.patch(
+                `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets/${contentBlockId}`,
+                updateContentBlockPayload,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  }
+                }
+              );
+              contentBlockAction = 'updated';
+            } catch (error) {
+              contentBlockAction = 'update_failed';
+            }
+          } else {
+            // Create new content block
+            const createContentBlockPayload = {
+              name: contentBlockName,
+              assetType: { name: 'codesnippetblock', id: 220 },
+              category: { id: contentFolderId },
+              content: archiveBlockContent,
+              description: 'AMPscript block for archiving email HTML to HTML_Log Data Extension (created by MC Explorer)'
+            };
+            
+            try {
+              const createContentBlockResp = await axios.post(
+                `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets`,
+                createContentBlockPayload,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  }
+                }
+              );
+              
+              if (createContentBlockResp.data && createContentBlockResp.data.id) {
+                contentBlockId = createContentBlockResp.data.id;
+                contentBlockAction = 'created';
+              } else {
+                contentBlockAction = 'create_failed';
+              }
+            } catch (error) {
+              contentBlockAction = 'create_failed';
+            }
+          }
+        }
+        
+        return res.json({
+          status: 'OK',
+          deName: deName,
+          folderName: folderName,
+          description: description,
+          dePath: `/Data Extensions / ${folderName}`,
+          objectId: existingDE.ObjectID,
+          contentFolderId: contentFolderId,
+          contentFolderName: contentFolderName,
+          contentBlockId: contentBlockId,
+          contentBlockName: contentBlockName,
+          contentBlockAction: contentBlockAction,
+          message: `Data Extension already exists. ${getArchiveSetupMessage(contentBlockAction, contentBlockName)}`
+        });
+        
+      } catch (contentError) {
+        console.error('❌ [Content Builder] Error in DE exists case:', contentError.message);
+        return res.json({
+          status: 'OK',
+          deName: deName,
+          folderName: folderName,
+          description: description,
+          dePath: `/Data Extensions / ${folderName}`,
+          objectId: existingDE.ObjectID,
+          message: 'Data Extension already exists, but content block operations failed'
+        });
+      }
     }
 
     console.log(`📧 [Email Archive] Data Extension ${deName} does not exist, creating new one`);
@@ -3109,14 +3287,299 @@ app.post('/createEmailArchiveDE', async (req, res) => {
     const deResult = deParsed['soap:Envelope']['soap:Body']['CreateResponse']['Results'];
 
     if (deResult?.StatusCode === 'OK') {
-      return res.json({
-        status: 'OK',
-        deName: deName,
-        folderName: folderName,
-        description: description,
-        dePath: `/Data Extensions / ${folderName}`,
-        objectId: deResult.NewID
-      });
+      console.log('📧 [Email Archive] Data Extension created successfully, proceeding to Content Builder setup');
+      
+      // Step 5: Check if Content Builder folder exists
+      const contentFolderName = 'MC_Explorer_Email_Archive_Content';
+      console.log(`📁 [Content Builder] Checking if folder '${contentFolderName}' exists`);
+      
+      try {
+        const checkContentFolderResp = await axios.get(
+          `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories?$filter=name eq '${contentFolderName}'`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        console.log('📁 [Content Builder] Folder check response:', checkContentFolderResp.data);
+        
+        let contentFolderId = null;
+        if (checkContentFolderResp.data && checkContentFolderResp.data.items && checkContentFolderResp.data.items.length > 0) {
+          contentFolderId = checkContentFolderResp.data.items[0].id;
+          console.log(`📁 [Content Builder] Found existing folder with ID: ${contentFolderId}`);
+        } else {
+          console.log('📁 [Content Builder] Folder does not exist, creating it');
+          
+          // Step 6: Create Content Builder folder
+          try {
+            const createContentFolderPayload = {
+              name: contentFolderName,
+              description: "Folder for MCX archiving block",
+              parentId: 0  // Root folder
+            };
+            
+            const createContentFolderResp = await axios.post(
+              `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories`,
+              createContentFolderPayload,
+              {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            console.log('📁 [Content Builder] Folder creation response:', createContentFolderResp.data);
+            
+            if (createContentFolderResp.data && createContentFolderResp.data.id) {
+              contentFolderId = createContentFolderResp.data.id;
+              console.log(`📁 [Content Builder] Successfully created folder with ID: ${contentFolderId}`);
+            } else {
+              console.error('❌ [Content Builder] Failed to get folder ID from creation response');
+            }
+            
+          } catch (createFolderError) {
+            console.error('❌ [Content Builder] Error creating folder:', createFolderError.message);
+            if (createFolderError.response) {
+              console.error('❌ [Content Builder] Error response:', createFolderError.response.data);
+            }
+          }
+        }
+        
+        // Step 7: Verify we have the Content Builder folder ID
+        if (!contentFolderId) {
+          console.log('📁 [Content Builder] Folder ID not captured, re-checking folder existence');
+          
+          try {
+            const recheckContentFolderResp = await axios.get(
+              `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories?$filter=name eq '${contentFolderName}'`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            console.log('📁 [Content Builder] Re-check folder response:', recheckContentFolderResp.data);
+            
+            if (recheckContentFolderResp.data && recheckContentFolderResp.data.items && recheckContentFolderResp.data.items.length > 0) {
+              contentFolderId = recheckContentFolderResp.data.items[0].id;
+              console.log(`📁 [Content Builder] Successfully retrieved folder ID: ${contentFolderId}`);
+            } else {
+              console.error('❌ [Content Builder] Still unable to find folder after creation attempt');
+            }
+            
+          } catch (recheckError) {
+            console.error('❌ [Content Builder] Error re-checking folder:', recheckError.message);
+          }
+        }
+        
+        console.log(`📁 [Content Builder] Final folder ID for content block creation: ${contentFolderId || 'NOT_FOUND'}`);
+        
+        // Step 8: Handle content block (search, update, or create)
+        let contentBlockId = null;
+        let contentBlockName = 'MCX_ArchivingBlock'; // Using consistent naming from requirement
+        let contentBlockAction = 'none';
+        
+        if (contentFolderId) {
+          console.log(`📝 [Content Block] Searching for content block '${contentBlockName}' in folder ID: ${contentFolderId}`);
+          
+          try {
+            // Step 8a: Search for existing content block by name (globally first, then by folder)
+            const searchContentBlockResp = await axios.get(
+              `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$filter=name eq '${contentBlockName}'`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            console.log('📝 [Content Block] Global search response:', JSON.stringify(searchContentBlockResp.data, null, 2));
+            
+            let existingBlock = null;
+            if (searchContentBlockResp.data && searchContentBlockResp.data.items && searchContentBlockResp.data.items.length > 0) {
+              // Check if any blocks are in our target folder
+              existingBlock = searchContentBlockResp.data.items.find(block => 
+                block.category && block.category.id === contentFolderId
+              );
+              
+              if (!existingBlock) {
+                // Found blocks with same name but in different folders - take the first one to update
+                existingBlock = searchContentBlockResp.data.items[0];
+                console.log(`📝 [Content Block] Found existing block '${contentBlockName}' in different folder (ID: ${existingBlock.category?.id}), will update it`);
+              } else {
+                console.log(`📝 [Content Block] Found existing block '${contentBlockName}' in target folder`);
+              }
+            }
+            
+            // Define the AMPscript content for the email archiving block
+            const archiveBlockContent = `%%[
+/* MC Explorer Email Archive Block - MCX_ArchivingBlock */
+/* This block logs email HTML to the HTML_Log Data Extension */
+
+SET @SendID = SendID()
+SET @JobID = JobID()
+SET @SubscriberKey = _subscriberkey
+SET @EmailAddress = emailaddr
+SET @EmailName = EmailName_
+SET @ListID = ListID()
+SET @SendTime = Now()
+
+/* Get the email HTML from the send */
+SET @EmailHTML = GetEmailHTML(@JobID)
+
+/* Log to HTML_Log Data Extension */
+IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@SubscriberKey) THEN
+  InsertDE("HTML_Log", 
+    "EmailAddress", @EmailAddress,
+    "JobID", @JobID,
+    "SendTime", @SendTime,
+    "EmailName", @EmailName,
+    "HTML", @EmailHTML,
+    "ListID", @ListID,
+    "SendID", @SendID,
+    "BatchID", ""
+  )
+ENDIF
+]%%`;
+
+            if (existingBlock) {
+              // Step 8b: Update existing content block
+              contentBlockId = existingBlock.id;
+              console.log(`📝 [Content Block] Updating existing content block with ID: ${contentBlockId}`);
+              
+              const updateContentBlockPayload = {
+                name: contentBlockName,
+                content: archiveBlockContent,
+                description: 'AMPscript block for archiving email HTML to HTML_Log Data Extension (updated by MC Explorer)',
+                category: {
+                  id: contentFolderId
+                }
+              };
+              
+              try {
+                const updateContentBlockResp = await axios.patch(
+                  `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets/${contentBlockId}`,
+                  updateContentBlockPayload,
+                  {
+                    headers: {
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json'
+                    }
+                  }
+                );
+                
+                console.log('📝 [Content Block] Update response:', JSON.stringify(updateContentBlockResp.data, null, 2));
+                contentBlockAction = 'updated';
+                console.log(`📝 [Content Block] Successfully updated content block with ID: ${contentBlockId}`);
+                
+              } catch (updateError) {
+                console.error('❌ [Content Block] Error updating content block:', updateError.message);
+                if (updateError.response) {
+                  console.error('❌ [Content Block] Update error response:', updateError.response.data);
+                }
+                contentBlockAction = 'update_failed';
+              }
+              
+            } else {
+              // Step 8c: Create new content block
+              console.log('📝 [Content Block] No existing block found, creating new one');
+              
+              const createContentBlockPayload = {
+                name: contentBlockName,
+                assetType: {
+                  name: 'codesnippetblock',
+                  id: 220
+                },
+                category: {
+                  id: contentFolderId
+                },
+                content: archiveBlockContent,
+                description: 'AMPscript block for archiving email HTML to HTML_Log Data Extension (created by MC Explorer)'
+              };
+              
+              try {
+                const createContentBlockResp = await axios.post(
+                  `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets`,
+                  createContentBlockPayload,
+                  {
+                    headers: {
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json'
+                    }
+                  }
+                );
+                
+                console.log('📝 [Content Block] Creation response:', JSON.stringify(createContentBlockResp.data, null, 2));
+                
+                if (createContentBlockResp.data && createContentBlockResp.data.id) {
+                  contentBlockId = createContentBlockResp.data.id;
+                  contentBlockAction = 'created';
+                  console.log(`📝 [Content Block] Successfully created content block with ID: ${contentBlockId}`);
+                } else {
+                  console.error('❌ [Content Block] Failed to get block ID from creation response');
+                  contentBlockAction = 'create_failed';
+                }
+                
+              } catch (createError) {
+                console.error('❌ [Content Block] Error creating content block:', createError.message);
+                if (createError.response) {
+                  console.error('❌ [Content Block] Create error response:', createError.response.data);
+                }
+                contentBlockAction = 'create_failed';
+              }
+            }
+            
+          } catch (searchError) {
+            console.error('❌ [Content Block] Error searching for content block:', searchError.message);
+            if (searchError.response) {
+              console.error('❌ [Content Block] Search error response:', searchError.response.data);
+            }
+            contentBlockAction = 'search_failed';
+          }
+        } else {
+          console.log('⚠️ [Content Block] Skipping content block operations - no folder ID available');
+          contentBlockAction = 'skipped_no_folder';
+        }
+        
+        return res.json({
+          status: 'OK',
+          deName: deName,
+          folderName: folderName,
+          description: description,
+          dePath: `/Data Extensions / ${folderName}`,
+          objectId: deResult.NewID,
+          contentFolderId: contentFolderId,
+          contentFolderName: contentFolderName,
+          contentBlockId: contentBlockId,
+          contentBlockName: contentBlockName,
+          contentBlockAction: contentBlockAction,
+          message: getArchiveSetupMessage(contentBlockAction, contentBlockName)
+        });
+        
+      } catch (contentError) {
+        console.error('❌ [Content Builder] Error in content operations:', contentError.message);
+        // Still return success for DE creation, but note the content folder issue
+        return res.json({
+          status: 'OK',
+          deName: deName,
+          folderName: folderName,
+          description: description,
+          dePath: `/Data Extensions / ${folderName}`,
+          objectId: deResult.NewID,
+          warning: 'Content Builder operations failed',
+          contentError: contentError.message,
+          contentBlockId: null,
+          contentBlockName: null,
+          contentBlockAction: 'error'
+        });
+      }
     } else {
       return res.status(500).json({ 
         status: 'ERROR', 
@@ -3130,6 +3593,26 @@ app.post('/createEmailArchiveDE', async (req, res) => {
     res.status(500).json({ status: 'ERROR', message: error.message });
   }
 });
+
+// Helper function to generate setup completion messages
+function getArchiveSetupMessage(contentBlockAction, contentBlockName) {
+  switch (contentBlockAction) {
+    case 'created':
+      return `Email archiving setup complete! Content block '${contentBlockName}' was created successfully.`;
+    case 'updated':
+      return `Email archiving setup complete! Content block '${contentBlockName}' was updated with latest AMPscript.`;
+    case 'skipped_no_folder':
+      return 'Data Extension created successfully, but content block creation was skipped (no folder available).';
+    case 'search_failed':
+      return 'Data Extension created successfully, but content block search failed.';
+    case 'create_failed':
+      return 'Data Extension created successfully, but content block creation failed.';
+    case 'update_failed':
+      return 'Data Extension created successfully, but content block update failed.';
+    default:
+      return 'Email archiving setup completed with unknown content block status.';
+  }
+}
 
 // Register the SentEvent endpoint
 require('./emailArchiveSentEventsEndpoint')(app);
