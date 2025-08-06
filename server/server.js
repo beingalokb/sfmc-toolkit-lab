@@ -3760,14 +3760,10 @@ app.get('/emails/list', async (req, res) => {
                 <Properties>Name</Properties>
                 <Properties>Subject</Properties>
                 <Properties>Status</Properties>
-                <Properties>PartnerKey</Properties>
-                <Properties>CreatedDate</Properties>
-                <Properties>Folder</Properties>
-                <Properties>CategoryID</Properties>
                 <Properties>EmailType</Properties>
                 <QueryAllAccounts>true</QueryAllAccounts>
                 <Options>
-                  <BatchSize>200</BatchSize>
+                  <BatchSize>50</BatchSize>
                 </Options>
               </RetrieveRequest>
             </RetrieveRequestMsg>
@@ -3787,38 +3783,36 @@ app.get('/emails/list', async (req, res) => {
       );
 
       console.log('📧 [Email List - SOAP] SOAP Response received, parsing...');
-      console.log('📧 [Email List - SOAP] Raw SOAP Response:', soapResponse.data);
+      // console.log('📧 [Email List - SOAP] Raw SOAP Response:', soapResponse.data); // Commented out to reduce log size
       
       const parser = new xml2js.Parser({ explicitArray: false });
       
       const soapResult = await parser.parseStringPromise(soapResponse.data);
-      console.log('📧 [Email List - SOAP] Parsed XML Result:', JSON.stringify(soapResult, null, 2));
+      // console.log('📧 [Email List - SOAP] Parsed XML Result:', JSON.stringify(soapResult, null, 2)); // Commented out to reduce log size
 
       const soapRetrieveResponse = soapResult?.['s:Envelope']?.['s:Body']?.['RetrieveResponseMsg'] || 
                                   soapResult?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg'];
-      console.log('📧 [Email List - SOAP] Retrieve Response Msg:', JSON.stringify(soapRetrieveResponse, null, 2));
+      // console.log('📧 [Email List - SOAP] Retrieve Response Msg:', JSON.stringify(soapRetrieveResponse, null, 2)); // Commented out to reduce log size
       
       // Check for SOAP errors
       if (soapRetrieveResponse?.OverallStatus === 'Error') {
         console.error('❌ [Email List - SOAP] SOAP Error:', soapRetrieveResponse.Results?.StatusMessage || 'Unknown error');
       } else {
         const soapResults = soapRetrieveResponse?.['Results'];
-        console.log('📧 [Email List - SOAP] Results:', JSON.stringify(soapResults, null, 2));
+        // console.log('📧 [Email List - SOAP] Results:', JSON.stringify(soapResults, null, 2)); // Commented out to reduce log size
         
         if (soapResults) {
           const soapResultArray = Array.isArray(soapResults) ? soapResults : [soapResults];
-          const soapEmails = soapResultArray.map(email => ({
-            id: email.ID || 'N/A',
-            name: email.Name || 'Untitled Email',
-            subject: email.Subject || 'No Subject',
-            status: email.Status || 'Unknown',
-            partnerKey: email.PartnerKey || '',
-            createdDate: email.CreatedDate || '',
-            categoryId: email.CategoryID || '',
-            emailType: email.EmailType || 'Classic',
-            folder: email.Folder ? (email.Folder.Name || 'No Folder') : 'No Folder',
-            source: 'SOAP-Classic'
-          }));
+          const soapEmails = soapResultArray
+            .filter(email => email && email.ID) // Filter out invalid entries
+            .map(email => ({
+              id: String(email.ID),
+              name: String(email.Name || 'Untitled Email').substring(0, 100),
+              subject: String(email.Subject || 'No Subject').substring(0, 150),
+              status: String(email.Status || 'Unknown'),
+              emailType: String(email.EmailType || 'Email'),
+              source: 'Classic'
+            }));
           
           allEmails = allEmails.concat(soapEmails);
           console.log(`📧 [Email List - SOAP] Successfully retrieved ${soapEmails.length} Classic emails`);
@@ -3838,7 +3832,7 @@ app.get('/emails/list', async (req, res) => {
       console.log('📧 [Email List - REST] Retrieving Content Builder emails via REST API');
       
       const restResponse = await axios.get(
-        `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$pagesize=200&$filter=assetType.id in (207,208,209)`,
+        `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$pagesize=50&$filter=assetType.id in (207,208,209)`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -3848,23 +3842,19 @@ app.get('/emails/list', async (req, res) => {
       );
 
       console.log('📧 [Email List - REST] REST Response received');
-      console.log('📧 [Email List - REST] REST Response Data:', JSON.stringify(restResponse.data, null, 2));
+      // console.log('📧 [Email List - REST] REST Response Data:', JSON.stringify(restResponse.data, null, 2)); // Commented out to reduce log size
 
       if (restResponse.data && restResponse.data.items && Array.isArray(restResponse.data.items)) {
-        const restEmails = restResponse.data.items.map(email => ({
-          id: email.id || 'N/A',
-          name: email.name || 'Untitled Email',
-          subject: email.data?.subject || email.subject || 'No Subject',
-          status: email.status || 'Unknown',
-          partnerKey: email.customerKey || '',
-          createdDate: email.createdDate || '',
-          categoryId: email.category?.id || '',
-          emailType: getEmailTypeFromAssetType(email.assetType?.id) || 'Content Builder',
-          folder: email.category?.name || 'No Folder',
-          source: 'REST-ContentBuilder',
-          assetTypeId: email.assetType?.id,
-          assetTypeName: email.assetType?.name
-        }));
+        const restEmails = restResponse.data.items
+          .filter(email => email && email.id) // Filter out invalid entries
+          .map(email => ({
+            id: String(email.id),
+            name: String(email.name || 'Untitled Email').substring(0, 100),
+            subject: String(email.data?.subject || email.subject || 'No Subject').substring(0, 150),
+            status: 'Active', // Content Builder emails are typically active
+            emailType: getEmailTypeFromAssetType(email.assetType?.id),
+            source: 'Content Builder'
+          }));
         
         allEmails = allEmails.concat(restEmails);
         console.log(`📧 [Email List - REST] Successfully retrieved ${restEmails.length} Content Builder emails`);
@@ -3878,9 +3868,21 @@ app.get('/emails/list', async (req, res) => {
       }
     }
 
-    // 3. Return combined results
-    console.log(`📧 [Email List] Total emails retrieved: ${allEmails.length} (SOAP + REST combined)`);
-    res.json(allEmails);
+    // 3. Deduplicate emails by name and subject, then return limited results
+    const emailMap = new Map();
+    allEmails.forEach(email => {
+      const key = `${email.name}|${email.subject}`;
+      if (!emailMap.has(key) || email.source === 'Classic') {
+        // Prefer Classic emails if duplicates exist
+        emailMap.set(key, email);
+      }
+    });
+    
+    const deduplicatedEmails = Array.from(emailMap.values());
+    const limitedEmails = deduplicatedEmails.slice(0, 100); // Limit to first 100 emails
+    
+    console.log(`📧 [Email List] Total emails retrieved: ${allEmails.length}, after deduplication: ${deduplicatedEmails.length}, returning: ${limitedEmails.length} (limited for performance)`);
+    res.json(limitedEmails);
 
   } catch (error) {
     console.error('❌ [Email List] Failed to retrieve emails:', error.message);

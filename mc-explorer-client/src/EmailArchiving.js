@@ -76,17 +76,21 @@ function EmailArchiving() {
   const loadEmails = async () => {
     setEmailsLoading(true);
     try {
+      console.log('📧 [Frontend] Loading emails...');
       const response = await fetch(`${baseURL}/emails/list`);
       const emailData = await response.json();
       
+      console.log('📧 [Frontend] Email data received:', emailData);
+      
       if (Array.isArray(emailData)) {
+        console.log(`📧 [Frontend] Setting ${emailData.length} emails`);
         setEmails(emailData);
       } else {
-        console.error('Invalid email data received:', emailData);
+        console.error('📧 [Frontend] Invalid email data received:', emailData);
         setEmails([]);
       }
     } catch (error) {
-      console.error('Error loading emails:', error);
+      console.error('📧 [Frontend] Error loading emails:', error);
       setEmails([]);
     } finally {
       setEmailsLoading(false);
@@ -306,53 +310,54 @@ function EmailArchiving() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Source
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Created Date
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {emails.map((email) => (
-                      <tr key={email.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <input
-                            type="checkbox"
-                            checked={selectedEmails.has(email.id)}
-                            onChange={(e) => handleEmailSelection(email.id, e.target.checked)}
-                            className="rounded"
-                          />
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{email.name}</div>
-                          <div className="text-sm text-gray-500">ID: {email.id}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-sm text-gray-900">{email.subject}</div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            email.status === 'Active' ? 'bg-green-100 text-green-800' :
-                            email.status === 'Draft' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {email.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {email.emailType}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            email.source === 'SOAP-Classic' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
-                          }`}>
-                            {email.source === 'SOAP-Classic' ? 'Classic' : 'Content Builder'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {email.createdDate ? new Date(email.createdDate).toLocaleDateString() : 'N/A'}
-                        </td>
-                      </tr>
-                    ))}
+                    {emails.map((email, index) => {
+                      if (!email || !email.id) {
+                        console.warn(`📧 [Frontend] Invalid email at index ${index}:`, email);
+                        return null;
+                      }
+                      
+                      return (
+                        <tr key={`${email.id}-${index}`} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              checked={selectedEmails.has(email.id)}
+                              onChange={(e) => handleEmailSelection(email.id, e.target.checked)}
+                              className="rounded"
+                            />
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{email.name || 'Untitled'}</div>
+                            <div className="text-sm text-gray-500">ID: {email.id}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm text-gray-900">{email.subject || 'No Subject'}</div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              (email.status || '').includes('Active') ? 'bg-green-100 text-green-800' :
+                              (email.status || '').includes('Draft') ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {email.status || 'Unknown'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {email.emailType || 'Email'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              email.source === 'Classic' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                            }`}>
+                              {email.source || 'Unknown'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    }).filter(Boolean)}
                   </tbody>
                 </table>
               </div>
