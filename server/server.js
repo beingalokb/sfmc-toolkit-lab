@@ -3731,94 +3731,172 @@ function getArchiveSetupMessage(contentBlockAction, contentBlockName) {
   }
 }
 
-// Get all emails from Marketing Cloud for Email Archiving
+// Get all emails from Marketing Cloud for Email Archiving (both SOAP and REST)
 app.get('/emails/list', async (req, res) => {
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
   if (!accessToken || !subdomain) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
-    console.log('📧 [Email List] Retrieving all emails from Marketing Cloud');
+    console.log('📧 [Email List] Retrieving emails from both SOAP (Classic) and REST (Content Builder) APIs');
     
-    const soapEnvelope = `
-      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-        <soapenv:Header>
-          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
-        </soapenv:Header>
-        <soapenv:Body>
-          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-            <RetrieveRequest>
-              <ObjectType>Email</ObjectType>
-              <Properties>ID</Properties>
-              <Properties>Name</Properties>
-              <Properties>Subject</Properties>
-              <Properties>Status</Properties>
-              <Properties>PartnerKey</Properties>
-              <Properties>CreatedDate</Properties>
-              <Properties>Folder</Properties>
-              <Properties>CategoryID</Properties>
-              <Properties>EmailType</Properties>
-            </RetrieveRequest>
-          </RetrieveRequestMsg>
-        </soapenv:Body>
-      </soapenv:Envelope>
-    `;
+    // Array to store all emails from both sources
+    let allEmails = [];
 
-    const response = await axios.post(
-      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-      soapEnvelope,
-      {
-        headers: {
-          'Content-Type': 'text/xml',
-          SOAPAction: 'Retrieve',
-        },
-      }
-    );
+    // 1. SOAP API - Classic Email Storage with QueryAllAccounts
+    try {
+      console.log('📧 [Email List - SOAP] Retrieving Classic emails via SOAP API');
+      
+      const soapEnvelope = `
+        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <s:Header>
+            <fueloauth>${accessToken}</fueloauth>
+          </s:Header>
+          <s:Body>
+            <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <RetrieveRequest>
+                <ObjectType>Email</ObjectType>
+                <Properties>ID</Properties>
+                <Properties>Name</Properties>
+                <Properties>Subject</Properties>
+                <Properties>Status</Properties>
+                <Properties>PartnerKey</Properties>
+                <Properties>CreatedDate</Properties>
+                <Properties>Folder</Properties>
+                <Properties>CategoryID</Properties>
+                <Properties>EmailType</Properties>
+                <QueryAllAccounts>true</QueryAllAccounts>
+                <Options>
+                  <BatchSize>200</BatchSize>
+                </Options>
+              </RetrieveRequest>
+            </RetrieveRequestMsg>
+          </s:Body>
+        </s:Envelope>
+      `;
 
-    console.log('📧 [Email List] SOAP Response received, parsing...');
-    const parser = new xml2js.Parser({ explicitArray: false });
-    
-    parser.parseString(response.data, (err, result) => {
-      if (err) {
-        console.error('❌ [Email List] Failed to parse XML:', err);
-        return res.status(500).json({ error: 'Failed to parse response' });
-      }
-
-      try {
-        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-        
-        if (!results) {
-          console.log('📧 [Email List] No emails found');
-          return res.json([]);
+      const soapResponse = await axios.post(
+        `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+        soapEnvelope,
+        {
+          headers: {
+            'Content-Type': 'text/xml',
+            SOAPAction: 'Retrieve',
+          },
         }
+      );
 
-        const resultArray = Array.isArray(results) ? results : [results];
-        const emails = resultArray.map(email => ({
-          id: email.ID || 'N/A',
-          name: email.Name || 'Untitled Email',
-          subject: email.Subject || 'No Subject',
-          status: email.Status || 'Unknown',
-          partnerKey: email.PartnerKey || '',
-          createdDate: email.CreatedDate || '',
-          categoryId: email.CategoryID || '',
-          emailType: email.EmailType || 'Unknown',
-          folder: email.Folder ? (email.Folder.Name || 'No Folder') : 'No Folder'
-        }));
+      console.log('📧 [Email List - SOAP] SOAP Response received, parsing...');
+      console.log('📧 [Email List - SOAP] Raw SOAP Response:', soapResponse.data);
+      
+      const parser = new xml2js.Parser({ explicitArray: false });
+      
+      const soapResult = await parser.parseStringPromise(soapResponse.data);
+      console.log('📧 [Email List - SOAP] Parsed XML Result:', JSON.stringify(soapResult, null, 2));
 
-        console.log(`📧 [Email List] Successfully retrieved ${emails.length} emails`);
-        res.json(emails);
-
-      } catch (parseError) {
-        console.error('❌ [Email List] Error processing email data:', parseError);
-        res.status(500).json({ error: 'Failed to process email data' });
+      const soapRetrieveResponse = soapResult?.['s:Envelope']?.['s:Body']?.['RetrieveResponseMsg'] || 
+                                  soapResult?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg'];
+      console.log('📧 [Email List - SOAP] Retrieve Response Msg:', JSON.stringify(soapRetrieveResponse, null, 2));
+      
+      // Check for SOAP errors
+      if (soapRetrieveResponse?.OverallStatus === 'Error') {
+        console.error('❌ [Email List - SOAP] SOAP Error:', soapRetrieveResponse.Results?.StatusMessage || 'Unknown error');
+      } else {
+        const soapResults = soapRetrieveResponse?.['Results'];
+        console.log('📧 [Email List - SOAP] Results:', JSON.stringify(soapResults, null, 2));
+        
+        if (soapResults) {
+          const soapResultArray = Array.isArray(soapResults) ? soapResults : [soapResults];
+          const soapEmails = soapResultArray.map(email => ({
+            id: email.ID || 'N/A',
+            name: email.Name || 'Untitled Email',
+            subject: email.Subject || 'No Subject',
+            status: email.Status || 'Unknown',
+            partnerKey: email.PartnerKey || '',
+            createdDate: email.CreatedDate || '',
+            categoryId: email.CategoryID || '',
+            emailType: email.EmailType || 'Classic',
+            folder: email.Folder ? (email.Folder.Name || 'No Folder') : 'No Folder',
+            source: 'SOAP-Classic'
+          }));
+          
+          allEmails = allEmails.concat(soapEmails);
+          console.log(`📧 [Email List - SOAP] Successfully retrieved ${soapEmails.length} Classic emails`);
+        } else {
+          console.log('📧 [Email List - SOAP] No Classic emails found');
+        }
       }
-    });
+    } catch (soapError) {
+      console.error('❌ [Email List - SOAP] SOAP API Error:', soapError.message);
+      if (soapError.response) {
+        console.error('❌ [Email List - SOAP] SOAP Error Response:', soapError.response.data);
+      }
+    }
+
+    // 2. REST API - Content Builder Email Storage
+    try {
+      console.log('📧 [Email List - REST] Retrieving Content Builder emails via REST API');
+      
+      const restResponse = await axios.get(
+        `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets?$pagesize=200&$filter=assetType.id in (207,208,209)`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('📧 [Email List - REST] REST Response received');
+      console.log('📧 [Email List - REST] REST Response Data:', JSON.stringify(restResponse.data, null, 2));
+
+      if (restResponse.data && restResponse.data.items && Array.isArray(restResponse.data.items)) {
+        const restEmails = restResponse.data.items.map(email => ({
+          id: email.id || 'N/A',
+          name: email.name || 'Untitled Email',
+          subject: email.data?.subject || email.subject || 'No Subject',
+          status: email.status || 'Unknown',
+          partnerKey: email.customerKey || '',
+          createdDate: email.createdDate || '',
+          categoryId: email.category?.id || '',
+          emailType: getEmailTypeFromAssetType(email.assetType?.id) || 'Content Builder',
+          folder: email.category?.name || 'No Folder',
+          source: 'REST-ContentBuilder',
+          assetTypeId: email.assetType?.id,
+          assetTypeName: email.assetType?.name
+        }));
+        
+        allEmails = allEmails.concat(restEmails);
+        console.log(`📧 [Email List - REST] Successfully retrieved ${restEmails.length} Content Builder emails`);
+      } else {
+        console.log('📧 [Email List - REST] No Content Builder emails found');
+      }
+    } catch (restError) {
+      console.error('❌ [Email List - REST] REST API Error:', restError.message);
+      if (restError.response) {
+        console.error('❌ [Email List - REST] REST Error Response:', restError.response.data);
+      }
+    }
+
+    // 3. Return combined results
+    console.log(`📧 [Email List] Total emails retrieved: ${allEmails.length} (SOAP + REST combined)`);
+    res.json(allEmails);
 
   } catch (error) {
     console.error('❌ [Email List] Failed to retrieve emails:', error.message);
     res.status(500).json({ error: 'Failed to retrieve emails' });
   }
 });
+
+// Helper function to map Content Builder asset type IDs to readable names
+function getEmailTypeFromAssetType(assetTypeId) {
+  const assetTypeMap = {
+    207: 'HTML Email',
+    208: 'Text Email', 
+    209: 'Template Email'
+  };
+  return assetTypeMap[assetTypeId] || 'Content Builder Email';
+}
 
 // Bulk update emails with MCX_ArchivingBlock
 app.post('/emails/add-archiving-block', async (req, res) => {

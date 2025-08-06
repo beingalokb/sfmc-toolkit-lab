@@ -304,6 +304,9 @@ function EmailArchiving() {
                         Type
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Source
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Created Date
                       </th>
                     </tr>
@@ -337,6 +340,13 @@ function EmailArchiving() {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                           {email.emailType}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            email.source === 'SOAP-Classic' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            {email.source === 'SOAP-Classic' ? 'Classic' : 'Content Builder'}
+                          </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                           {email.createdDate ? new Date(email.createdDate).toLocaleDateString() : 'N/A'}
