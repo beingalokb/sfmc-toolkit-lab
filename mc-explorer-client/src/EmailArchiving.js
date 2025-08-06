@@ -301,9 +301,6 @@ function EmailArchiving() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Email Name
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Subject
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -328,9 +325,6 @@ function EmailArchiving() {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{email.name || 'Untitled'}</div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="text-sm text-gray-900">{email.subject || 'No Subject'}</div>
                           </td>
                         </tr>
                       );
