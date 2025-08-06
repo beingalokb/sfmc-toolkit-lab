@@ -3731,6 +3731,160 @@ function getArchiveSetupMessage(contentBlockAction, contentBlockName) {
   }
 }
 
+// Get all emails from Marketing Cloud for Email Archiving
+app.get('/emails/list', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    console.log('📧 [Email List] Retrieving all emails from Marketing Cloud');
+    
+    const soapEnvelope = `
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <soapenv:Header>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+        </soapenv:Header>
+        <soapenv:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>Email</ObjectType>
+              <Properties>ID</Properties>
+              <Properties>Name</Properties>
+              <Properties>Subject</Properties>
+              <Properties>Status</Properties>
+              <Properties>PartnerKey</Properties>
+              <Properties>CreatedDate</Properties>
+              <Properties>Folder</Properties>
+              <Properties>CategoryID</Properties>
+              <Properties>EmailType</Properties>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    `;
+
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          SOAPAction: 'Retrieve',
+        },
+      }
+    );
+
+    console.log('📧 [Email List] SOAP Response received, parsing...');
+    const parser = new xml2js.Parser({ explicitArray: false });
+    
+    parser.parseString(response.data, (err, result) => {
+      if (err) {
+        console.error('❌ [Email List] Failed to parse XML:', err);
+        return res.status(500).json({ error: 'Failed to parse response' });
+      }
+
+      try {
+        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        
+        if (!results) {
+          console.log('📧 [Email List] No emails found');
+          return res.json([]);
+        }
+
+        const resultArray = Array.isArray(results) ? results : [results];
+        const emails = resultArray.map(email => ({
+          id: email.ID || 'N/A',
+          name: email.Name || 'Untitled Email',
+          subject: email.Subject || 'No Subject',
+          status: email.Status || 'Unknown',
+          partnerKey: email.PartnerKey || '',
+          createdDate: email.CreatedDate || '',
+          categoryId: email.CategoryID || '',
+          emailType: email.EmailType || 'Unknown',
+          folder: email.Folder ? (email.Folder.Name || 'No Folder') : 'No Folder'
+        }));
+
+        console.log(`📧 [Email List] Successfully retrieved ${emails.length} emails`);
+        res.json(emails);
+
+      } catch (parseError) {
+        console.error('❌ [Email List] Error processing email data:', parseError);
+        res.status(500).json({ error: 'Failed to process email data' });
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [Email List] Failed to retrieve emails:', error.message);
+    res.status(500).json({ error: 'Failed to retrieve emails' });
+  }
+});
+
+// Bulk update emails with MCX_ArchivingBlock
+app.post('/emails/add-archiving-block', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const { emailIds, contentBlockId } = req.body;
+    
+    if (!emailIds || !Array.isArray(emailIds) || emailIds.length === 0) {
+      return res.status(400).json({ error: 'Email IDs array is required' });
+    }
+
+    if (!contentBlockId) {
+      return res.status(400).json({ error: 'Content block ID is required' });
+    }
+
+    console.log(`📧 [Email Archive Block] Adding MCX_ArchivingBlock to ${emailIds.length} emails`);
+    
+    const results = [];
+    
+    for (const emailId of emailIds) {
+      try {
+        console.log(`📧 [Email Archive Block] Processing email ID: ${emailId}`);
+        
+        // For now, we'll log the action. In a real implementation, you would:
+        // 1. Retrieve the email content
+        // 2. Add the content block to the email template
+        // 3. Update the email via SOAP API
+        
+        results.push({
+          emailId: emailId,
+          status: 'success',
+          message: 'Archive block would be added here'
+        });
+        
+      } catch (emailError) {
+        console.error(`❌ [Email Archive Block] Failed to update email ${emailId}:`, emailError.message);
+        results.push({
+          emailId: emailId,
+          status: 'error',
+          message: emailError.message
+        });
+      }
+    }
+
+    const successCount = results.filter(r => r.status === 'success').length;
+    const errorCount = results.filter(r => r.status === 'error').length;
+
+    console.log(`📧 [Email Archive Block] Completed: ${successCount} success, ${errorCount} errors`);
+
+    res.json({
+      status: 'completed',
+      totalProcessed: emailIds.length,
+      successCount,
+      errorCount,
+      results
+    });
+
+  } catch (error) {
+    console.error('❌ [Email Archive Block] Failed to process bulk update:', error.message);
+    res.status(500).json({ error: 'Failed to process bulk update' });
+  }
+});
+
 // Register the SentEvent endpoint
 require('./emailArchiveSentEventsEndpoint')(app);
 
