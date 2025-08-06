@@ -3803,16 +3803,20 @@ app.get('/emails/list', async (req, res) => {
         
         if (soapResults) {
           const soapResultArray = Array.isArray(soapResults) ? soapResults : [soapResults];
+          console.log('📧 [Email List - SOAP] Sample email data:', JSON.stringify(soapResultArray[0], null, 2));
+          
           const soapEmails = soapResultArray
             .filter(email => email && email.ID) // Filter out invalid entries
-            .map(email => ({
-              id: String(email.ID),
-              name: String(email.Name || 'Untitled Email').substring(0, 100),
-              subject: String(email.Subject || 'No Subject').substring(0, 150),
-              status: String(email.Status || 'Unknown'),
-              emailType: String(email.EmailType || 'Email'),
-              source: 'Classic'
-            }));
+            .map(email => {
+              // Debug individual email processing
+              const processedEmail = {
+                id: String(email.ID),
+                name: String(email.Name || 'Untitled Email').substring(0, 100),
+                subject: String(email.Subject || email.EmailSubject || 'No Subject').substring(0, 150)
+              };
+              console.log(`📧 [Email List - SOAP] Processing email: ID=${email.ID}, Name=${email.Name}, Subject=${email.Subject || email.EmailSubject || 'MISSING'}`);
+              return processedEmail;
+            });
           
           allEmails = allEmails.concat(soapEmails);
           console.log(`📧 [Email List - SOAP] Successfully retrieved ${soapEmails.length} Classic emails`);
@@ -3845,16 +3849,20 @@ app.get('/emails/list', async (req, res) => {
       // console.log('📧 [Email List - REST] REST Response Data:', JSON.stringify(restResponse.data, null, 2)); // Commented out to reduce log size
 
       if (restResponse.data && restResponse.data.items && Array.isArray(restResponse.data.items)) {
+        console.log('📧 [Email List - REST] Sample email data:', JSON.stringify(restResponse.data.items[0], null, 2));
+        
         const restEmails = restResponse.data.items
           .filter(email => email && email.id) // Filter out invalid entries
-          .map(email => ({
-            id: String(email.id),
-            name: String(email.name || 'Untitled Email').substring(0, 100),
-            subject: String(email.data?.subject || email.subject || 'No Subject').substring(0, 150),
-            status: 'Active', // Content Builder emails are typically active
-            emailType: getEmailTypeFromAssetType(email.assetType?.id),
-            source: 'Content Builder'
-          }));
+          .map(email => {
+            // Debug individual email processing for REST
+            const processedEmail = {
+              id: String(email.id),
+              name: String(email.name || 'Untitled Email').substring(0, 100),
+              subject: String(email.data?.subject || email.subject || email.data?.email?.subject || 'No Subject').substring(0, 150)
+            };
+            console.log(`📧 [Email List - REST] Processing email: ID=${email.id}, Name=${email.name}, Subject=${email.data?.subject || email.subject || email.data?.email?.subject || 'MISSING'}`);
+            return processedEmail;
+          });
         
         allEmails = allEmails.concat(restEmails);
         console.log(`📧 [Email List - REST] Successfully retrieved ${restEmails.length} Content Builder emails`);
