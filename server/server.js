@@ -3294,23 +3294,55 @@ ENDIF
       console.log(`📁 [Content Builder] Checking if folder '${contentFolderName}' exists`);
       
       try {
-        const checkContentFolderResp = await axios.get(
-          `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories?$filter=name eq '${contentFolderName}'`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        console.log(`📁 [Content Builder] Making request to: https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories?$filter=name eq '${contentFolderName}'`);
+        console.log(`📁 [Content Builder] Using access token: ${accessToken ? accessToken.substring(0, 20) + '...' : 'NULL'}`);
         
-        console.log('📁 [Content Builder] Folder check response:', checkContentFolderResp.data);
+        // Try without filter first to see if basic endpoint works
+        let checkContentFolderResp;
+        try {
+          checkContentFolderResp = await axios.get(
+            `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories?$filter=name eq '${contentFolderName}'`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        } catch (filterError) {
+          console.log('📁 [Content Builder] Filter query failed, trying without filter...');
+          // If filter fails, try getting all categories and filter manually
+          checkContentFolderResp = await axios.get(
+            `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/categories`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+        
+        console.log('📁 [Content Builder] Folder check response:', JSON.stringify(checkContentFolderResp.data, null, 2));
         
         let contentFolderId = null;
         if (checkContentFolderResp.data && checkContentFolderResp.data.items && checkContentFolderResp.data.items.length > 0) {
-          contentFolderId = checkContentFolderResp.data.items[0].id;
-          console.log(`📁 [Content Builder] Found existing folder with ID: ${contentFolderId}`);
+          // Find the folder by name (either from filtered result or manual search)
+          const targetFolder = checkContentFolderResp.data.items.find(folder => 
+            folder.name === contentFolderName
+          );
+          
+          if (targetFolder) {
+            contentFolderId = targetFolder.id;
+            console.log(`📁 [Content Builder] Found existing folder with ID: ${contentFolderId}`);
+          } else {
+            console.log(`📁 [Content Builder] Folder '${contentFolderName}' not found in ${checkContentFolderResp.data.items.length} categories`);
+          }
         } else {
+          console.log('📁 [Content Builder] No categories found or empty response');
+        }
+        
+        if (!contentFolderId) {
           console.log('📁 [Content Builder] Folder does not exist, creating it');
           
           // Step 6: Create Content Builder folder
@@ -3565,6 +3597,18 @@ ENDIF
         
       } catch (contentError) {
         console.error('❌ [Content Builder] Error in content operations:', contentError.message);
+        if (contentError.response) {
+          console.error('❌ [Content Builder] Error status:', contentError.response.status);
+          console.error('❌ [Content Builder] Error data:', JSON.stringify(contentError.response.data, null, 2));
+          console.error('❌ [Content Builder] Error headers:', contentError.response.headers);
+        }
+        if (contentError.config) {
+          console.error('❌ [Content Builder] Request config:', {
+            url: contentError.config.url,
+            method: contentError.config.method,
+            headers: contentError.config.headers
+          });
+        }
         // Still return success for DE creation, but note the content folder issue
         return res.json({
           status: 'OK',
