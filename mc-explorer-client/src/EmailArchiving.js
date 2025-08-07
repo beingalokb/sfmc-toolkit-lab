@@ -230,12 +230,15 @@ function EmailArchiving() {
         {configDetails && configDetails.contentBlockName && (
           <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
             <h3 className="text-lg font-medium text-green-800 mb-2">✅ Next Steps:</h3>
-            <ol className="text-green-700 space-y-1 text-sm list-decimal list-inside">
-              <li>Go to Content Builder → {configDetails.contentFolderName}</li>
-              <li>Find the "{configDetails.contentBlockName}" content block</li>
-              <li>Add this block to any email template where you want to archive HTML</li>
-              <li>The block will automatically log email HTML to the Data Extension when emails are sent</li>
-            </ol>
+            <div className="text-green-700 space-y-1 text-sm">
+              <p className="font-medium">To archive complete email HTML content without truncation, please follow these one-time steps:</p>
+              <ol className="list-decimal list-inside ml-4 mt-2 space-y-1">
+                <li>Go to the HTML_Log data extension</li>
+                <li>Click Edit Fields</li>
+                <li>Locate the HTML field and clear the "Length" value</li>
+                <li>Save the changes</li>
+              </ol>
+            </div>
           </div>
         )}
       </div>
