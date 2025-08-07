@@ -142,7 +142,21 @@ function EmailArchiving() {
       const result = await response.json();
       
       if (result.status === 'completed') {
-        alert(`Successfully processed ${result.successCount} emails! (${result.errorCount} errors)`);
+        let message = `Processing completed!\n\n`;
+        message += `✅ Successfully updated: ${result.successCount} emails\n`;
+        if (result.skippedCount > 0) {
+          message += `⏭️ Skipped: ${result.skippedCount} emails (already had archiving block or no HTML content)\n`;
+        }
+        if (result.errorCount > 0) {
+          message += `❌ Errors: ${result.errorCount} emails\n`;
+        }
+        
+        message += `\nSee console for detailed results.`;
+        
+        // Log detailed results to console
+        console.log('📧 [Email Archive Block] Detailed Results:', result.results);
+        
+        alert(message);
         setSelectedEmails(new Set()); // Clear selection
       } else {
         alert('Failed to add archiving block to emails');
