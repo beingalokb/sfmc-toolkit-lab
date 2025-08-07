@@ -3298,7 +3298,7 @@ ENDIF
 
     // Step 4: Create the Data Extension with specified fields - hardcode like DM QS
     const fieldXml = `
-                <Field><Name>EmailAddress</Name><FieldType>EmailAddress</FieldType><IsRequired>true</IsRequired><IsPrimaryKey>true</IsPrimaryKey></Field>
+                <Field><Name>EmailAddress</Name><FieldType>EmailAddress</FieldType><IsRequired>false</IsRequired></Field>
                 <Field><Name>SendTime</Name><FieldType>Date</FieldType><IsRequired>false</IsRequired></Field>
                 <Field><Name>EmailName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>HTML</Name><FieldType>Text</FieldType><MaxLength>4000</MaxLength><IsRequired>false</IsRequired></Field>
