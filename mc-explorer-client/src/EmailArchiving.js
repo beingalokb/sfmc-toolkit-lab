@@ -13,6 +13,12 @@ function EmailArchiving() {
   const [emails, setEmails] = useState([]);
   const [selectedEmails, setSelectedEmails] = useState(new Set());
   const [addingBlockLoading, setAddingBlockLoading] = useState(false);
+  
+  // Search, pagination, and sorting state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   const handleEmailArchiveConfiguration = async () => {
     setConfigLoading(true);
@@ -155,11 +161,92 @@ function EmailArchiving() {
   };
 
   const handleSelectAll = (isSelected) => {
+    const filteredEmails = getFilteredAndSortedEmails();
     if (isSelected) {
-      setSelectedEmails(new Set(emails.map(email => email.id)));
+      setSelectedEmails(new Set(filteredEmails.map(email => email.id)));
     } else {
       setSelectedEmails(new Set());
     }
+  };
+
+  // Search and filter logic
+  const getFilteredAndSortedEmails = () => {
+    let filtered = emails;
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = emails.filter(email => 
+        email.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        email.id.toString().includes(searchTerm)
+      );
+    }
+
+    // Apply sorting
+    if (sortConfig.key) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+
+        // Handle different data types
+        if (sortConfig.key === 'id') {
+          aValue = parseInt(aValue) || 0;
+          bValue = parseInt(bValue) || 0;
+        } else if (sortConfig.key === 'archiveReady') {
+          aValue = aValue === true ? 1 : aValue === false ? 0 : -1;
+          bValue = bValue === true ? 1 : bValue === false ? 0 : -1;
+        } else {
+          aValue = String(aValue || '').toLowerCase();
+          bValue = String(bValue || '').toLowerCase();
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return filtered;
+  };
+
+  // Sorting handler
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+    setCurrentPage(1); // Reset to first page when sorting
+  };
+
+  // Get sort icon
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) {
+      return '↕️';
+    }
+    return sortConfig.direction === 'asc' ? '↑' : '↓';
+  };
+
+  // Pagination logic
+  const filteredEmails = getFilteredAndSortedEmails();
+  const totalPages = Math.ceil(filteredEmails.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentEmails = filteredEmails.slice(startIndex, endIndex);
+
+  // Pagination handlers
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    setSelectedEmails(new Set()); // Clear selection when changing pages
+  };
+
+  // Search handler
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handleAddArchivingBlock = async () => {
@@ -324,17 +411,34 @@ function EmailArchiving() {
             </div>
           ) : (
             <>
+              {/* Search Box */}
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="Search emails by name or ID..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Results Summary */}
+              <div className="mb-4 text-sm text-gray-600">
+                Showing {currentEmails.length} of {filteredEmails.length} emails
+                {searchTerm && ` (filtered from ${emails.length} total)`}
+              </div>
+
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <label className="flex items-center">
                     <input
                       type="checkbox"
-                      checked={selectedEmails.size === emails.length && emails.length > 0}
+                      checked={selectedEmails.size === currentEmails.length && currentEmails.length > 0}
                       onChange={(e) => handleSelectAll(e.target.checked)}
                       className="mr-2"
                     />
                     <span className="text-sm font-medium">
-                      Select All ({selectedEmails.size} of {emails.length} selected)
+                      Select All on Page ({selectedEmails.size} of {filteredEmails.length} selected)
                     </span>
                   </label>
                 </div>
@@ -362,19 +466,28 @@ function EmailArchiving() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Select
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ID
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('id')}
+                      >
+                        ID {getSortIcon('id')}
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Email Name
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('name')}
+                      >
+                        Email Name {getSortIcon('name')}
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Archive Ready
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('archiveReady')}
+                      >
+                        Archive Ready {getSortIcon('archiveReady')}
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {emails.map((email, index) => {
+                    {currentEmails.map((email, index) => {
                       if (!email || !email.id) {
                         console.warn(`📧 [Frontend] Invalid email at index ${index}:`, email);
                         return null;
@@ -413,6 +526,65 @@ function EmailArchiving() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Page {currentPage} of {totalPages} 
+                    ({startIndex + 1}-{Math.min(endIndex, filteredEmails.length)} of {filteredEmails.length} emails)
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      Previous
+                    </button>
+                    
+                    {/* Page Numbers */}
+                    <div className="flex items-center space-x-1">
+                      {[...Array(totalPages)].map((_, i) => {
+                        const page = i + 1;
+                        const isCurrentPage = page === currentPage;
+                        const showPage = page === 1 || page === totalPages || 
+                          (page >= currentPage - 2 && page <= currentPage + 2);
+                        
+                        if (!showPage) {
+                          if (page === currentPage - 3 || page === currentPage + 3) {
+                            return <span key={page} className="px-2 text-gray-400">...</span>;
+                          }
+                          return null;
+                        }
+                        
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => handlePageChange(page)}
+                            className={`px-3 py-1 border rounded text-sm ${
+                              isCurrentPage
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
