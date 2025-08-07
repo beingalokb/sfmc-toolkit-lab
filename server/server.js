@@ -4061,6 +4061,75 @@ app.post('/emails/add-archiving-block', async (req, res) => {
   }
 });
 
+// Check archive status for emails
+app.post('/emails/check-archive-status', async (req, res) => {
+  const accessToken = getAccessTokenFromRequest(req);
+  const subdomain = getSubdomainFromRequest(req);
+  if (!accessToken || !subdomain) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const { emailIds } = req.body;
+    
+    if (!emailIds || !Array.isArray(emailIds) || emailIds.length === 0) {
+      return res.status(400).json({ error: 'Email IDs array is required' });
+    }
+
+    console.log(`📧 [Archive Status Check] Checking archive status for ${emailIds.length} emails`);
+    
+    const results = [];
+    
+    for (const emailId of emailIds) {
+      try {
+        console.log(`📧 [Archive Status Check] Checking email ID: ${emailId}`);
+        
+        // Fetch email content via REST API
+        const getResponse = await axios.get(
+          `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets/${emailId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        // Check if email has HTML content and contains the archiving block
+        let hasArchiveBlock = false;
+        if (getResponse.data.views?.html?.content) {
+          const htmlContent = getResponse.data.views.html.content;
+          hasArchiveBlock = htmlContent.includes('%%=ContentBlockByName("MCX_ArchivingBlock")=%%');
+        }
+
+        console.log(`📧 [Archive Status Check] Email ${emailId}: Archive block present = ${hasArchiveBlock}`);
+
+        results.push({
+          emailId: emailId,
+          hasArchiveBlock: hasArchiveBlock
+        });
+        
+      } catch (emailError) {
+        console.error(`❌ [Archive Status Check] Failed to check email ${emailId}:`, emailError.message);
+        results.push({
+          emailId: emailId,
+          hasArchiveBlock: false // Default to false if check fails
+        });
+      }
+    }
+
+    console.log(`📧 [Archive Status Check] Completed checking ${emailIds.length} emails`);
+
+    res.json({
+      status: 'completed',
+      totalChecked: emailIds.length,
+      results
+    });
+
+  } catch (error) {
+    console.error('❌ [Archive Status Check] Failed to check archive status:', error.message);
+    res.status(500).json({ error: 'Failed to check archive status' });
+  }
+});
+
 // Register the SentEvent endpoint
 require('./emailArchiveSentEventsEndpoint')(app);
 

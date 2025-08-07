@@ -83,7 +83,15 @@ function EmailArchiving() {
       
       if (Array.isArray(emailData)) {
         console.log(`📧 [Frontend] Setting ${emailData.length} emails`);
-        setEmails(emailData);
+        // Initialize emails with archiveReady as undefined (checking state)
+        const emailsWithArchiveStatus = emailData.map(email => ({
+          ...email,
+          archiveReady: undefined
+        }));
+        setEmails(emailsWithArchiveStatus);
+        
+        // Check archive status for each email
+        checkArchiveStatus(emailsWithArchiveStatus);
       } else {
         console.error('📧 [Frontend] Invalid email data received:', emailData);
         setEmails([]);
@@ -93,6 +101,46 @@ function EmailArchiving() {
       setEmails([]);
     } finally {
       setEmailsLoading(false);
+    }
+  };
+
+  const checkArchiveStatus = async (emailList) => {
+    console.log('📧 [Frontend] Checking archive status for emails...');
+    try {
+      const response = await fetch(`${baseURL}/emails/check-archive-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          emailIds: emailList.map(email => email.id)
+        })
+      });
+
+      const statusData = await response.json();
+      console.log('📧 [Frontend] Archive status received:', statusData);
+
+      if (statusData && statusData.results) {
+        // Update emails with archive status
+        setEmails(prevEmails => 
+          prevEmails.map(email => {
+            const statusResult = statusData.results.find(result => result.emailId === email.id);
+            return {
+              ...email,
+              archiveReady: statusResult ? statusResult.hasArchiveBlock : false
+            };
+          })
+        );
+      }
+    } catch (error) {
+      console.error('📧 [Frontend] Error checking archive status:', error);
+      // Set all emails to false if check fails
+      setEmails(prevEmails => 
+        prevEmails.map(email => ({
+          ...email,
+          archiveReady: false
+        }))
+      );
     }
   };
 
@@ -157,6 +205,9 @@ function EmailArchiving() {
         
         alert(message);
         setSelectedEmails(new Set()); // Clear selection
+        
+        // Refresh archive status after updates
+        checkArchiveStatus(emails);
       } else {
         alert('Failed to add archiving block to emails');
       }
@@ -317,6 +368,9 @@ function EmailArchiving() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Email Name
                       </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Archive Ready
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -341,6 +395,17 @@ function EmailArchiving() {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{email.name || 'Untitled'}</div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              email.archiveReady === true ? 'bg-green-100 text-green-800' :
+                              email.archiveReady === false ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {email.archiveReady === true ? 'True' :
+                               email.archiveReady === false ? 'False' :
+                               'Checking...'}
+                            </span>
                           </td>
                         </tr>
                       );
