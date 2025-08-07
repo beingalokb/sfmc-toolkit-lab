@@ -3168,9 +3168,8 @@ app.post('/createEmailArchiveDE', async (req, res) => {
 /* MC Explorer Email Archive Block - MCX_ArchivingBlock */
 /* This block logs email HTML to the HTML_Log Data Extension */
 
-SET @SendID = SendID()
+SET @DataSourceName = _DataSourceName
 SET @JobID = JobID()
-SET @SubscriberKey = _subscriberkey
 SET @EmailAddress = emailaddr
 SET @EmailName = EmailName_
 SET @ListID = ListID()
@@ -3180,16 +3179,15 @@ SET @SendTime = Now()
 SET @EmailHTML = GetEmailHTML(@JobID)
 
 /* Log to HTML_Log Data Extension */
-IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@SubscriberKey) THEN
+IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@EmailAddress) THEN
   InsertDE("HTML_Log", 
     "EmailAddress", @EmailAddress,
-    "JobID", @JobID,
     "SendTime", @SendTime,
     "EmailName", @EmailName,
     "HTML", @EmailHTML,
     "ListID", @ListID,
-    "SendID", @SendID,
-    "BatchID", ""
+    "JobID", @JobID,
+    "DataSourceName", @DataSourceName
   )
 ENDIF
 ]%%`;
@@ -3300,14 +3298,13 @@ ENDIF
 
     // Step 4: Create the Data Extension with specified fields - hardcode like DM QS
     const fieldXml = `
-                <Field><Name>EmailAddress</Name><FieldType>EmailAddress</FieldType><IsRequired>false</IsRequired></Field>
-                <Field><Name>JobID</Name><FieldType>Number</FieldType><IsRequired>true</IsRequired></Field>
+                <Field><Name>EmailAddress</Name><FieldType>EmailAddress</FieldType><IsRequired>true</IsRequired><IsPrimaryKey>true</IsPrimaryKey></Field>
                 <Field><Name>SendTime</Name><FieldType>Date</FieldType><IsRequired>false</IsRequired></Field>
-                <Field><Name>EmailName</Name><FieldType>Text</FieldType><MaxLength>500</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>EmailName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>HTML</Name><FieldType>Text</FieldType><MaxLength>4000</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>ListID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
-                <Field><Name>SendID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
-                <Field><Name>BatchID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>`;
+                <Field><Name>JobID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
+                <Field><Name>DataSourceName</Name><FieldType>Text</FieldType><MaxLength>500</MaxLength><IsRequired>false</IsRequired></Field>`;
 
     // Since isSendable is false, we don't need sendable configuration
     const sendableXml = '';
@@ -3528,9 +3525,8 @@ ENDIF
 /* MC Explorer Email Archive Block - MCX_ArchivingBlock */
 /* This block logs email HTML to the HTML_Log Data Extension */
 
-SET @SendID = SendID()
+SET @DataSourceName = _DataSourceName
 SET @JobID = JobID()
-SET @SubscriberKey = _subscriberkey
 SET @EmailAddress = emailaddr
 SET @EmailName = EmailName_
 SET @ListID = ListID()
@@ -3540,16 +3536,15 @@ SET @SendTime = Now()
 SET @EmailHTML = GetEmailHTML(@JobID)
 
 /* Log to HTML_Log Data Extension */
-IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@SubscriberKey) THEN
+IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@EmailAddress) THEN
   InsertDE("HTML_Log", 
     "EmailAddress", @EmailAddress,
-    "JobID", @JobID,
     "SendTime", @SendTime,
     "EmailName", @EmailName,
     "HTML", @EmailHTML,
     "ListID", @ListID,
-    "SendID", @SendID,
-    "BatchID", ""
+    "JobID", @JobID,
+    "DataSourceName", @DataSourceName
   )
 ENDIF
 ]%%`;

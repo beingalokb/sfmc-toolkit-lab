@@ -31,14 +31,13 @@ function EmailArchiving() {
           description: 'Stores archived email HTML at send time',
           isSendable: false,
           fields: [
-            { name: 'SendID', fieldType: 'Number', isPrimaryKey: true },
-            { name: 'JobID', fieldType: 'Number' },
-            { name: 'SubscriberKey', fieldType: 'Text', maxLength: 254 },
             { name: 'EmailAddress', fieldType: 'EmailAddress' },
+            { name: 'SendTime', fieldType: 'Date' },
             { name: 'EmailName', fieldType: 'Text', maxLength: 100 },
+            { name: 'HTML', fieldType: 'Text' }, // No maxLength = unlimited
             { name: 'ListID', fieldType: 'Number' },
-            { name: 'EmailHTML', fieldType: 'Text' }, // No maxLength = unlimited
-            { name: 'LoggedDate', fieldType: 'Date' }
+            { name: 'JobID', fieldType: 'Number' },
+            { name: 'DataSourceName', fieldType: 'Text', maxLength: 500 }
           ]
         })
       });
