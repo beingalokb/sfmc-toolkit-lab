@@ -3176,7 +3176,7 @@ SET @ListID = ListID()
 SET @SendTime = Now()
 
 /* Get the email HTML from the send */
-SET @EmailHTML = GetEmailHTML(@JobID)
+SET @EmailHTML = HTTPGet(view_email_url)
 
 /* Log to HTML_Log Data Extension */
 IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@EmailAddress) THEN
