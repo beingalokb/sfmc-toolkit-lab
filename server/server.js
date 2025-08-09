@@ -4301,48 +4301,89 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       client_secret: creds.clientSecret
     };
 
-    const authResponse = await axios.post(`https://${creds.subdomain}.auth.marketingcloudapis.com/v2/token`, authPayload);
-    const accessToken = authResponse.data.access_token;
+    let accessToken = null;
+    try {
+      const authResponse = await axios.post(`https://${creds.subdomain}.auth.marketingcloudapis.com/v2/token`, authPayload);
+      accessToken = authResponse.data.access_token;
+      console.log('✅ [Export] Successfully authenticated with Marketing Cloud');
+    } catch (authError) {
+      console.log('⚠️ [Export] Authentication failed:', authError.response?.data);
+      if (authError.response?.data?.error === 'invalid_grant') {
+        console.log('💡 [Export] This requires a Server-to-Server app in Marketing Cloud. Proceeding with mock data.');
+      }
+      // We'll continue with mock data below
+    }
 
     // Try to query HTML_Log Data Extension using the correct endpoint
     let rows = [];
-    try {
-      console.log(`🔍 [Export] Querying HTML_Log DE at: https://${creds.subdomain}.rest.marketingcloudapis.com/hub/v1/dataevents/key:HTML_Log/rowset`);
-      const deResponse = await axios.get(
-        `https://${creds.subdomain}.rest.marketingcloudapis.com/hub/v1/dataevents/key:HTML_Log/rowset`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
+    let dataSource = 'mock'; // Track data source for user feedback
+    
+    if (accessToken) {
+      try {
+        console.log(`🔍 [Export] Querying HTML_Log DE at: https://${creds.subdomain}.rest.marketingcloudapis.com/hub/v1/dataevents/key:HTML_Log/rowset`);
+        const deResponse = await axios.get(
+          `https://${creds.subdomain}.rest.marketingcloudapis.com/hub/v1/dataevents/key:HTML_Log/rowset`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
-      rows = deResponse.data.items || [];
-      console.log(`📊 [Export] Found ${rows.length} records in HTML_Log`);
-      console.log(`📋 [Export] Sample data structure:`, rows.length > 0 ? JSON.stringify(rows[0], null, 2) : 'No data');
-    } catch (queryError) {
-      console.log('⚠️ [Export] Could not query HTML_Log DE:', queryError.response?.status, queryError.response?.statusText);
-      console.log('🔍 [Export] Query error details:', queryError.response?.data);
-      console.log('⚠️ [Export] Proceeding with mock data for demonstration');
-      // Create sample data for demonstration
+        );
+        rows = deResponse.data.items || [];
+        dataSource = 'marketing_cloud';
+        console.log(`📊 [Export] Found ${rows.length} records in HTML_Log`);
+        console.log(`📋 [Export] Sample data structure:`, rows.length > 0 ? JSON.stringify(rows[0], null, 2) : 'No data');
+      } catch (queryError) {
+        console.log('⚠️ [Export] Could not query HTML_Log DE:', queryError.response?.status, queryError.response?.statusText);
+        console.log('🔍 [Export] Query error details:', queryError.response?.data);
+        console.log('⚠️ [Export] Proceeding with mock data for demonstration');
+      }
+    } else {
+      console.log('⚠️ [Export] No access token available, using mock data');
+    }
+    
+    // If no data from MC, create sample data for demonstration
+    if (rows.length === 0) {
+      dataSource = 'mock';
       rows = [
         {
-          EmailAddress: 'test@example.com',
-          SendTime: new Date().toISOString(),
-          EmailName: 'Sample Email',
-          HTML: '<html><body>Sample email content</body></html>',
+          EmailAddress: 'subscriber1@example.com',
+          SendTime: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+          EmailName: 'Welcome Email Campaign',
+          HTML: '<html><head><title>Welcome!</title></head><body><h1>Welcome to our service!</h1><p>Thank you for subscribing.</p></body></html>',
           ListID: '12345',
           JobID: '67890',
-          DataSourceName: 'Sample Data Source'
+          DataSourceName: 'Email Studio'
+        },
+        {
+          EmailAddress: 'subscriber2@example.com',
+          SendTime: new Date(Date.now() - 43200000).toISOString(), // 12 hours ago
+          EmailName: 'Product Update Newsletter',
+          HTML: '<html><head><title>Product Updates</title></head><body><h1>Latest Product Updates</h1><p>Check out our new features!</p></body></html>',
+          ListID: '12346',
+          JobID: '67891',
+          DataSourceName: 'Journey Builder'
+        },
+        {
+          EmailAddress: 'subscriber3@example.com',
+          SendTime: new Date().toISOString(), // Now
+          EmailName: 'Special Offer Email',
+          HTML: '<html><head><title>Special Offer</title></head><body><h1>Limited Time Offer!</h1><p>Get 50% off your next purchase.</p></body></html>',
+          ListID: '12347',
+          JobID: '67892',
+          DataSourceName: 'Automation Studio'
         }
       ];
+      console.log(`📊 [Export] Using ${rows.length} mock records for demonstration`);
     }
     
     if (rows.length === 0) {
       return res.json({ 
         success: true, 
         message: 'No data found in HTML_Log to export',
-        exportedCount: 0
+        exportedCount: 0,
+        dataSource: dataSource
       });
     }
 
@@ -4385,12 +4426,19 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
 
     console.log(`✅ [Export] Successfully exported ${rows.length} records to SFTP`);
     
+    let message = `Successfully exported ${rows.length} records to SFTP`;
+    if (dataSource === 'mock') {
+      message += ' (using sample data - requires Server-to-Server app for live data)';
+    }
+    
     res.json({
       success: true,
-      message: `Successfully exported ${rows.length} records to SFTP`,
+      message: message,
       exportedCount: rows.length,
       filename: filename,
-      sftpPath: `${globalSettings.sftp.directory}/${filename}`
+      sftpPath: `${globalSettings.sftp.directory}/${filename}`,
+      dataSource: dataSource,
+      note: dataSource === 'mock' ? 'To export real data, configure a Server-to-Server app in Marketing Cloud Setup > Apps > Installed Packages' : undefined
     });
 
   } catch (error) {

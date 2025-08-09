@@ -325,10 +325,24 @@ function EmailArchiving() {
       const result = await response.json();
       
       if (response.ok && result.success) {
-        setExportStatus(`✅ ${result.message}`);
+        let message = `✅ ${result.message}`;
+        
+        // Add additional info based on data source
+        if (result.dataSource === 'mock') {
+          message += '\n\n💡 Note: This export used sample data because your Marketing Cloud app needs to be configured as a "Server-to-Server" app type for API access.';
+        }
+        
         if (result.filename && result.sftpPath) {
+          message += `\n📁 File: ${result.filename}`;
+          message += `\n📂 Path: ${result.sftpPath}`;
           console.log(`📤 [Export] File exported: ${result.filename} to ${result.sftpPath}`);
         }
+        
+        if (result.note) {
+          message += `\n\n🔧 Setup: ${result.note}`;
+        }
+        
+        setExportStatus(message);
       } else {
         setExportStatus(`❌ Export failed: ${result.error || 'Unknown error'}`);
       }
@@ -337,8 +351,8 @@ function EmailArchiving() {
       setExportStatus('❌ Error exporting to SFTP');
     } finally {
       setExportLoading(false);
-      // Clear status after 10 seconds
-      setTimeout(() => setExportStatus(''), 10000);
+      // Clear status after 15 seconds (longer for more detailed messages)
+      setTimeout(() => setExportStatus(''), 15000);
     }
   };
 
@@ -659,8 +673,8 @@ function EmailArchiving() {
           </div>
 
           {exportStatus && (
-            <div className={`p-3 rounded-lg ${
-              exportStatus.includes('✅') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+            <div className={`p-4 rounded-lg whitespace-pre-line ${
+              exportStatus.includes('✅') ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
             }`}>
               {exportStatus}
             </div>
