@@ -999,6 +999,12 @@ export default function MainApp() {
           >
             Email Archiving
           </button>
+          <button
+            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'settings' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
+            onClick={() => setParentNav('settings')}
+          >
+            Settings
+          </button>
         </div>
         {/* Render content based on parentNav */}
         {parentNav === 'search' ? (
@@ -1789,6 +1795,11 @@ export default function MainApp() {
 
         {/* Settings content */}
         {activeTab === 'settings' && (
+          <Settings />
+        )}
+
+        {/* Settings parent navigation content */}
+        {parentNav === 'settings' && (
           <Settings />
         )}
       </div>
