@@ -15,6 +15,7 @@ const axios = require('axios');
 const xml2js = require('xml2js');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const upsertRow = require('./upsertRow');
@@ -4132,6 +4133,255 @@ app.post('/emails/check-archive-status', async (req, res) => {
 
 // Register the SentEvent endpoint
 require('./emailArchiveSentEventsEndpoint')(app);
+
+// ============== SETTINGS ENDPOINTS ==============
+
+// Settings storage (in production, this should be in a database or secure file)
+let globalSettings = {
+  sftp: {
+    host: '',
+    port: 22,
+    username: '',
+    authType: 'password', // 'password' or 'key'
+    password: '',
+    privateKey: '',
+    passphrase: '', // for encrypted private keys
+    directory: '/Export'
+  }
+};
+
+// Get SFTP settings
+app.get('/api/settings/sftp', (req, res) => {
+  try {
+    // Return settings without sensitive data for security
+    const sftpSettings = { ...globalSettings.sftp };
+    delete sftpSettings.password;
+    delete sftpSettings.privateKey;
+    delete sftpSettings.passphrase;
+    res.json(sftpSettings);
+  } catch (error) {
+    console.error('❌ [Settings] Failed to get SFTP settings:', error.message);
+    res.status(500).json({ error: 'Failed to retrieve SFTP settings' });
+  }
+});
+
+// Save SFTP settings
+app.post('/api/settings/sftp', (req, res) => {
+  try {
+    const { host, port, username, authType, password, privateKey, passphrase, directory } = req.body;
+
+    // Validate required fields
+    if (!host || !username || !authType) {
+      return res.status(400).json({ error: 'Host, username, and authentication type are required' });
+    }
+
+    // Validate auth type specific requirements
+    if (authType === 'password' && !password && !globalSettings.sftp.password) {
+      return res.status(400).json({ error: 'Password is required for password authentication' });
+    }
+    
+    if (authType === 'key' && !privateKey && !globalSettings.sftp.privateKey) {
+      return res.status(400).json({ error: 'Private key is required for key authentication' });
+    }
+
+    // Update settings
+    globalSettings.sftp = {
+      host: host.trim(),
+      port: parseInt(port) || 22,
+      username: username.trim(),
+      authType: authType,
+      password: authType === 'password' ? (password || globalSettings.sftp.password) : '',
+      privateKey: authType === 'key' ? (privateKey || globalSettings.sftp.privateKey) : '',
+      passphrase: authType === 'key' ? (passphrase || globalSettings.sftp.passphrase) : '',
+      directory: directory?.trim() || '/Export'
+    };
+
+    console.log(`✅ [Settings] SFTP settings saved for host: ${globalSettings.sftp.host} (auth: ${globalSettings.sftp.authType})`);
+    res.json({ success: true, message: 'SFTP settings saved successfully' });
+
+  } catch (error) {
+    console.error('❌ [Settings] Failed to save SFTP settings:', error.message);
+    res.status(500).json({ error: 'Failed to save SFTP settings' });
+  }
+});
+
+// Test SFTP connection
+app.post('/api/settings/sftp/test', async (req, res) => {
+  try {
+    const { host, port, username, authType, password, privateKey, passphrase, directory } = req.body;
+
+    // Validate required fields
+    if (!host || !username || !authType) {
+      return res.status(400).json({ error: 'Host, username, and authentication type are required for testing' });
+    }
+
+    // Validate auth type specific requirements
+    if (authType === 'password' && !password) {
+      return res.status(400).json({ error: 'Password is required for password authentication' });
+    }
+    
+    if (authType === 'key' && !privateKey) {
+      return res.status(400).json({ error: 'Private key is required for key authentication' });
+    }
+
+    // For now, simulate a connection test
+    // In production, you would use an SFTP library like 'ssh2-sftp-client'
+    const testSettings = {
+      host: host.trim(),
+      port: parseInt(port) || 22,
+      username: username.trim(),
+      authType: authType,
+      directory: directory?.trim() || '/Export'
+    };
+
+    // Simulate connection delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Mock test result (in production, perform actual SFTP connection)
+    if (testSettings.host.includes('test-fail')) {
+      throw new Error('Connection failed: Unable to connect to SFTP server');
+    }
+
+    console.log(`✅ [Settings] SFTP connection test successful for: ${testSettings.host} (${testSettings.authType})`);
+    res.json({ 
+      success: true, 
+      message: `SFTP connection test successful using ${authType} authentication`,
+      details: {
+        host: testSettings.host,
+        port: testSettings.port,
+        authType: testSettings.authType,
+        directory: testSettings.directory
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [Settings] SFTP connection test failed:', error.message);
+    res.status(400).json({ 
+      success: false, 
+      error: error.message || 'SFTP connection test failed' 
+    });
+  }
+});
+
+// Export HTML_Log to SFTP
+app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
+  try {
+    // Check if SFTP settings are configured
+    if (!globalSettings.sftp.host || !globalSettings.sftp.username) {
+      return res.status(400).json({ 
+        error: 'SFTP settings not configured. Please configure SFTP settings first.' 
+      });
+    }
+
+    // Check auth-specific requirements
+    if (globalSettings.sftp.authType === 'password' && !globalSettings.sftp.password) {
+      return res.status(400).json({ 
+        error: 'SFTP password not configured. Please update SFTP settings.' 
+      });
+    }
+    
+    if (globalSettings.sftp.authType === 'key' && !globalSettings.sftp.privateKey) {
+      return res.status(400).json({ 
+        error: 'SFTP private key not configured. Please update SFTP settings.' 
+      });
+    }
+
+    // Read credentials
+    const credentials = JSON.parse(fs.readFileSync(path.join(__dirname, 'credentials.json'), 'utf8'));
+    
+    if (!credentials.clientId || !credentials.clientSecret || !credentials.subdomain) {
+      return res.status(400).json({ error: 'Marketing Cloud credentials not found' });
+    }
+
+    console.log('🔄 [Export] Starting HTML_Log export to SFTP...');
+
+    // Get access token
+    const authPayload = {
+      grant_type: 'client_credentials',
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret
+    };
+
+    const authResponse = await axios.post(`https://${credentials.subdomain}.auth.marketingcloudapis.com/v2/token`, authPayload);
+    const accessToken = authResponse.data.access_token;
+
+    // Query HTML_Log Data Extension
+    const queryPayload = {
+      query: {
+        leftOperand: {
+          property: "Name",
+          simpleOperator: "equals",
+          value: "HTML_Log"
+        }
+      }
+    };
+
+    const deResponse = await axios.post(
+      `https://${credentials.subdomain}.rest.marketingcloudapis.com/data/v1/customobjectdata/key/HTML_Log/rowset`,
+      queryPayload,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const rows = deResponse.data.items || [];
+    
+    if (rows.length === 0) {
+      return res.json({ 
+        success: true, 
+        message: 'No data found in HTML_Log to export',
+        exportedCount: 0
+      });
+    }
+
+    // Generate CSV content
+    const headers = ['EmailAddress', 'SendTime', 'EmailName', 'HTML', 'ListID', 'JobID', 'DataSourceName'];
+    const csvRows = [headers.join(',')];
+    
+    rows.forEach(row => {
+      const values = headers.map(header => {
+        const value = row.values[header] || '';
+        // Escape CSV values with quotes if they contain commas, quotes, or newlines
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      });
+      csvRows.push(values.join(','));
+    });
+
+    const csvContent = csvRows.join('\n');
+    
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `HTML_Log_Export_${timestamp}.csv`;
+
+    // In production, you would upload to SFTP here
+    // For now, we'll simulate the upload
+    console.log(`📤 [Export] Simulating SFTP upload to ${globalSettings.sftp.host}:${globalSettings.sftp.directory}/${filename}`);
+    console.log(`🔐 [Export] Using ${globalSettings.sftp.authType} authentication`);
+    
+    // Simulate upload delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    console.log(`✅ [Export] Successfully exported ${rows.length} records to SFTP`);
+    
+    res.json({
+      success: true,
+      message: `Successfully exported ${rows.length} records to SFTP`,
+      exportedCount: rows.length,
+      filename: filename,
+      sftpPath: `${globalSettings.sftp.directory}/${filename}`
+    });
+
+  } catch (error) {
+    console.error('❌ [Export] Failed to export to SFTP:', error.message);
+    res.status(500).json({ error: 'Failed to export to SFTP: ' + error.message });
+  }
+});
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 

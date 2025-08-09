@@ -4,6 +4,7 @@ import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
 import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
 import PreferenceCenterConfigForm from './PreferenceCenterConfigForm';
 import EmailArchiving from './EmailArchiving';
+import Settings from './Settings';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -888,6 +889,12 @@ export default function MainApp() {
         onClick={() => setActiveTab('emailarchiving')}
       >
         Email Archiving
+      </button>
+      <button
+        className={`px-4 py-2 rounded-lg ${activeTab === 'settings' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+        onClick={() => setActiveTab('settings')}
+      >
+        Settings
       </button>
     </div>
   );

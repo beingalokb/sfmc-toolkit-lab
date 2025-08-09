@@ -19,6 +19,10 @@ function EmailArchiving() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  
+  // Export state
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportStatus, setExportStatus] = useState('');
 
   const handleEmailArchiveConfiguration = async () => {
     setConfigLoading(true);
@@ -306,6 +310,38 @@ function EmailArchiving() {
     }
   };
 
+  const handleExportToSftp = async () => {
+    setExportLoading(true);
+    setExportStatus('Starting export to SFTP...');
+    
+    try {
+      const response = await fetch(`${baseURL}/api/email-archiving/export-to-sftp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        setExportStatus(`✅ ${result.message}`);
+        if (result.filename && result.sftpPath) {
+          console.log(`📤 [Export] File exported: ${result.filename} to ${result.sftpPath}`);
+        }
+      } else {
+        setExportStatus(`❌ Export failed: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error exporting to SFTP:', error);
+      setExportStatus('❌ Error exporting to SFTP');
+    } finally {
+      setExportLoading(false);
+      // Clear status after 10 seconds
+      setTimeout(() => setExportStatus(''), 10000);
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-2xl font-semibold text-indigo-700 mb-6">
@@ -586,6 +622,48 @@ function EmailArchiving() {
                 </div>
               )}
             </>
+          )}
+        </div>
+      )}
+
+      {/* Export Section - Show after successful setup */}
+      {configDetails && configDetails.contentBlockId && (
+        <div className="mt-8 bg-white rounded-lg shadow p-6">
+          <h3 className="text-xl font-semibold text-indigo-700 mb-4">
+            📤 Export Archived Data
+          </h3>
+          
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-blue-800 text-sm">
+              💡 Export all archived email data from the HTML_Log Data Extension to your configured SFTP server. 
+              Make sure SFTP settings are configured in the Settings tab first.
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-4 mb-4">
+            <button
+              onClick={handleExportToSftp}
+              disabled={exportLoading}
+              className={`px-6 py-2 rounded-lg font-medium ${
+                exportLoading
+                  ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+              }`}
+            >
+              {exportLoading ? 'Exporting...' : 'Export to SFTP'}
+            </button>
+            
+            <span className="text-sm text-gray-600">
+              Exports all data from HTML_Log Data Extension as CSV
+            </span>
+          </div>
+
+          {exportStatus && (
+            <div className={`p-3 rounded-lg ${
+              exportStatus.includes('✅') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+            }`}>
+              {exportStatus}
+            </div>
           )}
         </div>
       )}
