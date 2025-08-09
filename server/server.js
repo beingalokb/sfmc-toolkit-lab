@@ -4286,11 +4286,10 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       });
     }
 
-    // Read credentials
-    const credentials = JSON.parse(fs.readFileSync(path.join(__dirname, 'credentials.json'), 'utf8'));
-    
-    if (!credentials.clientId || !credentials.clientSecret || !credentials.subdomain) {
-      return res.status(400).json({ error: 'Marketing Cloud credentials not found' });
+    // Get credentials from session (same as other endpoints)
+    const creds = req.session.mcCreds;
+    if (!creds || !creds.clientId || !creds.clientSecret || !creds.subdomain) {
+      return res.status(400).json({ error: 'Marketing Cloud credentials not found. Please login first.' });
     }
 
     console.log('🔄 [Export] Starting HTML_Log export to SFTP...');
@@ -4298,11 +4297,11 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     // Get access token
     const authPayload = {
       grant_type: 'client_credentials',
-      client_id: credentials.clientId,
-      client_secret: credentials.clientSecret
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret
     };
 
-    const authResponse = await axios.post(`https://${credentials.subdomain}.auth.marketingcloudapis.com/v2/token`, authPayload);
+    const authResponse = await axios.post(`https://${creds.subdomain}.auth.marketingcloudapis.com/v2/token`, authPayload);
     const accessToken = authResponse.data.access_token;
 
     // Query HTML_Log Data Extension
@@ -4317,7 +4316,7 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     };
 
     const deResponse = await axios.post(
-      `https://${credentials.subdomain}.rest.marketingcloudapis.com/data/v1/customobjectdata/key/HTML_Log/rowset`,
+      `https://${creds.subdomain}.rest.marketingcloudapis.com/data/v1/customobjectdata/key/HTML_Log/rowset`,
       queryPayload,
       {
         headers: {
