@@ -1786,6 +1786,11 @@ export default function MainApp() {
         {parentNav === 'emailArchivingSetup' && (
           <EmailArchiving />
         )}
+
+        {/* Settings content */}
+        {activeTab === 'settings' && (
+          <Settings />
+        )}
       </div>
     </div>
   );
