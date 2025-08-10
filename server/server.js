@@ -4299,7 +4299,8 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     const authPayload = {
       grant_type: 'client_credentials',
       client_id: creds.clientId,
-      client_secret: creds.clientSecret
+      client_secret: creds.clientSecret,
+      account_id: creds.mid || creds.accountId // Add account_id for proper authentication
     };
 
     let accessToken = null;
@@ -4363,6 +4364,7 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
         // Parse XML response using xml2js
         const xmlData = soapResponse.data;
         console.log(`📋 [Export] SOAP Response received, parsing XML...`);
+        console.log(`🔍 [Export] Raw SOAP Response (first 2000 chars):`, xmlData.substring(0, 2000));
         
         try {
           const parser = new xml2js.Parser({ explicitArray: false, ignoreAttrs: false });
@@ -4375,8 +4377,15 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
           
           // Navigate through the SOAP response structure
           const soapBody = result['soap:Envelope']?.['soap:Body'] || result['s:Envelope']?.['s:Body'];
+          console.log(`🔍 [Export] SOAP Body keys:`, Object.keys(soapBody || {}));
+          
           const retrieveResponse = soapBody?.['RetrieveResponseMsg'];
+          console.log(`🔍 [Export] RetrieveResponse exists:`, !!retrieveResponse);
+          console.log(`🔍 [Export] RetrieveResponse keys:`, Object.keys(retrieveResponse || {}));
+          
           const results = retrieveResponse?.['Results'];
+          console.log(`🔍 [Export] Results type:`, Array.isArray(results) ? 'array' : typeof results);
+          console.log(`🔍 [Export] Results length/content:`, Array.isArray(results) ? results.length : results);
           
           if (results && Array.isArray(results)) {
             // Parse each result into our row format
