@@ -4603,10 +4603,25 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// Serve React frontend (must be before app.listen)
+const buildPath = path.join(__dirname, '../mc-explorer-client/build');
 
-// Serve React frontend (must be last)
-app.use(express.static(path.join(__dirname, '../mc-explorer-client/build')));
-app.get(/(.*)/, (req, res) => {
-  res.sendFile(path.join(__dirname, '../mc-explorer-client/build/index.html'));
-});
+// Check if build directory exists
+if (fs.existsSync(buildPath)) {
+  app.use(express.static(buildPath));
+  app.get(/(.*)/, (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
+  });
+  console.log('✅ Serving React frontend from build directory');
+} else {
+  console.log('⚠️ Build directory not found. Frontend may not be available.');
+  app.get('/', (req, res) => {
+    res.json({ 
+      message: 'MC-Explorer Server is running', 
+      status: 'Build directory not found - please run npm run build',
+      api: 'Available at /api/*'
+    });
+  });
+}
+
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
