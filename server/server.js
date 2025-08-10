@@ -4320,23 +4320,117 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     
     if (accessToken) {
       try {
-        console.log(`🔍 [Export] Querying HTML_Log DE at: https://${creds.subdomain}.rest.marketingcloudapis.com/hub/v1/dataevents/key:HTML_Log/rowset`);
-        const deResponse = await axios.get(
-          `https://${creds.subdomain}.rest.marketingcloudapis.com/hub/v1/dataevents/key:HTML_Log/rowset`,
+        console.log(`🔍 [Export] Querying HTML_Log DE using SOAP API at: https://${creds.subdomain}.soap.marketingcloudapis.com/Service.asmx`);
+        
+        // Create SOAP envelope for retrieving Data Extension data
+        const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:u="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
+  <s:Header>
+    <a:Action s:mustUnderstand="1">Retrieve</a:Action>
+    <a:To s:mustUnderstand="1">https://${creds.subdomain}.soap.marketingcloudapis.com/Service.asmx</a:To>
+    <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+  </s:Header>
+  <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+      <RetrieveRequest>
+        <ObjectType>DataExtensionObject[HTML_Log]</ObjectType>
+        <Properties>EmailAddress</Properties>
+        <Properties>SendTime</Properties>
+        <Properties>EmailName</Properties>
+        <Properties>HTML</Properties>
+        <Properties>ListID</Properties>
+        <Properties>JobID</Properties>
+        <Properties>DataSourceName</Properties>
+      </RetrieveRequest>
+    </RetrieveRequestMsg>
+  </s:Body>
+</s:Envelope>`;
+
+        const soapResponse = await axios.post(
+          `https://${creds.subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+          soapEnvelope,
           {
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'text/xml; charset=utf-8',
+              'SOAPAction': 'Retrieve'
             }
           }
         );
-        rows = deResponse.data.items || [];
+        
+        console.log(`📊 [Export] SOAP Response Status: ${soapResponse.status}`);
+        
+        // Parse XML response using xml2js
+        const xmlData = soapResponse.data;
+        console.log(`📋 [Export] SOAP Response received, parsing XML...`);
+        
+        try {
+          const parser = new xml2js.Parser({ explicitArray: false, ignoreAttrs: false });
+          const result = await new Promise((resolve, reject) => {
+            parser.parseString(xmlData, (err, parsed) => {
+              if (err) reject(err);
+              else resolve(parsed);
+            });
+          });
+          
+          // Navigate through the SOAP response structure
+          const soapBody = result['soap:Envelope']?.['soap:Body'] || result['s:Envelope']?.['s:Body'];
+          const retrieveResponse = soapBody?.['RetrieveResponseMsg'];
+          const results = retrieveResponse?.['Results'];
+          
+          if (results && Array.isArray(results)) {
+            // Parse each result into our row format
+            rows = results.map(result => {
+              const properties = result.Properties?.Property || [];
+              const row = {};
+              
+              if (Array.isArray(properties)) {
+                properties.forEach(prop => {
+                  if (prop.Name && prop.Value) {
+                    row[prop.Name] = prop.Value;
+                  }
+                });
+              } else if (properties.Name && properties.Value) {
+                // Single property case
+                row[properties.Name] = properties.Value;
+              }
+              
+              return row;
+            });
+            
+            console.log(`📊 [Export] Successfully parsed ${rows.length} records from SOAP response`);
+            console.log(`📋 [Export] Sample parsed record:`, rows.length > 0 ? JSON.stringify(rows[0], null, 2) : 'No data');
+          } else if (results && !Array.isArray(results)) {
+            // Single result case
+            const properties = results.Properties?.Property || [];
+            const row = {};
+            
+            if (Array.isArray(properties)) {
+              properties.forEach(prop => {
+                if (prop.Name && prop.Value) {
+                  row[prop.Name] = prop.Value;
+                }
+              });
+            }
+            
+            rows = [row];
+            console.log(`📊 [Export] Successfully parsed 1 record from SOAP response`);
+          } else {
+            console.log(`⚠️ [Export] No results found in SOAP response`);
+            rows = [];
+          }
+          
+        } catch (xmlParseError) {
+          console.log('⚠️ [Export] Failed to parse SOAP XML response:', xmlParseError.message);
+          console.log('📋 [Export] Raw SOAP Response sample:', xmlData.substring(0, 1000));
+          rows = [];
+        }
+        
         dataSource = 'marketing_cloud';
-        console.log(`📊 [Export] Found ${rows.length} records in HTML_Log`);
-        console.log(`📋 [Export] Sample data structure:`, rows.length > 0 ? JSON.stringify(rows[0], null, 2) : 'No data');
+        console.log(`� [Export] Successfully queried HTML_Log using SOAP API`);
+        
       } catch (queryError) {
-        console.log('⚠️ [Export] Could not query HTML_Log DE:', queryError.response?.status, queryError.response?.statusText);
-        console.log('🔍 [Export] Query error details:', queryError.response?.data);
+        console.log('⚠️ [Export] Could not query HTML_Log DE using SOAP:', queryError.response?.status, queryError.response?.statusText);
+        console.log('🔍 [Export] SOAP query error details:', queryError.response?.data?.substring(0, 500));
         console.log('⚠️ [Export] Proceeding with mock data for demonstration');
       }
     } else {
@@ -4428,7 +4522,9 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     
     let message = `Successfully exported ${rows.length} records to SFTP`;
     if (dataSource === 'mock') {
-      message += ' (using sample data - requires Server-to-Server app for live data)';
+      message += ' (using sample data - HTML_Log DE may not exist or be empty)';
+    } else {
+      message += ' (using live data from HTML_Log DE)';
     }
     
     res.json({
@@ -4438,7 +4534,7 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       filename: filename,
       sftpPath: `${globalSettings.sftp.directory}/${filename}`,
       dataSource: dataSource,
-      note: dataSource === 'mock' ? 'To export real data, configure a Server-to-Server app in Marketing Cloud Setup > Apps > Installed Packages' : undefined
+      note: dataSource === 'mock' ? 'HTML_Log Data Extension may not exist yet or be empty. Archive some emails first, then try exporting again.' : 'Successfully retrieved live data from HTML_Log Data Extension'
     });
 
   } catch (error) {
