@@ -13,6 +13,7 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const xml2js = require('xml2js');
+const Client = require('ssh2-sftp-client');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
@@ -4510,13 +4511,67 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const filename = `HTML_Log_Export_${timestamp}.csv`;
 
-    // In production, you would upload to SFTP here
-    // For now, we'll simulate the upload
-    console.log(`📤 [Export] Simulating SFTP upload to ${globalSettings.sftp.host}:${globalSettings.sftp.directory}/${filename}`);
+    // Real SFTP upload with ssh2-sftp-client
+    console.log(`📤 [Export] Starting SFTP upload to ${globalSettings.sftp.host}:${globalSettings.sftp.directory}/${filename}`);
     console.log(`🔐 [Export] Using ${globalSettings.sftp.authType} authentication`);
     
-    // Simulate upload delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    const sftp = new Client();
+    
+    try {
+      // Prepare connection config
+      const connectOptions = {
+        host: globalSettings.sftp.host,
+        port: globalSettings.sftp.port || 22,
+        username: globalSettings.sftp.username
+      };
+      
+      // Add authentication method
+      if (globalSettings.sftp.authType === 'password') {
+        connectOptions.password = globalSettings.sftp.password;
+      } else if (globalSettings.sftp.authType === 'key') {
+        connectOptions.privateKey = globalSettings.sftp.privateKey;
+      }
+      
+      console.log(`🔌 [Export] Connecting to SFTP server...`);
+      await sftp.connect(connectOptions);
+      console.log(`✅ [Export] Successfully connected to SFTP server`);
+      
+      // Ensure directory exists
+      const targetPath = globalSettings.sftp.directory || '/';
+      try {
+        await sftp.mkdir(targetPath, true); // Create directory recursively if needed
+        console.log(`📁 [Export] Directory verified/created: ${targetPath}`);
+      } catch (mkdirError) {
+        // Directory might already exist, which is fine
+        console.log(`📁 [Export] Directory check: ${mkdirError.message} (may already exist)`);
+      }
+      
+      // Upload the file
+      const fullPath = `${targetPath}/${filename}`.replace(/\/+/g, '/'); // Clean up multiple slashes
+      console.log(`📤 [Export] Uploading to: ${fullPath}`);
+      
+      await sftp.put(Buffer.from(csvContent), fullPath);
+      console.log(`✅ [Export] Successfully uploaded ${filename} to SFTP`);
+      
+      // Verify upload by checking file exists
+      const fileList = await sftp.list(targetPath);
+      const uploadedFile = fileList.find(file => file.name === filename);
+      if (uploadedFile) {
+        console.log(`✅ [Export] Upload verified - file size: ${uploadedFile.size} bytes`);
+      }
+      
+      await sftp.end();
+      console.log(`🔌 [Export] SFTP connection closed`);
+      
+    } catch (sftpError) {
+      console.error(`❌ [Export] SFTP upload failed:`, sftpError.message);
+      try {
+        await sftp.end();
+      } catch (closeError) {
+        console.error(`⚠️ [Export] Error closing SFTP connection:`, closeError.message);
+      }
+      throw new Error(`SFTP upload failed: ${sftpError.message}`);
+    }
 
     console.log(`✅ [Export] Successfully exported ${rows.length} records to SFTP`);
     
