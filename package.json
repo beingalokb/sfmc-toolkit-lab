@@ -2,10 +2,15 @@
   "name": "mc-explorer",
   "version": "1.0.0",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
   "scripts": {
-    "build": "cd mc-explorer-client && npm install && npm run build",
+    "build": "cd mc-explorer-client && npm install && npm run build && cd ../server && npm install",
     "start": "node --max-old-space-size=2048 server/server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "postinstall": "cd mc-explorer-client && npm install && cd ../server && npm install"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +25,7 @@
     "express-session": "^1.18.1",
     "react-csv": "^2.2.2",
     "react-router-dom": "^7.6.2",
+    "ssh2-sftp-client": "^12.0.1",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
