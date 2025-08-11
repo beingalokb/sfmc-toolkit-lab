@@ -4629,6 +4629,12 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     // Wait for zip creation to complete
     await zipPromise;
 
+    // Define SFTP paths that will be used in response
+    const basePath = globalSettings.sftp.directory || '/Export';
+    const emailArchivePath = `${basePath}/Email_Archive`.replace(/\/+/g, '/');
+    const backupPath = `${emailArchivePath}/Backup`.replace(/\/+/g, '/');
+    const auditFailurePath = `${emailArchivePath}/Audit_Failure`.replace(/\/+/g, '/');
+
     // Real SFTP upload with zip file
     console.log(`📤 [Export] Starting SFTP upload of zip file`);
     console.log(`🔐 [Export] Using ${globalSettings.sftp.authType} authentication`);
@@ -4655,11 +4661,6 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       console.log(`✅ [Export] Successfully connected to SFTP server`);
       
       // Create enhanced folder structure: Export/Email_Archive/Backup and Export/Email_Archive/Audit_Failure
-      const basePath = globalSettings.sftp.directory || '/Export';
-      const emailArchivePath = `${basePath}/Email_Archive`.replace(/\/+/g, '/');
-      const backupPath = `${emailArchivePath}/Backup`.replace(/\/+/g, '/');
-      const auditFailurePath = `${emailArchivePath}/Audit_Failure`.replace(/\/+/g, '/');
-      
       // Create directories
       for (const dirPath of [basePath, emailArchivePath, backupPath, auditFailurePath]) {
         try {
@@ -4697,6 +4698,9 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
           
           if (exportedMemberIds.length > 0) {
             // Update each record to set archived = 'Yes'
+            // Using HTML_Log as the Data Extension key
+            const deKey = 'HTML_Log';
+            
             for (const memberId of exportedMemberIds) {
               const updatePayload = {
                 'keys': {
@@ -4708,7 +4712,7 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
               };
               
               const updateResponse = await axios.patch(
-                `${auth.rest_instance_url}data/v1/customobjectdata/key/${deKey}/rowset`,
+                `https://${subdomain}.rest.marketingcloudapis.com/data/v1/customobjectdata/key/${deKey}/rowset`,
                 updatePayload,
                 {
                   headers: {
