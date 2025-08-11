@@ -4299,8 +4299,7 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     const authPayload = {
       grant_type: 'client_credentials',
       client_id: creds.clientId,
-      client_secret: creds.clientSecret,
-      account_id: creds.mid || creds.accountId // Add account_id for proper authentication
+      client_secret: creds.clientSecret
     };
 
     let accessToken = null;
@@ -4311,7 +4310,10 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     } catch (authError) {
       console.log('⚠️ [Export] Authentication failed:', authError.response?.data);
       if (authError.response?.data?.error === 'invalid_grant') {
-        console.log('💡 [Export] This requires a Server-to-Server app in Marketing Cloud. Proceeding with mock data.');
+        console.log('💡 [Export] Authentication failed - This requires a Server-to-Server app in Marketing Cloud.');
+        console.log('🔧 [Export] To fix: Go to MC Setup → Apps → Your App → Change from Web App to Server-to-Server App');
+        console.log('📋 [Export] Required scopes: Email (Read/Write), Data Extensions (Read/Write), Automations (Read/Write)');
+        console.log('⚠️ [Export] Proceeding with mock data until app configuration is fixed');
       }
       // We'll continue with mock data below
     }
@@ -4364,7 +4366,6 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
         // Parse XML response using xml2js
         const xmlData = soapResponse.data;
         console.log(`📋 [Export] SOAP Response received, parsing XML...`);
-        console.log(`🔍 [Export] Raw SOAP Response (first 2000 chars):`, xmlData.substring(0, 2000));
         
         try {
           const parser = new xml2js.Parser({ explicitArray: false, ignoreAttrs: false });
@@ -4377,15 +4378,8 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
           
           // Navigate through the SOAP response structure
           const soapBody = result['soap:Envelope']?.['soap:Body'] || result['s:Envelope']?.['s:Body'];
-          console.log(`🔍 [Export] SOAP Body keys:`, Object.keys(soapBody || {}));
-          
           const retrieveResponse = soapBody?.['RetrieveResponseMsg'];
-          console.log(`🔍 [Export] RetrieveResponse exists:`, !!retrieveResponse);
-          console.log(`🔍 [Export] RetrieveResponse keys:`, Object.keys(retrieveResponse || {}));
-          
           const results = retrieveResponse?.['Results'];
-          console.log(`🔍 [Export] Results type:`, Array.isArray(results) ? 'array' : typeof results);
-          console.log(`🔍 [Export] Results length/content:`, Array.isArray(results) ? results.length : results);
           
           if (results && Array.isArray(results)) {
             // Parse each result into our row format
@@ -4586,7 +4580,7 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     
     let message = `Successfully exported ${rows.length} records to SFTP`;
     if (dataSource === 'mock') {
-      message += ' (using sample data - HTML_Log DE may not exist or be empty)';
+      message += ' (using sample data - MC authentication failed)';
     } else {
       message += ' (using live data from HTML_Log DE)';
     }
@@ -4598,7 +4592,8 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       filename: filename,
       sftpPath: `${globalSettings.sftp.directory}/${filename}`,
       dataSource: dataSource,
-      note: dataSource === 'mock' ? 'HTML_Log Data Extension may not exist yet or be empty. Archive some emails first, then try exporting again.' : 'Successfully retrieved live data from HTML_Log Data Extension'
+      note: dataSource === 'mock' ? 'Using sample data because Marketing Cloud authentication failed. Please change your MC app to "Server-to-Server" type in MC Setup → Apps.' : 'Successfully retrieved live data from HTML_Log Data Extension',
+      configurationHelp: dataSource === 'mock' ? 'To fix: In Marketing Cloud, go to Setup → Apps → Installed Packages → Your App → Change from "Web App" to "Server-to-Server App" with Email and Data Extension scopes.' : null
     });
 
   } catch (error) {
