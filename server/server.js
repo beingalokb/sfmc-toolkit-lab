@@ -4295,26 +4295,20 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
 
     console.log('🔄 [Export] Starting HTML_Log export to SFTP...');
 
-    // Get access token
-    const authPayload = {
-      grant_type: 'client_credentials',
-      client_id: creds.clientId,
-      client_secret: creds.clientSecret
-    };
-
+    // Get access token using the same method as other endpoints
     let accessToken = null;
     try {
-      const authResponse = await axios.post(`https://${creds.subdomain}.auth.marketingcloudapis.com/v2/token`, authPayload);
-      accessToken = authResponse.data.access_token;
+      accessToken = await getMCAccessToken(req);
       console.log('✅ [Export] Successfully authenticated with Marketing Cloud');
     } catch (authError) {
-      console.log('⚠️ [Export] Authentication failed:', authError.response?.data);
+      console.log('⚠️ [Export] Authentication failed:', authError.message);
       if (authError.response?.data?.error === 'invalid_grant') {
         console.log('💡 [Export] Authentication failed - This requires a Server-to-Server app in Marketing Cloud.');
         console.log('🔧 [Export] To fix: Go to MC Setup → Apps → Your App → Change from Web App to Server-to-Server App');
         console.log('📋 [Export] Required scopes: Email (Read/Write), Data Extensions (Read/Write), Automations (Read/Write)');
         console.log('⚠️ [Export] Proceeding with mock data until app configuration is fixed');
       }
+      console.log('⚠️ [Export] Proceeding with mock data for demonstration');
       // We'll continue with mock data below
     }
 
