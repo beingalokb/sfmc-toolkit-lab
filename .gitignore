@@ -14,6 +14,7 @@ dist/
 .env.test.local
 .env.production.local
 credentials.json
+settings.json
 
 # SSH Keys and test fixtures (for security)
 *.pem

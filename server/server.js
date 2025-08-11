@@ -14,6 +14,7 @@ const express = require('express');
 const axios = require('axios');
 const xml2js = require('xml2js');
 const Client = require('ssh2-sftp-client');
+const archiver = require('archiver');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
@@ -26,6 +27,49 @@ const { retrieveSendWithFilter } = require('./retrieveSend');
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: true, credentials: true }));
+
+// File paths
+const credentialsPath = path.join(__dirname, 'credentials.json');
+const settingsPath = path.join(__dirname, 'settings.json');
+
+// Function to load settings from file
+function loadSettings() {
+  try {
+    if (fs.existsSync(settingsPath)) {
+      const settingsData = fs.readFileSync(settingsPath, 'utf8');
+      return JSON.parse(settingsData);
+    }
+  } catch (error) {
+    console.error('❌ [Settings] Failed to load settings file:', error.message);
+  }
+  
+  // Return default settings if file doesn't exist or can't be read
+  return {
+    sftp: {
+      host: '',
+      port: 22,
+      username: '',
+      authType: 'password', // 'password' or 'key'
+      password: '',
+      privateKey: '',
+      passphrase: '', // for encrypted private keys
+      directory: '/Export'
+    }
+  };
+}
+
+// Function to save settings to file
+function saveSettings(settings) {
+  try {
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    console.log('✅ [Settings] Settings saved to file');
+    return true;
+  } catch (error) {
+    console.error('❌ [Settings] Failed to save settings file:', error.message);
+    return false;
+  }
+}
+
 app.use(session({
   secret: 'your-very-secret-key', // use a strong secret in production!
   resave: false,
@@ -3176,6 +3220,8 @@ SET @EmailAddress = emailaddr
 SET @EmailName = EmailName_
 SET @ListID = ListID()
 SET @SendTime = Now()
+SET @archived = 'No'
+SET @memberid = memberid
 
 /* Get the email HTML from the send */
 SET @EmailHTML = HTTPGet(view_email_url)
@@ -3189,7 +3235,9 @@ IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@EmailAddress) THEN
     "HTML", @EmailHTML,
     "ListID", @ListID,
     "JobID", @JobID,
-    "DataSourceName", @DataSourceName
+    "DataSourceName", @DataSourceName,
+    "archived", @archived,
+    "memberid", @memberid
   )
 ENDIF
 ]%%`;
@@ -3306,7 +3354,9 @@ ENDIF
                 <Field><Name>HTML</Name><FieldType>Text</FieldType><MaxLength>4000</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>ListID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
                 <Field><Name>JobID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
-                <Field><Name>DataSourceName</Name><FieldType>Text</FieldType><MaxLength>500</MaxLength><IsRequired>false</IsRequired></Field>`;
+                <Field><Name>DataSourceName</Name><FieldType>Text</FieldType><MaxLength>500</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>archived</Name><FieldType>Text</FieldType><MaxLength>10</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>memberid</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>`;
 
     // Since isSendable is false, we don't need sendable configuration
     const sendableXml = '';
@@ -3533,6 +3583,8 @@ SET @EmailAddress = emailaddr
 SET @EmailName = EmailName_
 SET @ListID = ListID()
 SET @SendTime = Now()
+SET @archived = 'No'
+SET @memberid = memberid
 
 /* Get the email HTML from the send */
 SET @EmailHTML = HTTPGet(view_email_url)
@@ -3546,7 +3598,9 @@ IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@EmailAddress) THEN
     "HTML", @EmailHTML,
     "ListID", @ListID,
     "JobID", @JobID,
-    "DataSourceName", @DataSourceName
+    "DataSourceName", @DataSourceName,
+    "archived", @archived,
+    "memberid", @memberid
   )
 ENDIF
 ]%%`;
@@ -4137,19 +4191,8 @@ require('./emailArchiveSentEventsEndpoint')(app);
 
 // ============== SETTINGS ENDPOINTS ==============
 
-// Settings storage (in production, this should be in a database or secure file)
-let globalSettings = {
-  sftp: {
-    host: '',
-    port: 22,
-    username: '',
-    authType: 'password', // 'password' or 'key'
-    password: '',
-    privateKey: '',
-    passphrase: '', // for encrypted private keys
-    directory: '/Export'
-  }
-};
+// Settings storage (loaded from file and persisted across server restarts)
+let globalSettings = loadSettings();
 
 // Get SFTP settings
 app.get('/api/settings/sftp', (req, res) => {
@@ -4197,7 +4240,14 @@ app.post('/api/settings/sftp', (req, res) => {
       directory: directory?.trim() || '/Export'
     };
 
-    console.log(`✅ [Settings] SFTP settings saved for host: ${globalSettings.sftp.host} (auth: ${globalSettings.sftp.authType})`);
+    // Persist settings to file
+    const settingsSaved = saveSettings(globalSettings);
+    
+    if (!settingsSaved) {
+      return res.status(500).json({ error: 'Failed to save settings to file' });
+    }
+
+    console.log(`✅ [Settings] SFTP settings saved and persisted for host: ${globalSettings.sftp.host} (auth: ${globalSettings.sftp.authType})`);
     res.json({ success: true, message: 'SFTP settings saved successfully' });
 
   } catch (error) {
@@ -4333,6 +4383,8 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
         <Properties>ListID</Properties>
         <Properties>JobID</Properties>
         <Properties>DataSourceName</Properties>
+        <Properties>archived</Properties>
+        <Properties>memberid</Properties>
       </RetrieveRequest>
     </RetrieveRequestMsg>
   </s:Body>
@@ -4473,37 +4525,112 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       });
     }
 
-    // Generate CSV content
-    const headers = ['EmailAddress', 'SendTime', 'EmailName', 'HTML', 'ListID', 'JobID', 'DataSourceName'];
-    const csvRows = [headers.join(',')];
+    // Generate zip file with individual HTML files and manifest
+    if (rows.length === 0) {
+      return res.json({ 
+        success: true, 
+        message: 'No data found in HTML_Log to export',
+        exportedCount: 0,
+        dataSource: dataSource
+      });
+    }
+
+    // Generate timestamp for filename pattern
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const sec = String(now.getSeconds()).padStart(2, '0');
     
-    rows.forEach(row => {
-      const values = headers.map(header => {
-        // Handle different data structures - direct property or values object
-        let value = '';
-        if (row.values && typeof row.values === 'object') {
-          value = row.values[header] || '';
-        } else {
-          value = row[header] || '';
-        }
-        
-        // Escape CSV values with quotes if they contain commas, quotes, or newlines
+    // Get memberid from first record for filename (or use default)
+    const primaryMemberid = rows[0]?.memberid || rows[0]?.values?.memberid || '00000';
+    
+    // Generate zip filename: EmailArchiving_%MEMBERID%_%YEAR%-%MM%-%DD%-%HH%%MIN%%SS%.zip
+    const zipFilename = `EmailArchiving_${primaryMemberid}_${year}-${month}-${day}-${hour}h${min}m${sec}s.zip`;
+    
+    console.log(`📦 [Export] Creating zip file: ${zipFilename}`);
+    
+    // Create zip archive in memory
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    const zipBuffers = [];
+    
+    archive.on('data', (chunk) => {
+      zipBuffers.push(chunk);
+    });
+    
+    let zipBuffer;
+    const zipPromise = new Promise((resolve, reject) => {
+      archive.on('end', () => {
+        zipBuffer = Buffer.concat(zipBuffers);
+        console.log(`📦 [Export] Zip file created successfully, size: ${zipBuffer.length} bytes`);
+        resolve();
+      });
+      
+      archive.on('error', (err) => {
+        console.error(`❌ [Export] Error creating zip file:`, err);
+        reject(err);
+      });
+    });
+    
+    // Process each row to create individual HTML files
+    const manifestData = [];
+    let htmlFileCount = 0;
+    
+    rows.forEach((row, index) => {
+      const memberid = row.memberid || row.values?.memberid || (index + 1);
+      const jobid = row.JobID || row.values?.JobID || '';
+      const listid = row.ListID || row.values?.ListID || '';
+      const html = row.HTML || row.values?.HTML || '<html><body>No HTML content available</body></html>';
+      const emailAddress = row.EmailAddress || row.values?.EmailAddress || '';
+      
+      // Generate individual HTML filename
+      const htmlFilename = `email_${index + 1}.html`;
+      
+      // Add HTML file to zip
+      archive.append(html, { name: htmlFilename });
+      htmlFileCount++;
+      
+      // Add to manifest: Filename, JobID, ListID, BatchID, SubID
+      manifestData.push({
+        Filename: htmlFilename,
+        JobID: jobid,
+        ListID: listid,
+        BatchID: jobid, // Using JobID as BatchID
+        SubID: memberid
+      });
+    });
+    
+    // Create manifest CSV content
+    const manifestHeaders = ['Filename', 'JobID', 'ListID', 'BatchID', 'SubID'];
+    const manifestCsvRows = [manifestHeaders.join(',')];
+    
+    manifestData.forEach(row => {
+      const values = manifestHeaders.map(header => {
+        let value = row[header] || '';
+        // Escape CSV values if they contain commas, quotes, or newlines
         if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
           return `"${value.replace(/"/g, '""')}"`;
         }
         return value;
       });
-      csvRows.push(values.join(','));
+      manifestCsvRows.push(values.join(','));
     });
-
-    const csvContent = csvRows.join('\n');
     
-    // Generate filename with timestamp
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const filename = `HTML_Log_Export_${timestamp}.csv`;
+    const manifestContent = manifestCsvRows.join('\n');
+    
+    // Add manifest to zip
+    archive.append(manifestContent, { name: 'Archive_Manifest.csv' });
+    
+    // Finalize the zip
+    archive.finalize();
+    
+    // Wait for zip creation to complete
+    await zipPromise;
 
-    // Real SFTP upload with ssh2-sftp-client
-    console.log(`📤 [Export] Starting SFTP upload to ${globalSettings.sftp.host}:${globalSettings.sftp.directory}/${filename}`);
+    // Real SFTP upload with zip file
+    console.log(`📤 [Export] Starting SFTP upload of zip file`);
     console.log(`🔐 [Export] Using ${globalSettings.sftp.authType} authentication`);
     
     const sftp = new Client();
@@ -4527,32 +4654,82 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       await sftp.connect(connectOptions);
       console.log(`✅ [Export] Successfully connected to SFTP server`);
       
-      // Ensure directory exists
-      const targetPath = globalSettings.sftp.directory || '/';
-      try {
-        await sftp.mkdir(targetPath, true); // Create directory recursively if needed
-        console.log(`📁 [Export] Directory verified/created: ${targetPath}`);
-      } catch (mkdirError) {
-        // Directory might already exist, which is fine
-        console.log(`📁 [Export] Directory check: ${mkdirError.message} (may already exist)`);
+      // Create enhanced folder structure: Export/Email_Archive/Backup and Export/Email_Archive/Audit_Failure
+      const basePath = globalSettings.sftp.directory || '/Export';
+      const emailArchivePath = `${basePath}/Email_Archive`.replace(/\/+/g, '/');
+      const backupPath = `${emailArchivePath}/Backup`.replace(/\/+/g, '/');
+      const auditFailurePath = `${emailArchivePath}/Audit_Failure`.replace(/\/+/g, '/');
+      
+      // Create directories
+      for (const dirPath of [basePath, emailArchivePath, backupPath, auditFailurePath]) {
+        try {
+          await sftp.mkdir(dirPath, true);
+          console.log(`📁 [Export] Directory verified/created: ${dirPath}`);
+        } catch (mkdirError) {
+          console.log(`📁 [Export] Directory check for ${dirPath}: ${mkdirError.message} (may already exist)`);
+        }
       }
       
-      // Upload the file
-      const fullPath = `${targetPath}/${filename}`.replace(/\/+/g, '/'); // Clean up multiple slashes
-      console.log(`📤 [Export] Uploading to: ${fullPath}`);
+      // Upload zip file to Email_Archive folder
+      const zipFilePath = `${emailArchivePath}/${zipFilename}`.replace(/\/+/g, '/');
+      console.log(`📤 [Export] Uploading zip file: ${zipFilePath}`);
       
-      await sftp.put(Buffer.from(csvContent), fullPath);
-      console.log(`✅ [Export] Successfully uploaded ${filename} to SFTP`);
+      await sftp.put(zipBuffer, zipFilePath);
+      console.log(`✅ [Export] Successfully uploaded ${zipFilename} to SFTP`);
       
       // Verify upload by checking file exists
-      const fileList = await sftp.list(targetPath);
-      const uploadedFile = fileList.find(file => file.name === filename);
+      const fileList = await sftp.list(emailArchivePath);
+      const uploadedFile = fileList.find(file => file.name === zipFilename);
       if (uploadedFile) {
         console.log(`✅ [Export] Upload verified - file size: ${uploadedFile.size} bytes`);
       }
       
       await sftp.end();
       console.log(`🔌 [Export] SFTP connection closed`);
+      
+      // Update archived status for successfully exported records
+      if (dataSource !== 'mock' && rows.length > 0) {
+        console.log(`📝 [Export] Updating archived status for ${rows.length} exported records`);
+        
+        try {
+          // Get member IDs of exported records
+          const exportedMemberIds = rows.map(row => row.memberid).filter(id => id);
+          
+          if (exportedMemberIds.length > 0) {
+            // Update each record to set archived = 'Yes'
+            for (const memberId of exportedMemberIds) {
+              const updatePayload = {
+                'keys': {
+                  'memberid': memberId
+                },
+                'values': {
+                  'archived': 'Yes'
+                }
+              };
+              
+              const updateResponse = await axios.patch(
+                `${auth.rest_instance_url}data/v1/customobjectdata/key/${deKey}/rowset`,
+                updatePayload,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  }
+                }
+              );
+              
+              if (updateResponse.status === 200) {
+                console.log(`✅ [Export] Updated archived status for memberid: ${memberId}`);
+              }
+            }
+            
+            console.log(`✅ [Export] Successfully updated archived status for ${exportedMemberIds.length} records`);
+          }
+        } catch (updateError) {
+          console.error(`⚠️ [Export] Failed to update archived status:`, updateError.message);
+          // Don't throw error - export was successful, archiving status update is secondary
+        }
+      }
       
     } catch (sftpError) {
       console.error(`❌ [Export] SFTP upload failed:`, sftpError.message);
@@ -4564,11 +4741,11 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       throw new Error(`SFTP upload failed: ${sftpError.message}`);
     }
 
-    console.log(`✅ [Export] Successfully exported ${rows.length} records to SFTP`);
+    console.log(`✅ [Export] Successfully exported ${rows.length} records in zip file to SFTP`);
     
-    let message = `Successfully exported ${rows.length} records to SFTP`;
+    let message = `Successfully exported ${rows.length} email records in zip file (${htmlFileCount} HTML files + manifest) to SFTP`;
     if (dataSource === 'mock') {
-      message += ' (using sample data - MC authentication failed)';
+      message += ' (using sample data - HTML_Log DE may not exist or be empty)';
     } else {
       message += ' (using live data from HTML_Log DE)';
     }
@@ -4577,11 +4754,17 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       success: true,
       message: message,
       exportedCount: rows.length,
-      filename: filename,
-      sftpPath: `${globalSettings.sftp.directory}/${filename}`,
+      htmlFilesCount: htmlFileCount,
+      zipFilename: zipFilename,
+      zipPath: `${emailArchivePath}/${zipFilename}`,
+      manifestIncluded: true,
+      folderStructure: {
+        emailArchive: emailArchivePath,
+        backup: backupPath,
+        auditFailure: auditFailurePath
+      },
       dataSource: dataSource,
-      note: dataSource === 'mock' ? 'Using sample data because Marketing Cloud authentication failed. Please change your MC app to "Server-to-Server" type in MC Setup → Apps.' : 'Successfully retrieved live data from HTML_Log Data Extension',
-      configurationHelp: dataSource === 'mock' ? 'To fix: In Marketing Cloud, go to Setup → Apps → Installed Packages → Your App → Change from "Web App" to "Server-to-Server App" with Email and Data Extension scopes.' : null
+      note: dataSource === 'mock' ? 'HTML_Log Data Extension may not exist yet or be empty. Archive some emails first, then try exporting again.' : 'Successfully retrieved live data from HTML_Log Data Extension'
     });
 
   } catch (error) {
