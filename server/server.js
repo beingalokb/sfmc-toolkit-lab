@@ -3222,6 +3222,8 @@ SET @ListID = ListID()
 SET @SendTime = Now()
 SET @archived = 'No'
 SET @memberid = memberid
+SET @subid = subscriberid
+SET @subscriberkey = _subscriberkey
 
 /* Get the email HTML from the send */
 SET @EmailHTML = HTTPGet(view_email_url)
@@ -3237,7 +3239,9 @@ IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@EmailAddress) THEN
     "JobID", @JobID,
     "DataSourceName", @DataSourceName,
     "archived", @archived,
-    "memberid", @memberid
+    "memberid", @memberid,
+    "subid", @subid,
+    "subscriberkey", @subscriberkey
   )
 ENDIF
 ]%%`;
@@ -3356,7 +3360,9 @@ ENDIF
                 <Field><Name>JobID</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
                 <Field><Name>DataSourceName</Name><FieldType>Text</FieldType><MaxLength>500</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>archived</Name><FieldType>Text</FieldType><MaxLength>10</MaxLength><IsRequired>false</IsRequired></Field>
-                <Field><Name>memberid</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>`;
+                <Field><Name>memberid</Name><FieldType>Number</FieldType><IsRequired>false</IsRequired></Field>
+                <Field><Name>subid</Name><FieldType>Text</FieldType><MaxLength>150</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>subscriberkey</Name><FieldType>Text</FieldType><MaxLength>300</MaxLength><IsRequired>false</IsRequired></Field>`;
 
     // Since isSendable is false, we don't need sendable configuration
     const sendableXml = '';
@@ -3585,6 +3591,8 @@ SET @ListID = ListID()
 SET @SendTime = Now()
 SET @archived = 'No'
 SET @memberid = memberid
+SET @subid = subscriberid
+SET @subscriberkey = _subscriberkey
 
 /* Get the email HTML from the send */
 SET @EmailHTML = HTTPGet(view_email_url)
@@ -3600,7 +3608,9 @@ IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@EmailAddress) THEN
     "JobID", @JobID,
     "DataSourceName", @DataSourceName,
     "archived", @archived,
-    "memberid", @memberid
+    "memberid", @memberid,
+    "subid", @subid,
+    "subscriberkey", @subscriberkey
   )
 ENDIF
 ]%%`;
@@ -4385,6 +4395,13 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
         <Properties>DataSourceName</Properties>
         <Properties>archived</Properties>
         <Properties>memberid</Properties>
+        <Properties>subid</Properties>
+        <Properties>subscriberkey</Properties>
+        <Filter xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="SimpleFilterPart">
+          <Property>archived</Property>
+          <SimpleOperator>equals</SimpleOperator>
+          <Value>No</Value>
+        </Filter>
       </RetrieveRequest>
     </RetrieveRequestMsg>
   </s:Body>
@@ -4492,7 +4509,11 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
           HTML: '<html><head><title>Welcome!</title></head><body><h1>Welcome to our service!</h1><p>Thank you for subscribing.</p></body></html>',
           ListID: '12345',
           JobID: '67890',
-          DataSourceName: 'Email Studio'
+          DataSourceName: 'Email Studio',
+          archived: 'No',
+          memberid: '523018375',
+          subid: 'SUB123456',
+          subscriberkey: 'subscriber1@example.com'
         },
         {
           EmailAddress: 'subscriber2@example.com',
@@ -4501,7 +4522,11 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
           HTML: '<html><head><title>Product Updates</title></head><body><h1>Latest Product Updates</h1><p>Check out our new features!</p></body></html>',
           ListID: '12346',
           JobID: '67891',
-          DataSourceName: 'Journey Builder'
+          DataSourceName: 'Journey Builder',
+          archived: 'No',
+          memberid: '523018376',
+          subid: 'SUB123457',
+          subscriberkey: 'subscriber2@example.com'
         },
         {
           EmailAddress: 'subscriber3@example.com',
@@ -4510,7 +4535,11 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
           HTML: '<html><head><title>Special Offer</title></head><body><h1>Limited Time Offer!</h1><p>Get 50% off your next purchase.</p></body></html>',
           ListID: '12347',
           JobID: '67892',
-          DataSourceName: 'Automation Studio'
+          DataSourceName: 'Automation Studio',
+          archived: 'No',
+          memberid: '523018377',
+          subid: 'SUB123458',
+          subscriberkey: 'subscriber3@example.com'
         }
       ];
       console.log(`📊 [Export] Using ${rows.length} mock records for demonstration`);
@@ -4582,28 +4611,34 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       const memberid = row.memberid || row.values?.memberid || (index + 1);
       const jobid = row.JobID || row.values?.JobID || '';
       const listid = row.ListID || row.values?.ListID || '';
+      const subid = row.subid || row.values?.subid || memberid; // Use subid if available, fallback to memberid
+      const subscriberkey = row.subscriberkey || row.values?.subscriberkey || '';
+      const emailname = row.EmailName || row.values?.EmailName || 'Unknown_Email';
+      const sendtime = row.SendTime || row.values?.SendTime || new Date().toISOString();
       const html = row.HTML || row.values?.HTML || '<html><body>No HTML content available</body></html>';
       const emailAddress = row.EmailAddress || row.values?.EmailAddress || '';
       
-      // Generate individual HTML filename
-      const htmlFilename = `email_${index + 1}.html`;
+      // Generate individual HTML filename: EmailName_JobID_subid_Sendtime.html
+      // Clean up filename by removing special characters and spaces
+      const cleanEmailName = emailname.replace(/[^a-zA-Z0-9]/g, '_');
+      const cleanSendTime = sendtime.replace(/[^a-zA-Z0-9]/g, '_');
+      const htmlFilename = `${cleanEmailName}_${jobid}_${subid}_${cleanSendTime}.html`;
       
       // Add HTML file to zip
       archive.append(html, { name: htmlFilename });
       htmlFileCount++;
       
-      // Add to manifest: Filename, JobID, ListID, BatchID, SubID
+      // Add to manifest: Filename, JobID, ListID, SubID
       manifestData.push({
         Filename: htmlFilename,
         JobID: jobid,
         ListID: listid,
-        BatchID: jobid, // Using JobID as BatchID
-        SubID: memberid
+        SubID: subid // Use the actual subid field
       });
     });
     
     // Create manifest CSV content
-    const manifestHeaders = ['Filename', 'JobID', 'ListID', 'BatchID', 'SubID'];
+    const manifestHeaders = ['Filename', 'JobID', 'ListID', 'SubID'];
     const manifestCsvRows = [manifestHeaders.join(',')];
     
     manifestData.forEach(row => {

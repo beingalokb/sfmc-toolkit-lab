@@ -47,7 +47,11 @@ function EmailArchiving() {
             { name: 'HTML', fieldType: 'Text' }, // No maxLength = unlimited
             { name: 'ListID', fieldType: 'Number' },
             { name: 'JobID', fieldType: 'Number' },
-            { name: 'DataSourceName', fieldType: 'Text', maxLength: 500 }
+            { name: 'DataSourceName', fieldType: 'Text', maxLength: 500 },
+            { name: 'archived', fieldType: 'Text', maxLength: 10 },
+            { name: 'memberid', fieldType: 'Number' },
+            { name: 'subid', fieldType: 'Text', maxLength: 150 },
+            { name: 'subscriberkey', fieldType: 'Text', maxLength: 300 }
           ]
         })
       });
