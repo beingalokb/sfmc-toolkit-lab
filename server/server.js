@@ -4294,22 +4294,16 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     }
 
     console.log('🔄 [Export] Starting HTML_Log export to SFTP...');
-
+    
     // Get access token using the same method as other endpoints
-    let accessToken = null;
-    try {
-      accessToken = await getMCAccessToken(req);
-      console.log('✅ [Export] Successfully authenticated with Marketing Cloud');
-    } catch (authError) {
-      console.log('⚠️ [Export] Authentication failed:', authError.message);
-      if (authError.response?.data?.error === 'invalid_grant') {
-        console.log('💡 [Export] Authentication failed - This requires a Server-to-Server app in Marketing Cloud.');
-        console.log('🔧 [Export] To fix: Go to MC Setup → Apps → Your App → Change from Web App to Server-to-Server App');
-        console.log('📋 [Export] Required scopes: Email (Read/Write), Data Extensions (Read/Write), Automations (Read/Write)');
-        console.log('⚠️ [Export] Proceeding with mock data until app configuration is fixed');
-      }
-      console.log('⚠️ [Export] Proceeding with mock data for demonstration');
-      // We'll continue with mock data below
+    const accessToken = getAccessTokenFromRequest(req);
+    const subdomain = getSubdomainFromRequest(req);
+    
+    if (!accessToken || !subdomain) {
+      console.log('⚠️ [Export] No access token or subdomain found in session');
+      console.log('� [Export] User may need to login again');
+    } else {
+      console.log('✅ [Export] Successfully retrieved access token from session');
     }
 
     // Try to query HTML_Log Data Extension using the correct endpoint
@@ -4318,14 +4312,14 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     
     if (accessToken) {
       try {
-        console.log(`🔍 [Export] Querying HTML_Log DE using SOAP API at: https://${creds.subdomain}.soap.marketingcloudapis.com/Service.asmx`);
+        console.log(`🔍 [Export] Querying HTML_Log DE using SOAP API at: https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`);
         
         // Create SOAP envelope for retrieving Data Extension data
         const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:u="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
   <s:Header>
     <a:Action s:mustUnderstand="1">Retrieve</a:Action>
-    <a:To s:mustUnderstand="1">https://${creds.subdomain}.soap.marketingcloudapis.com/Service.asmx</a:To>
+    <a:To s:mustUnderstand="1">https://${subdomain}.soap.marketingcloudapis.com/Service.asmx</a:To>
     <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
   </s:Header>
   <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
@@ -4345,7 +4339,7 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
 </s:Envelope>`;
 
         const soapResponse = await axios.post(
-          `https://${creds.subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+          `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
           soapEnvelope,
           {
             headers: {
