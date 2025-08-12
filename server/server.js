@@ -3248,7 +3248,6 @@ SET @EmailHTML = HTTPGet(view_email_url)
 /* Log to HTML_Log Data Extension */
 IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@EmailAddress) THEN
   InsertDE("HTML_Log", 
-    "ArchiveId", @ArchiveId,
     "EmailAddress", @EmailAddress,
     "SendTime", @SendTime,
     "EmailName", @EmailName,
@@ -3259,7 +3258,8 @@ IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@EmailAddress) THEN
     "archived", @archived,
     "memberid", @memberid,
     "subid", @subid,
-    "subscriberkey", @subscriberkey
+    "subscriberkey", @subscriberkey,
+    "ArchiveId", @ArchiveId
   )
 ENDIF
 ]%%`;
@@ -3612,6 +3612,7 @@ SET @archived = 'No'
 SET @memberid = memberid
 SET @subid = subscriberid
 SET @subscriberkey = _subscriberkey
+SET @ArchiveId = GUID()
 
 /* Get the email HTML from the send */
 SET @EmailHTML = HTTPGet(view_email_url)
@@ -3629,7 +3630,8 @@ IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@EmailAddress) THEN
     "archived", @archived,
     "memberid", @memberid,
     "subid", @subid,
-    "subscriberkey", @subscriberkey
+    "subscriberkey", @subscriberkey,
+    "ArchiveId", @ArchiveId
   )
 ENDIF
 ]%%`;
