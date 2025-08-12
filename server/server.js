@@ -1432,59 +1432,116 @@ app.get('/search/sendclassification', async (req, res) => {
   }
 });
 
-// DeliveryProfile Search (SOAP)
+// DeliveryProfile Search - Extract from EmailSendDefinitions and SendClassifications
+// Note: DeliveryProfile object doesn't support SOAP Retrieve directly
+// We extract delivery profile info from other objects that contain this data
 app.get('/search/deliveryprofile', async (req, res) => {
+  console.log('🔔 /search/deliveryprofile endpoint hit - extracting from EmailSendDefinitions and SendClassifications');
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
-  if (!accessToken || !subdomain) return res.status(401).json([]);
+  if (!accessToken || !subdomain) {
+    console.log('❌ [DeliveryProfile] No access token or subdomain found');
+    return res.status(401).json([]);
+  }
+  
   try {
-    const soapEnvelope = `
-      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-        <soapenv:Header>
-          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
-        </soapenv:Header>
-        <soapenv:Body>
-          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-            <RetrieveRequest>
-              <ObjectType>DeliveryProfile</ObjectType>
-              <Properties>CustomerKey</Properties>
-              <Properties>Name</Properties>
-              <Properties>Description</Properties>
-            </RetrieveRequest>
-          </RetrieveRequestMsg>
-        </soapenv:Body>
-      </soapenv:Envelope>
-    `;
-    const response = await axios.post(
-      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
-      soapEnvelope,
-      {
-        headers: {
-          'Content-Type': 'text/xml',
-          SOAPAction: 'Retrieve',
-        },
-      }
-    );
-    const parser = new xml2js.Parser({ explicitArray: false });
-    parser.parseString(response.data, (err, result) => {
-      if (err) return res.status(500).json({ error: 'Failed to parse XML' });
-      try {
-        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-        if (!results) return res.status(200).json([]);
+    console.log('🔍 [DeliveryProfile] Extracting delivery profiles from EmailSendDefinitions and SendClassifications...');
+    
+    const deliveryProfileMap = new Map();
+    
+    // Helper function to fetch and extract delivery profiles from SOAP objects
+    async function extractDeliveryProfiles(objectType, properties) {
+      const propsXml = properties.map(p => `<Properties>${p}</Properties>`).join('');
+      const soapEnvelope = `
+        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                          xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <soapenv:Header>
+            <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+          </soapenv:Header>
+          <soapenv:Body>
+            <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <RetrieveRequest>
+                <ObjectType>${objectType}</ObjectType>
+                ${propsXml}
+              </RetrieveRequest>
+            </RetrieveRequestMsg>
+          </soapenv:Body>
+        </soapenv:Envelope>
+      `;
+      
+      const response = await axios.post(
+        `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+        soapEnvelope,
+        {
+          headers: {
+            'Content-Type': 'text/xml',
+            SOAPAction: 'Retrieve',
+          },
+        }
+      );
+      
+      const parser = new xml2js.Parser({ explicitArray: false });
+      const result = await parser.parseStringPromise(response.data);
+      const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+      
+      if (results) {
         const arr = Array.isArray(results) ? results : [results];
-        const profiles = arr.map(item => ({
-          CustomerKey: item.CustomerKey || '',
-          Name: item.Name || '',
-          Description: item.Description || ''
-        }));
-        res.json(profiles);
-      } catch (e) {
-        res.status(500).json([]);
+        arr.forEach(item => {
+          // Extract DeliveryProfile information
+          const deliveryProfile = item.DeliveryProfile || item['DeliveryProfile.CustomerKey'];
+          if (deliveryProfile) {
+            if (typeof deliveryProfile === 'object' && deliveryProfile.CustomerKey) {
+              // Full DeliveryProfile object with Name and Description
+              deliveryProfileMap.set(deliveryProfile.CustomerKey, {
+                CustomerKey: deliveryProfile.CustomerKey,
+                Name: deliveryProfile.Name || deliveryProfile.CustomerKey,
+                Description: deliveryProfile.Description || ''
+              });
+            } else if (typeof deliveryProfile === 'string') {
+              // Just CustomerKey string
+              if (!deliveryProfileMap.has(deliveryProfile)) {
+                deliveryProfileMap.set(deliveryProfile, {
+                  CustomerKey: deliveryProfile,
+                  Name: deliveryProfile,
+                  Description: ''
+                });
+              }
+            }
+          }
+        });
       }
-    });
+    }
+    
+    // Extract from EmailSendDefinitions
+    console.log('📧 [DeliveryProfile] Extracting from EmailSendDefinitions...');
+    await extractDeliveryProfiles('EmailSendDefinition', [
+      'DeliveryProfile.CustomerKey',
+      'DeliveryProfile.Name', 
+      'DeliveryProfile.Description'
+    ]);
+    
+    // Extract from SendClassifications
+    console.log('📋 [DeliveryProfile] Extracting from SendClassifications...');
+    await extractDeliveryProfiles('SendClassification', [
+      'DeliveryProfile.CustomerKey',
+      'DeliveryProfile.Name',
+      'DeliveryProfile.Description'
+    ]);
+    
+    // Convert Map to Array
+    const deliveryProfiles = Array.from(deliveryProfileMap.values());
+    
+    console.log(`✅ [DeliveryProfile] Successfully extracted ${deliveryProfiles.length} unique delivery profiles`);
+    console.log('📋 [DeliveryProfile] Sample profiles:', deliveryProfiles.slice(0, 3));
+    
+    res.json(deliveryProfiles);
+    
   } catch (e) {
+    console.error('❌ [DeliveryProfile] Failed to extract delivery profiles:', e.response?.data || e.message);
+    if (e.response?.data) {
+      console.log('📋 [DeliveryProfile] Error response sample:', e.response.data.substring(0, 500));
+    }
     res.status(500).json([]);
   }
 });
@@ -1778,8 +1835,12 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         'CategoryID',
         'ModifiedDate',
         'SendClassification.CustomerKey',
+        'SendClassification.Name',
         'SenderProfile.CustomerKey',
+        'SenderProfile.Name',
         'DeliveryProfile.CustomerKey',
+        'DeliveryProfile.Name',
+        'DeliveryProfile.Description',
         'BccEmail',
         'CCEmail'
       ];
@@ -1817,8 +1878,12 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         CategoryID: item.CategoryID,
         ModifiedDate: item.ModifiedDate,
         SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
+        SendClassificationName: item['SendClassification']?.Name || item['SendClassification.Name'] || '',
         SenderProfileKey: item['SenderProfile']?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
+        SenderProfileName: item['SenderProfile']?.Name || item['SenderProfile.Name'] || '',
         DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || '',
+        DeliveryProfileName: item['DeliveryProfile']?.Name || item['DeliveryProfile.Name'] || '',
+        DeliveryProfileDescription: item['DeliveryProfile']?.Description || item['DeliveryProfile.Description'] || '',
         BccEmail: item.BccEmail || '',
         CCEmail: item.CCEmail || ''
       }));
@@ -1829,18 +1894,19 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
     const senderProfileKeys = Array.from(new Set(sendDefs.map(d => d.SenderProfileKey).filter(Boolean)));
     const deliveryProfileKeys = Array.from(new Set(sendDefs.map(d => d.DeliveryProfileKey).filter(Boolean)));
 
-    // Step 3: Fetch details for all related objects
-    const [sendClassMap, senderProfileMap, deliveryProfileMap] = await Promise.all([
+    // Step 3: Fetch details for all related objects (except DeliveryProfile which we extract directly)
+    const [sendClassMap, senderProfileMap] = await Promise.all([
       fetchSoapByCustomerKeys('SendClassification', ['CustomerKey', 'Name', 'Description', 'SenderProfile.CustomerKey', 'DeliveryProfile.CustomerKey'], sendClassKeys),
-      fetchSoapByCustomerKeys('SenderProfile', ['CustomerKey', 'Name', 'Description'], senderProfileKeys),
-      fetchSoapByCustomerKeys('DeliveryProfile', ['CustomerKey', 'Name', 'Description'], deliveryProfileKeys)
+      fetchSoapByCustomerKeys('SenderProfile', ['CustomerKey', 'Name', 'Description'], senderProfileKeys)
     ]);
+
+    // For DeliveryProfile, we use the data directly captured from EmailSendDefinitions
+    // since DeliveryProfile object doesn't support SOAP Retrieve operations
 
     // Step 4: Enrich each EmailSendDefinition with full details
     const resolved = sendDefs.map(def => {
       const sendClass = sendClassMap[def.SendClassificationKey] || {};
       const senderProfile = senderProfileMap[def.SenderProfileKey] || {};
-      const deliveryProfile = deliveryProfileMap[def.DeliveryProfileKey] || {};
       return {
         Name: def.Name,
         CustomerKey: def.CustomerKey,
@@ -1850,20 +1916,20 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         CCEmail: def.CCEmail || '',
         SendClassification: {
           CustomerKey: def.SendClassificationKey,
-          Name: sendClass.Name || '',
+          Name: def.SendClassificationName || sendClass.Name || '',
           Description: sendClass.Description || '',
           SenderProfileKey: sendClass['SenderProfile']?.CustomerKey || sendClass['SenderProfile.CustomerKey'] || '',
           DeliveryProfileKey: sendClass['DeliveryProfile']?.CustomerKey || sendClass['DeliveryProfile.CustomerKey'] || ''
         },
         SenderProfile: {
           CustomerKey: def.SenderProfileKey,
-          Name: senderProfile.Name || '',
+          Name: def.SenderProfileName || senderProfile.Name || '',
           Description: senderProfile.Description || ''
         },
         DeliveryProfile: {
           CustomerKey: def.DeliveryProfileKey,
-          Name: deliveryProfile.Name || '',
-          Description: deliveryProfile.Description || ''
+          Name: def.DeliveryProfileName || def.DeliveryProfileKey,
+          Description: def.DeliveryProfileDescription || ''
         }
       };
     });
