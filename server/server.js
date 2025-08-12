@@ -1253,8 +1253,12 @@ app.get('/search/emailsenddefinition', async (req, res) => {
       'CategoryID',
       'ModifiedDate',
       'SendClassification.CustomerKey',
+      'SendClassification.Name',
       'SenderProfile.CustomerKey',
+      'SenderProfile.Name',
       'DeliveryProfile.CustomerKey',
+      'DeliveryProfile.Name',
+      'DeliveryProfile.Description',
       'BccEmail',
       'CCEmail'
     ];
@@ -1297,15 +1301,28 @@ app.get('/search/emailsenddefinition', async (req, res) => {
       }
       try {
         const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-        if (!results) return res.status(200).json([]);
+        if (!results) {
+          console.log('⚠️ No EmailSendDefinition results found in SOAP response');
+          return res.status(200).json([]);
+        }
+        
         const resultArray = Array.isArray(results) ? results : [results];
+        console.log(`📧 Found ${resultArray.length} EmailSendDefinition records`);
+        console.log('📧 Sample record:', JSON.stringify(resultArray[0], null, 2));
+        
         const sendDefs = resultArray.map(item => ({
           Name: item.Name || '',
           CustomerKey: item.CustomerKey || '',
           SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
           SenderProfileKey: item['SenderProfile']?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
-          DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || ''
+          DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || '',
+          BccEmail: item.BccEmail || '',
+          CCEmail: item.CCEmail || ''
         }));
+        
+        console.log(`✅ Mapped ${sendDefs.length} EmailSendDefinition records for frontend`);
+        console.log('📧 Sample mapped record:', JSON.stringify(sendDefs[0], null, 2));
+        
         res.json(sendDefs);
       } catch (e) {
         console.error('❌ Error parsing EmailSendDefinition SOAP response:', e);
@@ -1487,12 +1504,31 @@ app.get('/search/deliveryprofile', async (req, res) => {
       
       if (results) {
         const arr = Array.isArray(results) ? results : [results];
-        arr.forEach(item => {
-          // Extract DeliveryProfile information
-          const deliveryProfile = item.DeliveryProfile || item['DeliveryProfile.CustomerKey'];
+        console.log(`🔍 [DeliveryProfile] Processing ${arr.length} ${objectType} results...`);
+        
+        arr.forEach((item, index) => {
+          console.log(`🔍 [DeliveryProfile] Item ${index + 1}:`, JSON.stringify(item, null, 2));
+          
+          // Extract DeliveryProfile information - try multiple ways to access it
+          let deliveryProfile = null;
+          
+          // Method 1: Direct object access
+          if (item.DeliveryProfile) {
+            deliveryProfile = item.DeliveryProfile;
+            console.log(`🔍 [DeliveryProfile] Found via direct access:`, deliveryProfile);
+          }
+          // Method 2: Dot notation property
+          else if (item['DeliveryProfile.CustomerKey']) {
+            deliveryProfile = item['DeliveryProfile.CustomerKey'];
+            console.log(`🔍 [DeliveryProfile] Found via dot notation:`, deliveryProfile);
+          }
+          
+          console.log(`🔍 [DeliveryProfile] Final deliveryProfile from item ${index + 1}:`, deliveryProfile);
+          
           if (deliveryProfile) {
             if (typeof deliveryProfile === 'object' && deliveryProfile.CustomerKey) {
               // Full DeliveryProfile object with Name and Description
+              console.log(`✅ [DeliveryProfile] Adding full object: ${deliveryProfile.CustomerKey}`);
               deliveryProfileMap.set(deliveryProfile.CustomerKey, {
                 CustomerKey: deliveryProfile.CustomerKey,
                 Name: deliveryProfile.Name || deliveryProfile.CustomerKey,
@@ -1500,6 +1536,7 @@ app.get('/search/deliveryprofile', async (req, res) => {
               });
             } else if (typeof deliveryProfile === 'string') {
               // Just CustomerKey string
+              console.log(`✅ [DeliveryProfile] Adding string key: ${deliveryProfile}`);
               if (!deliveryProfileMap.has(deliveryProfile)) {
                 deliveryProfileMap.set(deliveryProfile, {
                   CustomerKey: deliveryProfile,
@@ -1508,6 +1545,8 @@ app.get('/search/deliveryprofile', async (req, res) => {
                 });
               }
             }
+          } else {
+            console.log(`❌ [DeliveryProfile] No delivery profile found in item ${index + 1}`);
           }
         });
       }
@@ -1516,6 +1555,8 @@ app.get('/search/deliveryprofile', async (req, res) => {
     // Extract from EmailSendDefinitions
     console.log('📧 [DeliveryProfile] Extracting from EmailSendDefinitions...');
     await extractDeliveryProfiles('EmailSendDefinition', [
+      'CustomerKey', // Need the main object properties for context
+      'Name',
       'DeliveryProfile.CustomerKey',
       'DeliveryProfile.Name', 
       'DeliveryProfile.Description'
@@ -1524,6 +1565,8 @@ app.get('/search/deliveryprofile', async (req, res) => {
     // Extract from SendClassifications
     console.log('📋 [DeliveryProfile] Extracting from SendClassifications...');
     await extractDeliveryProfiles('SendClassification', [
+      'CustomerKey', // Need the main object properties for context
+      'Name',
       'DeliveryProfile.CustomerKey',
       'DeliveryProfile.Name',
       'DeliveryProfile.Description'
