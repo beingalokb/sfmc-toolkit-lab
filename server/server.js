@@ -34,17 +34,31 @@ const settingsPath = path.join(__dirname, 'settings.json');
 
 // Function to load settings from file
 function loadSettings() {
+  console.log('📂 [Settings] Loading settings from:', settingsPath);
   try {
     if (fs.existsSync(settingsPath)) {
+      console.log('✅ [Settings] Settings file exists, reading...');
       const settingsData = fs.readFileSync(settingsPath, 'utf8');
-      return JSON.parse(settingsData);
+      console.log('📋 [Settings] Raw settings data:', settingsData.substring(0, 200));
+      const parsed = JSON.parse(settingsData);
+      console.log('✅ [Settings] Successfully parsed settings:', {
+        sftpHost: parsed.sftp?.host || 'Not set',
+        sftpUsername: parsed.sftp?.username || 'Not set',
+        sftpAuthType: parsed.sftp?.authType || 'Not set',
+        hasPassword: !!parsed.sftp?.password,
+        hasPrivateKey: !!parsed.sftp?.privateKey
+      });
+      return parsed;
+    } else {
+      console.log('⚠️ [Settings] Settings file does not exist, using defaults');
     }
   } catch (error) {
     console.error('❌ [Settings] Failed to load settings file:', error.message);
+    console.error('❌ [Settings] Error details:', error.stack);
   }
   
   // Return default settings if file doesn't exist or can't be read
-  return {
+  const defaultSettings = {
     sftp: {
       host: '',
       port: 22,
@@ -56,6 +70,8 @@ function loadSettings() {
       directory: '/Export'
     }
   };
+  console.log('📋 [Settings] Using default settings:', defaultSettings);
+  return defaultSettings;
 }
 
 // Function to save settings to file
@@ -4203,15 +4219,29 @@ require('./emailArchiveSentEventsEndpoint')(app);
 
 // Settings storage (loaded from file and persisted across server restarts)
 let globalSettings = loadSettings();
+console.log('🔧 [Settings] Loaded settings on startup:');
+console.log('🔧 [Settings] SFTP Host:', globalSettings.sftp?.host || 'Not set');
+console.log('🔧 [Settings] SFTP Username:', globalSettings.sftp?.username || 'Not set');
+console.log('🔧 [Settings] SFTP Auth Type:', globalSettings.sftp?.authType || 'Not set');
+console.log('🔧 [Settings] SFTP Directory:', globalSettings.sftp?.directory || 'Not set');
+console.log('🔧 [Settings] Settings file exists:', fs.existsSync(settingsPath));
+console.log('🔧 [Settings] Settings file path:', settingsPath);
 
 // Get SFTP settings
 app.get('/api/settings/sftp', (req, res) => {
   try {
+    console.log('🔍 [Settings] GET request for SFTP settings');
+    console.log('🔍 [Settings] Settings file path:', settingsPath);
+    console.log('🔍 [Settings] Settings file exists:', fs.existsSync(settingsPath));
+    console.log('🔍 [Settings] Current globalSettings.sftp:', globalSettings.sftp);
+    
     // Return settings without sensitive data for security
     const sftpSettings = { ...globalSettings.sftp };
     delete sftpSettings.password;
     delete sftpSettings.privateKey;
     delete sftpSettings.passphrase;
+    
+    console.log('🔍 [Settings] Returning SFTP settings (without sensitive data):', sftpSettings);
     res.json(sftpSettings);
   } catch (error) {
     console.error('❌ [Settings] Failed to get SFTP settings:', error.message);
@@ -4251,13 +4281,25 @@ app.post('/api/settings/sftp', (req, res) => {
     };
 
     // Persist settings to file
+    console.log('💾 [Settings] Saving settings to file:', settingsPath);
     const settingsSaved = saveSettings(globalSettings);
     
     if (!settingsSaved) {
+      console.error('❌ [Settings] Failed to save settings to file');
       return res.status(500).json({ error: 'Failed to save settings to file' });
     }
 
     console.log(`✅ [Settings] SFTP settings saved and persisted for host: ${globalSettings.sftp.host} (auth: ${globalSettings.sftp.authType})`);
+    console.log(`💾 [Settings] Settings file updated at: ${settingsPath}`);
+    
+    // Verify the file was actually written
+    if (fs.existsSync(settingsPath)) {
+      const fileSize = fs.statSync(settingsPath).size;
+      console.log(`✅ [Settings] Settings file verified - size: ${fileSize} bytes`);
+    } else {
+      console.error('❌ [Settings] Settings file was not created!');
+    }
+    
     res.json({ success: true, message: 'SFTP settings saved successfully' });
 
   } catch (error) {
@@ -4460,6 +4502,47 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
             
             console.log(`📊 [Export] Successfully parsed ${rows.length} records from SOAP response`);
             console.log(`📋 [Export] Sample parsed record:`, rows.length > 0 ? JSON.stringify(rows[0], null, 2) : 'No data');
+            
+            // Additional client-side filter to ensure no archived records are included
+            const totalRowCount = rows.length;
+            rows = rows.filter(row => {
+              const archived = row.archived || row.Archived || 'No';
+              const isNotArchived = archived === 'No' || archived === 'no' || archived === '' || archived === null || archived === undefined;
+              if (!isNotArchived) {
+                console.log(`🚫 [Export] Filtering out already archived record - memberid: ${row.memberid}, archived: ${archived}`);
+              }
+              return isNotArchived;
+            });
+            
+            if (totalRowCount !== rows.length) {
+              console.log(`🔍 [Export] Filtered out ${totalRowCount - rows.length} already archived records. Remaining: ${rows.length}`);
+            } else {
+              console.log(`✅ [Export] All ${rows.length} records are unarchived and ready for export`);
+            }
+            
+            // Debug: Check archived status of fetched records
+            if (rows.length > 0) {
+              const archivedStatuses = rows.map(row => ({ memberid: row.memberid, archived: row.archived }));
+              console.log(`🔍 [Export] Archived status of fetched records:`, archivedStatuses.slice(0, 5)); // Show first 5
+              
+              const alreadyArchivedCount = rows.filter(row => row.archived === 'Yes').length;
+              const notArchivedCount = rows.filter(row => row.archived === 'No' || !row.archived).length;
+              
+              console.log(`📊 [Export] Record status breakdown: ${alreadyArchivedCount} already archived, ${notArchivedCount} not archived`);
+              
+              if (alreadyArchivedCount > 0) {
+                console.log(`⚠️ [Export] WARNING: Found ${alreadyArchivedCount} records with archived='Yes' - these should have been filtered out!`);
+              }
+            }
+            
+            // Safety net: Filter out any records that might have slipped through with archived='Yes'
+            const originalRowCount = rows.length;
+            rows = rows.filter(row => row.archived !== 'Yes');
+            const filteredRowCount = rows.length;
+            
+            if (originalRowCount !== filteredRowCount) {
+              console.log(`🛡️ [Export] Safety filter: Removed ${originalRowCount - filteredRowCount} already archived records`);
+            }
           } else if (results && !Array.isArray(results)) {
             // Single result case
             const properties = results.Properties?.Property || [];
@@ -4697,12 +4780,23 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       
       // Create enhanced folder structure: Export/Email_Archive/Backup and Export/Email_Archive/Audit_Failure
       // Create directories
+      console.log(`📁 [Export] Creating SFTP directory structure...`);
+      console.log(`📁 [Export] Base path: ${basePath}`);
+      console.log(`📁 [Export] Email Archive path: ${emailArchivePath}`);
+      console.log(`📁 [Export] Backup path: ${backupPath}`);
+      console.log(`📁 [Export] Audit Failure path: ${auditFailurePath}`);
+      
       for (const dirPath of [basePath, emailArchivePath, backupPath, auditFailurePath]) {
         try {
           await sftp.mkdir(dirPath, true);
-          console.log(`📁 [Export] Directory verified/created: ${dirPath}`);
+          console.log(`✅ [Export] Directory verified/created: ${dirPath}`);
         } catch (mkdirError) {
-          console.log(`📁 [Export] Directory check for ${dirPath}: ${mkdirError.message} (may already exist)`);
+          if (mkdirError.message.includes('No such file') || mkdirError.message.includes('does not exist')) {
+            console.log(`❌ [Export] Failed to create directory ${dirPath}: ${mkdirError.message}`);
+            throw new Error(`Failed to create SFTP directory: ${dirPath}`);
+          } else {
+            console.log(`📁 [Export] Directory ${dirPath}: ${mkdirError.message} (likely already exists)`);
+          }
         }
       }
       
@@ -4711,62 +4805,167 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       console.log(`📤 [Export] Uploading zip file: ${zipFilePath}`);
       
       await sftp.put(zipBuffer, zipFilePath);
-      console.log(`✅ [Export] Successfully uploaded ${zipFilename} to SFTP`);
+      console.log(`✅ [Export] Successfully uploaded ${zipFilename} to Email_Archive folder`);
       
-      // Verify upload by checking file exists
+      // Also copy the same file to Backup folder
+      const backupZipFilePath = `${backupPath}/${zipFilename}`.replace(/\/+/g, '/');
+      console.log(`📤 [Export] Copying zip file to Backup folder: ${backupZipFilePath}`);
+      console.log(`📋 [Export] Backup folder path: ${backupPath}`);
+      console.log(`📋 [Export] Zip buffer size: ${zipBuffer.length} bytes`);
+      
+      await sftp.put(zipBuffer, backupZipFilePath);
+      console.log(`✅ [Export] Successfully copied ${zipFilename} to Backup folder`);
+      
+      // Verify backup copy immediately
+      try {
+        const backupExists = await sftp.exists(backupZipFilePath);
+        console.log(`🔍 [Export] Backup file exists check: ${backupExists}`);
+        
+        if (backupExists) {
+          const backupStat = await sftp.stat(backupZipFilePath);
+          console.log(`📊 [Export] Backup file stats:`, {
+            size: backupStat.size,
+            modifiedTime: backupStat.modifyTime
+          });
+        }
+      } catch (backupVerifyError) {
+        console.log(`⚠️ [Export] Could not verify backup file:`, backupVerifyError.message);
+      }
+      
+      // Verify upload by checking file exists in Email_Archive
       const fileList = await sftp.list(emailArchivePath);
       const uploadedFile = fileList.find(file => file.name === zipFilename);
       if (uploadedFile) {
         console.log(`✅ [Export] Upload verified - file size: ${uploadedFile.size} bytes`);
       }
       
+      // Verify backup copy
+      const backupFileList = await sftp.list(backupPath);
+      const backupFile = backupFileList.find(file => file.name === zipFilename);
+      if (backupFile) {
+        console.log(`✅ [Export] Backup copy verified - file size: ${backupFile.size} bytes`);
+      }
+      
       await sftp.end();
       console.log(`🔌 [Export] SFTP connection closed`);
       
-      // Update archived status for successfully exported records
+      // Update archived status for successfully exported records using SOAP
       if (dataSource !== 'mock' && rows.length > 0) {
-        console.log(`📝 [Export] Updating archived status for ${rows.length} exported records`);
+        console.log(`📝 [Export] Updating archived status for ${rows.length} exported records using SOAP`);
         
         try {
           // Get member IDs of exported records
           const exportedMemberIds = rows.map(row => row.memberid).filter(id => id);
           
           if (exportedMemberIds.length > 0) {
-            // Update each record to set archived = 'Yes'
-            // Using HTML_Log as the Data Extension key
-            const deKey = 'HTML_Log';
-            
+            // Update each record to set archived = 'Yes' using SOAP
             for (const memberId of exportedMemberIds) {
-              const updatePayload = {
-                'keys': {
-                  'memberid': memberId
-                },
-                'values': {
-                  'archived': 'Yes'
-                }
-              };
+              console.log(`📝 [Export] Updating memberid: ${memberId} to archived='Yes'`);
               
-              const updateResponse = await axios.patch(
-                `https://${subdomain}.rest.marketingcloudapis.com/data/v1/customobjectdata/key/${deKey}/rowset`,
-                updatePayload,
-                {
-                  headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
+              const updateSoap = `
+                <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+                  <soapenv:Header>
+                    <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+                  </soapenv:Header>
+                  <soapenv:Body>
+                    <UpdateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                      <Objects xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="DataExtensionObject">
+                        <CustomerKey>HTML_Log</CustomerKey>
+                        <Keys>
+                          <Key>
+                            <Name>memberid</Name>
+                            <Value>${memberId}</Value>
+                          </Key>
+                        </Keys>
+                        <Properties>
+                          <Property>
+                            <Name>archived</Name>
+                            <Value>Yes</Value>
+                          </Property>
+                        </Properties>
+                      </Objects>
+                    </UpdateRequest>
+                  </soapenv:Body>
+                </soapenv:Envelope>
+              `;
+              
+              try {
+                const updateResponse = await axios.post(
+                  `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+                  updateSoap,
+                  {
+                    headers: {
+                      'Content-Type': 'text/xml; charset=utf-8',
+                      'SOAPAction': 'Update'
+                    }
                   }
+                );
+                
+                console.log(`📝 [Export] SOAP update response for memberid ${memberId}:`, updateResponse.status);
+                console.log(`📝 [Export] Response sample for memberid ${memberId}:`, updateResponse.data.substring(0, 500));
+                
+                // Parse XML response to check for success/errors
+                try {
+                  const parser = new xml2js.Parser({ explicitArray: false, ignoreAttrs: false });
+                  const updateResult = await new Promise((resolve, reject) => {
+                    parser.parseString(updateResponse.data, (err, parsed) => {
+                      if (err) reject(err);
+                      else resolve(parsed);
+                    });
+                  });
+                  
+                  console.log(`📋 [Export] Parsed SOAP response for memberid ${memberId}:`, JSON.stringify(updateResult, null, 2));
+                  
+                  // Navigate through the SOAP response structure
+                  const soapBody = updateResult['soap:Envelope']?.['soap:Body'] || updateResult['s:Envelope']?.['s:Body'];
+                  const updateResponseMsg = soapBody?.['UpdateResponse'] || soapBody?.['UpdateResponseMsg'];
+                  const results = updateResponseMsg?.['Results'];
+                  
+                  let updateSuccess = false;
+                  
+                  if (results) {
+                    const resultsArray = Array.isArray(results) ? results : [results];
+                    for (const result of resultsArray) {
+                      const statusCode = result?.['StatusCode'];
+                      const statusMessage = result?.['StatusMessage'];
+                      
+                      console.log(`📋 [Export] Result for memberid ${memberId} - Status: ${statusCode}, Message: ${statusMessage}`);
+                      
+                      if (statusCode === 'OK') {
+                        updateSuccess = true;
+                        console.log(`✅ [Export] Successfully updated archived status for memberid: ${memberId}`);
+                      } else {
+                        console.log(`⚠️ [Export] Update failed for memberid ${memberId}. Status: ${statusCode}, Message: ${statusMessage}`);
+                      }
+                    }
+                  } else {
+                    // Fallback to simple string check
+                    if (updateResponse.data && (updateResponse.data.includes('OK') || updateResponse.data.includes('Success'))) {
+                      updateSuccess = true;
+                      console.log(`✅ [Export] Successfully updated archived status for memberid: ${memberId} (fallback check)`);
+                    } else {
+                      console.log(`⚠️ [Export] No clear success indicator for memberid ${memberId}`);
+                    }
+                  }
+                  
+                  if (!updateSuccess) {
+                    console.log(`❌ [Export] Failed to update archived status for memberid: ${memberId}`);
+                  }
+                  
+                } catch (xmlParseError) {
+                  console.log(`⚠️ [Export] XML parsing failed for memberid ${memberId}:`, xmlParseError.message);
+                  console.log(`📋 [Export] Raw response:`, updateResponse.data);
                 }
-              );
-              
-              if (updateResponse.status === 200) {
-                console.log(`✅ [Export] Updated archived status for memberid: ${memberId}`);
+              } catch (soapUpdateError) {
+                console.error(`❌ [Export] SOAP update failed for memberid ${memberId}:`, soapUpdateError.message);
               }
             }
             
-            console.log(`✅ [Export] Successfully updated archived status for ${exportedMemberIds.length} records`);
+            console.log(`✅ [Export] Completed archived status update for ${exportedMemberIds.length} records`);
           }
         } catch (updateError) {
           console.error(`⚠️ [Export] Failed to update archived status:`, updateError.message);
-          // Don't throw error - export was successful, archiving status update is secondary
+          console.error(`⚠️ [Export] Update error details:`, updateError.response?.data || updateError.stack);
         }
       }
       

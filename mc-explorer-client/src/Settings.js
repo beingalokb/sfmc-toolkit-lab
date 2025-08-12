@@ -26,21 +26,35 @@ function Settings() {
   }, []);
 
   const loadSftpConfig = async () => {
+    console.log('🔄 [Frontend Settings] Loading SFTP configuration...');
     try {
       const response = await fetch(`${baseURL}/api/settings/sftp`);
+      console.log('📡 [Frontend Settings] Response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('📋 [Frontend Settings] Received SFTP config:', { 
+          ...data, 
+          password: data.password ? '[HIDDEN]' : '[EMPTY]', 
+          privateKey: data.privateKey ? '[HIDDEN]' : '[EMPTY]' 
+        });
+        
         setSftpConfig({
           ...data,
           password: '', // Don't show saved password for security
           privateKey: '', // Don't show saved private key for security
           passphrase: '' // Don't show saved passphrase for security
         });
+        
+        console.log('✅ [Frontend Settings] SFTP config applied to state');
+      } else {
+        console.error('❌ [Frontend Settings] Failed to load SFTP config:', response.status, response.statusText);
       }
     } catch (error) {
-      console.error('Failed to load SFTP config:', error);
+      console.error('❌ [Frontend Settings] Error loading SFTP config:', error);
     } finally {
       setConfigLoaded(true);
+      console.log('🏁 [Frontend Settings] Config loading completed');
     }
   };
 
