@@ -1253,12 +1253,8 @@ app.get('/search/emailsenddefinition', async (req, res) => {
       'CategoryID',
       'ModifiedDate',
       'SendClassification.CustomerKey',
-      'SendClassification.Name',
       'SenderProfile.CustomerKey',
-      'SenderProfile.Name',
       'DeliveryProfile.CustomerKey',
-      'DeliveryProfile.Name',
-      'DeliveryProfile.Description',
       'BccEmail',
       'CCEmail'
     ];
@@ -1555,21 +1551,17 @@ app.get('/search/deliveryprofile', async (req, res) => {
     // Extract from EmailSendDefinitions
     console.log('📧 [DeliveryProfile] Extracting from EmailSendDefinitions...');
     await extractDeliveryProfiles('EmailSendDefinition', [
-      'CustomerKey', // Need the main object properties for context
+      'CustomerKey',
       'Name',
-      'DeliveryProfile.CustomerKey',
-      'DeliveryProfile.Name', 
-      'DeliveryProfile.Description'
+      'DeliveryProfile.CustomerKey'
     ]);
     
     // Extract from SendClassifications
     console.log('📋 [DeliveryProfile] Extracting from SendClassifications...');
     await extractDeliveryProfiles('SendClassification', [
-      'CustomerKey', // Need the main object properties for context
+      'CustomerKey',
       'Name',
-      'DeliveryProfile.CustomerKey',
-      'DeliveryProfile.Name',
-      'DeliveryProfile.Description'
+      'DeliveryProfile.CustomerKey'
     ]);
     
     // Convert Map to Array
