@@ -41,6 +41,7 @@ function EmailArchiving() {
           description: 'Stores archived email HTML at send time',
           isSendable: false,
           fields: [
+            { name: 'ArchiveId', fieldType: 'Text', maxLength: 50, isPrimaryKey: true },
             { name: 'EmailAddress', fieldType: 'EmailAddress' },
             { name: 'SendTime', fieldType: 'Date' },
             { name: 'EmailName', fieldType: 'Text', maxLength: 100 },

@@ -3240,6 +3240,7 @@ SET @archived = 'No'
 SET @memberid = memberid
 SET @subid = subscriberid
 SET @subscriberkey = _subscriberkey
+SET @ArchiveId = GUID()
 
 /* Get the email HTML from the send */
 SET @EmailHTML = HTTPGet(view_email_url)
@@ -3247,6 +3248,7 @@ SET @EmailHTML = HTTPGet(view_email_url)
 /* Log to HTML_Log Data Extension */
 IF NOT EMPTY(@EmailHTML) AND NOT EMPTY(@EmailAddress) THEN
   InsertDE("HTML_Log", 
+    "ArchiveId", @ArchiveId,
     "EmailAddress", @EmailAddress,
     "SendTime", @SendTime,
     "EmailName", @EmailName,
@@ -3368,6 +3370,7 @@ ENDIF
 
     // Step 4: Create the Data Extension with specified fields - hardcode like DM QS
     const fieldXml = `
+                <Field><Name>ArchiveId</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsRequired>true</IsRequired><IsPrimaryKey>true</IsPrimaryKey></Field>
                 <Field><Name>EmailAddress</Name><FieldType>EmailAddress</FieldType><IsRequired>false</IsRequired></Field>
                 <Field><Name>SendTime</Name><FieldType>Date</FieldType><IsRequired>false</IsRequired></Field>
                 <Field><Name>EmailName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
@@ -4428,6 +4431,7 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
       <RetrieveRequest>
         <ObjectType>DataExtensionObject[HTML_Log]</ObjectType>
+        <Properties>ArchiveId</Properties>
         <Properties>EmailAddress</Properties>
         <Properties>SendTime</Properties>
         <Properties>EmailName</Properties>
@@ -4586,6 +4590,7 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       dataSource = 'mock';
       rows = [
         {
+          ArchiveId: 'A1B2C3D4-E5F6-7890-ABCD-EFGH12345678',
           EmailAddress: 'subscriber1@example.com',
           SendTime: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
           EmailName: 'Welcome Email Campaign',
@@ -4599,6 +4604,7 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
           subscriberkey: 'subscriber1@example.com'
         },
         {
+          ArchiveId: 'B2C3D4E5-F6G7-8901-BCDE-FGHI23456789',
           EmailAddress: 'subscriber2@example.com',
           SendTime: new Date(Date.now() - 43200000).toISOString(), // 12 hours ago
           EmailName: 'Product Update Newsletter',
@@ -4612,6 +4618,7 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
           subscriberkey: 'subscriber2@example.com'
         },
         {
+          ArchiveId: 'C3D4E5F6-G7H8-9012-CDEF-GHIJ34567890',
           EmailAddress: 'subscriber3@example.com',
           SendTime: new Date().toISOString(), // Now
           EmailName: 'Special Offer Email',
@@ -4849,95 +4856,119 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       await sftp.end();
       console.log(`🔌 [Export] SFTP connection closed`);
       
-      // Archive status update challenge: HTML_Log DE has no primary key
+      // Update archived status for successfully exported records using SOAP
       if (dataSource !== 'mock' && rows.length > 0) {
-        console.log(`📝 [Export] Archive status update: HTML_Log DE has no primary key defined`);
-        console.log(`📝 [Export] Current solution: Rely on improved filtering to prevent re-export`);
+        console.log(`📝 [Export] Updating archived status for ${rows.length} exported records using ArchiveId`);
         
         try {
-          // Log the records that were exported for tracking purposes
-          const exportedRecords = rows.map(row => ({
-            memberid: row.memberid,
-            emailAddress: row.EmailAddress,
-            jobId: row.JobID,
-            sendTime: row.SendTime
-          })).filter(record => record.memberid);
+          // Get ArchiveIds of exported records
+          const exportedArchiveIds = rows.map(row => row.ArchiveId).filter(id => id);
           
-          console.log(`📋 [Export] Successfully exported ${exportedRecords.length} records:`);
-          exportedRecords.forEach(record => {
-            console.log(`   - memberid: ${record.memberid}, email: ${record.emailAddress}, jobId: ${record.jobId}`);
-          });
-          
-          console.log(`📌 [Export] Note: These records should be marked as archived, but update requires primary key`);
-          console.log(`📌 [Export] Recommendation: Add a composite primary key (memberid + EmailAddress + JobID + SendTime) to HTML_Log DE`);
-          console.log(`� [Export] Alternative: Create separate tracking DE for archive status`);
-          console.log(`📌 [Export] Current workaround: Enhanced filtering prevents re-export of same records`);
-          
-        } catch (trackingError) {
-          console.error(`⚠️ [Export] Error tracking exported records:`, trackingError.message);
-        }
-        
-        try {
-          // Get member IDs and row data of exported records
-          const exportedRecords = rows.map(row => ({
-            memberid: row.memberid,
-            emailAddress: row.EmailAddress,
-            jobId: row.JobID,
-            sendTime: row.SendTime
-          })).filter(record => record.memberid);
-          
-          if (exportedRecords.length > 0) {
-            console.log(`📝 [Export] Updating archived status for ${exportedRecords.length} records using REST API`);
-            
-            // Use REST API to update records since SOAP requires primary keys
-            // We'll update records by using a unique combination of fields
-            for (const record of exportedRecords) {
-              console.log(`📝 [Export] Updating memberid: ${record.memberid} (${record.emailAddress}, JobID: ${record.jobId}) to archived='Yes'`);
+          if (exportedArchiveIds.length > 0) {
+            // Update each record to set archived = 'Yes' using SOAP with ArchiveId as primary key
+            for (const archiveId of exportedArchiveIds) {
+              console.log(`📝 [Export] Updating ArchiveId: ${archiveId} to archived='Yes'`);
+              
+              const updateSoap = `
+                <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+                  <soapenv:Header>
+                    <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+                  </soapenv:Header>
+                  <soapenv:Body>
+                    <UpdateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                      <Objects xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="DataExtensionObject">
+                        <CustomerKey>HTML_Log</CustomerKey>
+                        <Keys>
+                          <Key>
+                            <Name>ArchiveId</Name>
+                            <Value>${archiveId}</Value>
+                          </Key>
+                        </Keys>
+                        <Properties>
+                          <Property>
+                            <Name>archived</Name>
+                            <Value>Yes</Value>
+                          </Property>
+                        </Properties>
+                      </Objects>
+                    </UpdateRequest>
+                  </soapenv:Body>
+                </soapenv:Envelope>
+              `;
               
               try {
-                // Use REST API to update the specific record
-                const updatePayload = {
-                  keys: {
-                    memberid: record.memberid,
-                    EmailAddress: record.emailAddress,
-                    JobID: record.jobId
-                  },
-                  values: {
-                    archived: 'Yes'
-                  }
-                };
-                
-                const updateResponse = await axios.patch(
-                  `https://${subdomain}.rest.marketingcloudapis.com/data/v1/customobjectdata/key/HTML_Log/rowset`,
-                  updatePayload,
+                const updateResponse = await axios.post(
+                  `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+                  updateSoap,
                   {
                     headers: {
-                      'Authorization': `Bearer ${accessToken}`,
-                      'Content-Type': 'application/json'
+                      'Content-Type': 'text/xml; charset=utf-8',
+                      'SOAPAction': 'Update'
                     }
                   }
                 );
                 
-                console.log(`📝 [Export] REST update response for memberid ${record.memberid}:`, updateResponse.status);
-                console.log(`� [Export] REST response data:`, updateResponse.data);
+                console.log(`📝 [Export] SOAP update response for ArchiveId ${archiveId}:`, updateResponse.status);
+                console.log(`📝 [Export] Response sample for ArchiveId ${archiveId}:`, updateResponse.data.substring(0, 500));
                 
-                if (updateResponse.status === 200 || updateResponse.status === 204) {
-                  console.log(`✅ [Export] Successfully updated archived status for memberid: ${record.memberid}`);
-                } else {
-                  console.log(`⚠️ [Export] Unexpected response status for memberid ${record.memberid}:`, updateResponse.status);
+                // Parse XML response to check for success/errors
+                try {
+                  const parser = new xml2js.Parser({ explicitArray: false, ignoreAttrs: false });
+                  const updateResult = await new Promise((resolve, reject) => {
+                    parser.parseString(updateResponse.data, (err, parsed) => {
+                      if (err) reject(err);
+                      else resolve(parsed);
+                    });
+                  });
+                  
+                  console.log(`📋 [Export] Parsed SOAP response for ArchiveId ${archiveId}:`, JSON.stringify(updateResult, null, 2));
+                  
+                  // Navigate through the SOAP response structure
+                  const soapBody = updateResult['soap:Envelope']?.['soap:Body'] || updateResult['s:Envelope']?.['s:Body'];
+                  const updateResponseMsg = soapBody?.['UpdateResponse'] || soapBody?.['UpdateResponseMsg'];
+                  const results = updateResponseMsg?.['Results'];
+                  
+                  let updateSuccess = false;
+                  
+                  if (results) {
+                    const resultsArray = Array.isArray(results) ? results : [results];
+                    for (const result of resultsArray) {
+                      const statusCode = result?.['StatusCode'];
+                      const statusMessage = result?.['StatusMessage'];
+                      
+                      console.log(`📋 [Export] Result for ArchiveId ${archiveId} - Status: ${statusCode}, Message: ${statusMessage}`);
+                      
+                      if (statusCode === 'OK') {
+                        updateSuccess = true;
+                        console.log(`✅ [Export] Successfully updated archived status for ArchiveId: ${archiveId}`);
+                      } else {
+                        console.log(`⚠️ [Export] Update failed for ArchiveId ${archiveId}. Status: ${statusCode}, Message: ${statusMessage}`);
+                      }
+                    }
+                  } else {
+                    // Fallback to simple string check
+                    if (updateResponse.data && (updateResponse.data.includes('OK') || updateResponse.data.includes('Success'))) {
+                      updateSuccess = true;
+                      console.log(`✅ [Export] Successfully updated archived status for ArchiveId: ${archiveId} (fallback check)`);
+                    } else {
+                      console.log(`⚠️ [Export] No clear success indicator for ArchiveId ${archiveId}`);
+                    }
+                  }
+                  
+                  if (!updateSuccess) {
+                    console.log(`❌ [Export] Failed to update archived status for ArchiveId: ${archiveId}`);
+                  }
+                  
+                } catch (xmlParseError) {
+                  console.log(`⚠️ [Export] XML parsing failed for ArchiveId ${archiveId}:`, xmlParseError.message);
+                  console.log(`📋 [Export] Raw response:`, updateResponse.data);
                 }
-                
-              } catch (restUpdateError) {
-                console.error(`❌ [Export] REST update failed for memberid ${record.memberid}:`, restUpdateError.message);
-                console.log(`📋 [Export] REST error response:`, restUpdateError.response?.data);
-                
-                // If REST fails, let's try a simpler approach - just log the issue for now
-                // In production, you might want to implement a retry mechanism or alternative strategy
-                console.log(`⚠️ [Export] Will continue with other records despite update failure for memberid: ${record.memberid}`);
+              } catch (soapUpdateError) {
+                console.error(`❌ [Export] SOAP update failed for ArchiveId ${archiveId}:`, soapUpdateError.message);
               }
             }
             
-            console.log(`✅ [Export] Completed archived status update attempt for ${exportedRecords.length} records`);
+            console.log(`✅ [Export] Completed archived status update for ${exportedArchiveIds.length} records`);
           }
         } catch (updateError) {
           console.error(`⚠️ [Export] Failed to update archived status:`, updateError.message);
