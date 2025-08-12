@@ -4992,9 +4992,9 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     
     let message = `Successfully exported ${rows.length} email records in zip file (${htmlFileCount} HTML files + manifest) to SFTP`;
     if (dataSource === 'mock') {
-      message += ' (using sample data - HTML_Log DE may not exist or be empty)';
+      message += ' (DEMO MODE: Using sample data for testing. To export real data, ensure HTML_Log DE exists and contains email records)';
     } else {
-      message += ' (using live data from HTML_Log DE)';
+      message += ' (LIVE DATA: Exported actual email records from HTML_Log DE)';
     }
     
     res.json({
@@ -5011,7 +5011,9 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
         auditFailure: auditFailurePath
       },
       dataSource: dataSource,
-      note: dataSource === 'mock' ? 'HTML_Log Data Extension may not exist yet or be empty. Archive some emails first, then try exporting again.' : 'Successfully retrieved live data from HTML_Log Data Extension'
+      note: dataSource === 'mock' ? 
+        'Demo mode: Export completed with sample data. To export real emails: 1) Create HTML_Log DE, 2) Add AMPscript to emails, 3) Send emails to generate data, 4) Export again.' : 
+        'Live data export: Successfully exported actual email records from HTML_Log Data Extension'
     });
 
   } catch (error) {
