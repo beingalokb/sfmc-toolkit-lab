@@ -4415,13 +4415,133 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
 
     // Try to query HTML_Log Data Extension using the correct endpoint
     let rows = [];
+    let allRows = []; // To check if all records are archived
     let dataSource = 'mock'; // Track data source for user feedback
     
     if (accessToken) {
       try {
         console.log(`🔍 [Export] Querying HTML_Log DE using SOAP API at: https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`);
         
-        // Create SOAP envelope for retrieving Data Extension data
+        // First, query ALL records to check if HTML_Log exists and has data
+        const allRecordsSoapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:u="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
+  <s:Header>
+    <a:Action s:mustUnderstand="1">Retrieve</a:Action>
+    <a:To s:mustUnderstand="1">https://${subdomain}.soap.marketingcloudapis.com/Service.asmx</a:To>
+    <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+  </s:Header>
+  <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+      <RetrieveRequest>
+        <ObjectType>DataExtensionObject[HTML_Log]</ObjectType>
+        <Properties>ArchiveId</Properties>
+        <Properties>archived</Properties>
+      </RetrieveRequest>
+    </RetrieveRequestMsg>
+  </s:Body>
+</s:Envelope>`;
+
+        const allRecordsResponse = await axios.post(
+          `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+          allRecordsSoapEnvelope,
+          {
+            headers: {
+              'Content-Type': 'text/xml; charset=utf-8',
+              'SOAPAction': 'Retrieve'
+            }
+          }
+        );
+        
+        console.log(`📊 [Export] All records query status: ${allRecordsResponse.status}`);
+        
+        // Parse response to check what data exists
+        try {
+          const parser = new xml2js.Parser({ explicitArray: false, ignoreAttrs: false });
+          const allRecordsResult = await new Promise((resolve, reject) => {
+            parser.parseString(allRecordsResponse.data, (err, parsed) => {
+              if (err) reject(err);
+              else resolve(parsed);
+            });
+          });
+          
+          const soapBody = allRecordsResult['soap:Envelope']?.['soap:Body'] || allRecordsResult['s:Envelope']?.['s:Body'];
+          const retrieveResponse = soapBody?.['RetrieveResponseMsg'];
+          const results = retrieveResponse?.['Results'];
+          
+          if (results && Array.isArray(results)) {
+            allRows = results.map(result => {
+              const properties = result.Properties?.Property || [];
+              const row = {};
+              
+              if (Array.isArray(properties)) {
+                properties.forEach(prop => {
+                  if (prop.Name && prop.Value) {
+                    row[prop.Name] = prop.Value;
+                  }
+                });
+              } else if (properties.Name && properties.Value) {
+                row[properties.Name] = properties.Value;
+              }
+              
+              return row;
+            });
+          } else if (results && !Array.isArray(results)) {
+            const properties = results.Properties?.Property || [];
+            const row = {};
+            
+            if (Array.isArray(properties)) {
+              properties.forEach(prop => {
+                if (prop.Name && prop.Value) {
+                  row[prop.Name] = prop.Value;
+                }
+              });
+            }
+            
+            allRows = [row];
+          } else {
+            allRows = [];
+          }
+          
+          console.log(`📊 [Export] Found ${allRows.length} total records in HTML_Log`);
+          
+          // Check if HTML_Log exists but is empty
+          if (allRows.length === 0) {
+            return res.json({ 
+              success: true, 
+              message: 'HTML_Log Data Extension exists but contains no email records',
+              exportedCount: 0,
+              dataSource: 'empty_de',
+              note: 'No emails have been archived yet. Send emails with the archiving AMPscript block first, then return here to export.',
+              isEmpty: true
+            });
+          }
+          
+          // Check if all records are already archived
+          const unarchivedRecords = allRows.filter(row => {
+            const archived = row.archived || 'No';
+            return archived === 'No' || archived === 'no' || archived === '' || archived === null || archived === undefined;
+          });
+          
+          console.log(`📊 [Export] Found ${unarchivedRecords.length} unarchived records out of ${allRows.length} total`);
+          
+          if (unarchivedRecords.length === 0) {
+            return res.json({ 
+              success: true, 
+              message: `All ${allRows.length} email records in HTML_Log are already archived`,
+              exportedCount: 0,
+              dataSource: 'all_archived',
+              note: 'All email records have already been exported and archived. Send new emails to generate fresh content for export.',
+              allArchived: true,
+              totalRecords: allRows.length
+            });
+          }
+          
+        } catch (allRecordsParseError) {
+          console.log('⚠️ [Export] Failed to parse all records query:', allRecordsParseError.message);
+          allRows = [];
+        }
+        
+        // Now query for unarchived records only (the original query)
         const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:u="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
   <s:Header>
@@ -4587,8 +4707,22 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       console.log('⚠️ [Export] No access token available, using mock data');
     }
     
-    // If no data from MC, create sample data for demonstration
+    // Handle case when no data is found
     if (rows.length === 0) {
+      // If we successfully connected to MC but found no data, it means HTML_Log exists but is empty
+      if (accessToken && dataSource === 'marketing_cloud') {
+        return res.json({ 
+          success: true, 
+          message: 'No email records found in HTML_Log Data Extension to export',
+          exportedCount: 0,
+          dataSource: 'empty',
+          note: 'HTML_Log Data Extension exists but contains no data. Send emails with the archiving AMPscript block to generate data for export.',
+          isEmpty: true
+        });
+      }
+      
+      // Otherwise, provide mock data for demo purposes (when MC connection issues, etc.)
+      console.log('📊 [Export] No data available, providing demo export for testing purposes');
       dataSource = 'mock';
       rows = [
         {
@@ -4992,9 +5126,9 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
     
     let message = `Successfully exported ${rows.length} email records in zip file (${htmlFileCount} HTML files + manifest) to SFTP`;
     if (dataSource === 'mock') {
-      message += ' (DEMO MODE: Using sample data for testing. To export real data, ensure HTML_Log DE exists and contains email records)';
+      message += ' (🧪 DEMO MODE: Using sample data for testing purposes)';
     } else {
-      message += ' (LIVE DATA: Exported actual email records from HTML_Log DE)';
+      message += ' (📊 LIVE DATA: Exported actual email records from HTML_Log DE)';
     }
     
     res.json({
@@ -5012,8 +5146,8 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       },
       dataSource: dataSource,
       note: dataSource === 'mock' ? 
-        'Demo mode: Export completed with sample data. To export real emails: 1) Create HTML_Log DE, 2) Add AMPscript to emails, 3) Send emails to generate data, 4) Export again.' : 
-        'Live data export: Successfully exported actual email records from HTML_Log Data Extension'
+        '🧪 Demo mode: This was a test export with sample data to verify SFTP functionality.' : 
+        '📊 Live data export: Successfully exported actual email records from HTML_Log Data Extension'
     });
 
   } catch (error) {

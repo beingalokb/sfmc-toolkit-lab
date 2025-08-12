@@ -333,8 +333,10 @@ function EmailArchiving() {
         let message = `✅ ${result.message}`;
         
         // Add additional info based on data source
-        if (result.dataSource === 'mock') {
-          message += '\n\n💡 Note: This export used sample data because your Marketing Cloud app needs to be configured as a "Server-to-Server" app type for API access.';
+        if (result.dataSource === 'empty') {
+          message += '\n\n� No Data: HTML_Log Data Extension exists but is empty. Send emails with the archiving AMPscript to generate data.';
+        } else if (result.dataSource === 'mock') {
+          message += '\n\n🧪 Demo Mode: Using sample data for testing purposes.';
         }
         
         if (result.filename && result.sftpPath) {
