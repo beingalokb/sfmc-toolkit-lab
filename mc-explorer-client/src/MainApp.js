@@ -105,6 +105,17 @@ export default function MainApp() {
     return found ? found.Description : '';
   }
 
+  // Helper function to clean up email strings (remove duplicates and normalize)
+  function cleanEmailString(emailStr) {
+    if (!emailStr) return '';
+    // Split by semicolon, trim whitespace, remove duplicates, filter empty strings
+    const emails = emailStr.split(';')
+      .map(email => email.trim())
+      .filter(email => email.length > 0);
+    const uniqueEmails = [...new Set(emails)];
+    return uniqueEmails.join('; ');
+  }
+
   // Parent navigation state
   const [parentNav, setParentNav] = useState('search'); // 'search' or 'preference'
   const [previewResult, setPreviewResult] = useState(null);
@@ -590,6 +601,11 @@ export default function MainApp() {
   function openEditESDModal(esd) {
     // Always use the most up-to-date data from resolvedEmailSendDefs
     const currentEsd = resolvedEmailSendDefs.find(item => item.CustomerKey === esd.CustomerKey) || esd;
+    
+    // Clean up the BCC/CC email strings to remove duplicates and normalize format
+    const cleanBccEmail = cleanEmailString(currentEsd.BccEmail);
+    const cleanCcEmail = cleanEmailString(currentEsd.CCEmail);
+    
     setEditESDModal({
       open: true,
       loading: false,
@@ -598,8 +614,8 @@ export default function MainApp() {
       sendClassification: currentEsd.SendClassification?.CustomerKey || '',
       senderProfile: currentEsd.SenderProfile?.CustomerKey || '',
       deliveryProfile: currentEsd.DeliveryProfile?.CustomerKey || '',
-      bccEmail: currentEsd.BccEmail || '',
-      ccEmail: currentEsd.CCEmail || ''
+      bccEmail: cleanBccEmail,
+      ccEmail: cleanCcEmail
     });
   }
 
@@ -1403,6 +1419,11 @@ export default function MainApp() {
                   </div>
                   <div className="mb-4">
                     <label className="block mb-1 font-semibold">BCC Email</label>
+                    {editESDModal.esd?.BccEmail && editESDModal.esd.BccEmail !== cleanEmailString(editESDModal.esd.BccEmail) && (
+                      <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
+                        <strong>Current value:</strong> {editESDModal.esd.BccEmail}
+                      </div>
+                    )}
                     <input
                       type="text"
                       className="w-full border rounded p-2"
@@ -1413,6 +1434,11 @@ export default function MainApp() {
                   </div>
                   <div className="mb-4">
                     <label className="block mb-1 font-semibold">CC Email</label>
+                    {editESDModal.esd?.CCEmail && editESDModal.esd.CCEmail !== cleanEmailString(editESDModal.esd.CCEmail) && (
+                      <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
+                        <strong>Current value:</strong> {editESDModal.esd.CCEmail}
+                      </div>
+                    )}
                     <input
                       type="text"
                       className="w-full border rounded p-2"
