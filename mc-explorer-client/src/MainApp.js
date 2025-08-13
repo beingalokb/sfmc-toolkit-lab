@@ -588,16 +588,18 @@ export default function MainApp() {
 
   // Handler to open edit modal
   function openEditESDModal(esd) {
+    // Always use the most up-to-date data from resolvedEmailSendDefs
+    const currentEsd = resolvedEmailSendDefs.find(item => item.CustomerKey === esd.CustomerKey) || esd;
     setEditESDModal({
       open: true,
       loading: false,
       error: null,
-      esd,
-      sendClassification: esd.SendClassification?.CustomerKey || '',
-      senderProfile: esd.SenderProfile?.CustomerKey || '',
-      deliveryProfile: esd.DeliveryProfile?.CustomerKey || '',
-      bccEmail: esd.BccEmail || '',
-      ccEmail: esd.CCEmail || ''
+      esd: currentEsd,
+      sendClassification: currentEsd.SendClassification?.CustomerKey || '',
+      senderProfile: currentEsd.SenderProfile?.CustomerKey || '',
+      deliveryProfile: currentEsd.DeliveryProfile?.CustomerKey || '',
+      bccEmail: currentEsd.BccEmail || '',
+      ccEmail: currentEsd.CCEmail || ''
     });
   }
 
@@ -651,8 +653,10 @@ export default function MainApp() {
         setEditESDModal(prev => ({ ...prev, loading: false, open: false }));
         // Show success toast/snackbar
         alert('✅ Updated successfully');
-        // Refresh table with resolved relationships
-        await refreshResolvedEmailSendDefs();
+        // Add a small delay before refreshing to ensure Marketing Cloud has processed the update
+        setTimeout(async () => {
+          await refreshResolvedEmailSendDefs();
+        }, 1000);
       } else {
         setEditESDModal(prev => ({ ...prev, loading: false, error: data.message || 'Update failed' }));
         alert('❌ Update failed: ' + (data.message || 'Unknown error'));
@@ -774,7 +778,10 @@ export default function MainApp() {
         setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '', loading: false, error: null });
         setSelectedESDKeys([]);
         alert('✅ Bulk update successful');
-        await refreshResolvedEmailSendDefs();
+        // Add a small delay before refreshing to ensure Marketing Cloud has processed the update
+        setTimeout(async () => {
+          await refreshResolvedEmailSendDefs();
+        }, 1000);
       } else {
         setMassEditModal(prev => ({ ...prev, loading: false, error: data.message || 'Update failed' }));
         alert('❌ Bulk update failed: ' + (data.message || 'Unknown error'));
