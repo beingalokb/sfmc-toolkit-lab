@@ -653,10 +653,10 @@ export default function MainApp() {
         setEditESDModal(prev => ({ ...prev, loading: false, open: false }));
         // Show success toast/snackbar
         alert('✅ Updated successfully');
-        // Add a small delay before refreshing to ensure Marketing Cloud has processed the update
+        // Add a longer delay (3 seconds) to ensure Marketing Cloud has fully propagated the update
         setTimeout(async () => {
           await refreshResolvedEmailSendDefs();
-        }, 1000);
+        }, 3000);
       } else {
         setEditESDModal(prev => ({ ...prev, loading: false, error: data.message || 'Update failed' }));
         alert('❌ Update failed: ' + (data.message || 'Unknown error'));
@@ -709,7 +709,9 @@ export default function MainApp() {
     const subdomain = localStorage.getItem('subdomain');
     if (!accessToken || !subdomain) return;
     try {
-      const res = await fetch(`${baseURL}/resolved/emailsenddefinition-relationships`, {
+      // Add cache-busting parameter to ensure fresh data
+      const cacheBuster = Date.now();
+      const res = await fetch(`${baseURL}/resolved/emailsenddefinition-relationships?_t=${cacheBuster}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'x-mc-subdomain': subdomain
@@ -778,10 +780,10 @@ export default function MainApp() {
         setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '', loading: false, error: null });
         setSelectedESDKeys([]);
         alert('✅ Bulk update successful');
-        // Add a small delay before refreshing to ensure Marketing Cloud has processed the update
+        // Add a longer delay (3 seconds) to ensure Marketing Cloud has fully propagated the update
         setTimeout(async () => {
           await refreshResolvedEmailSendDefs();
-        }, 1000);
+        }, 3000);
       } else {
         setMassEditModal(prev => ({ ...prev, loading: false, error: data.message || 'Update failed' }));
         alert('❌ Bulk update failed: ' + (data.message || 'Unknown error'));

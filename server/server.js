@@ -1644,28 +1644,6 @@ app.post('/update/emailsenddefinition', async (req, res) => {
   try {
     // Log the incoming payload for debugging
     console.log('🔵 [Update ESD] Payload:', req.body);
-    // Handle BccEmail and CCEmail - try different approaches for empty vs non-empty values
-    let bccEmailXml = '';
-    let ccEmailXml = '';
-    
-    if (BccEmail !== undefined) {
-      if (BccEmail === '' || BccEmail === null) {
-        // For clearing the field, try using xsi:nil
-        bccEmailXml = '<BccEmail xsi:nil="true" />';
-      } else {
-        bccEmailXml = `<BccEmail>${BccEmail}</BccEmail>`;
-      }
-    }
-    
-    if (CCEmail !== undefined) {
-      if (CCEmail === '' || CCEmail === null) {
-        // For clearing the field, try using xsi:nil
-        ccEmailXml = '<CCEmail xsi:nil="true" />';
-      } else {
-        ccEmailXml = `<CCEmail>${CCEmail}</CCEmail>`;
-      }
-    }
-    
     const soapEnvelope = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <soapenv:Header>
@@ -1678,8 +1656,8 @@ app.post('/update/emailsenddefinition', async (req, res) => {
               ${SendClassification ? `<SendClassification><CustomerKey>${SendClassification}</CustomerKey></SendClassification>` : ''}
               ${SenderProfile ? `<SenderProfile><CustomerKey>${SenderProfile}</CustomerKey></SenderProfile>` : ''}
               ${DeliveryProfile ? `<DeliveryProfile><CustomerKey>${DeliveryProfile}</CustomerKey></DeliveryProfile>` : ''}
-              ${bccEmailXml}
-              ${ccEmailXml}
+              <BccEmail>${BccEmail || ''}</BccEmail>
+              <CCEmail>${CCEmail || ''}</CCEmail>
             </Objects>
           </UpdateRequest>
         </soapenv:Body>
@@ -1831,6 +1809,7 @@ app.post('/parse/emailsenddefinition-config', (req, res) => {
 
 // Resolved EmailSendDefinition relationships endpoint (enrich with full details for all related objects)
 app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
+  console.log(`🕐 [Resolved ESD] Request received at ${new Date().toISOString()}`);
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
   if (!accessToken || !subdomain) return res.status(401).json([]);
