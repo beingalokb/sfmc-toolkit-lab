@@ -1681,6 +1681,11 @@ app.post('/update/emailsenddefinition', async (req, res) => {
     const result = await parser.parseStringPromise(response.data);
     const status = result?.['soap:Envelope']?.['soap:Body']?.['UpdateResponse']?.['OverallStatus'];
     const statusMessage = result?.['soap:Envelope']?.['soap:Body']?.['UpdateResponse']?.['Results']?.['StatusMessage'];
+    
+    console.log(`🔍 [Update ESD] SOAP Status: ${status}`);
+    console.log(`🔍 [Update ESD] Status Message: ${statusMessage}`);
+    console.log(`🔍 [Update ESD] Updated BccEmail: "${BccEmail || ''}", CCEmail: "${CCEmail || ''}"`);
+    
     if (status && status.toLowerCase().includes('ok')) {
       res.json({ status: 'OK' });
     } else {
@@ -1934,6 +1939,10 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
     const resolved = sendDefs.map(def => {
       const sendClass = sendClassMap[def.SendClassificationKey] || {};
       const senderProfile = senderProfileMap[def.SenderProfileKey] || {};
+      
+      // Debug logging for BCC/CC emails
+      console.log(`🔍 [Resolved ESD] ${def.CustomerKey} - BccEmail: "${def.BccEmail}", CCEmail: "${def.CCEmail}"`);
+      
       return {
         Name: def.Name,
         CustomerKey: def.CustomerKey,
@@ -1960,6 +1969,10 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         }
       };
     });
+    
+    console.log(`✅ [Resolved ESD] Returning ${resolved.length} records`);
+    console.log(`📧 [Resolved ESD] Sample record:`, JSON.stringify(resolved[0], null, 2));
+    
     res.json(resolved);
   } catch (e) {
     res.status(500).json({ error: e.message });
