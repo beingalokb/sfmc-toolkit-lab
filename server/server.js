@@ -1870,12 +1870,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         'CategoryID',
         'ModifiedDate',
         'SendClassification.CustomerKey',
-        'SendClassification.Name',
         'SenderProfile.CustomerKey',
-        'SenderProfile.Name',
         'DeliveryProfile.CustomerKey',
-        'DeliveryProfile.Name',
-        'DeliveryProfile.Description',
         'BccEmail',
         'CCEmail'
       ];
@@ -1913,12 +1909,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         CategoryID: item.CategoryID,
         ModifiedDate: item.ModifiedDate,
         SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
-        SendClassificationName: item['SendClassification']?.Name || item['SendClassification.Name'] || '',
         SenderProfileKey: item['SenderProfile']?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
-        SenderProfileName: item['SenderProfile']?.Name || item['SenderProfile.Name'] || '',
         DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || '',
-        DeliveryProfileName: item['DeliveryProfile']?.Name || item['DeliveryProfile.Name'] || '',
-        DeliveryProfileDescription: item['DeliveryProfile']?.Description || item['DeliveryProfile.Description'] || '',
         BccEmail: item.BccEmail || '',
         CCEmail: item.CCEmail || ''
       }));
@@ -1951,20 +1943,20 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         CCEmail: def.CCEmail || '',
         SendClassification: {
           CustomerKey: def.SendClassificationKey,
-          Name: def.SendClassificationName || sendClass.Name || '',
+          Name: sendClass.Name || def.SendClassificationKey,
           Description: sendClass.Description || '',
           SenderProfileKey: sendClass['SenderProfile']?.CustomerKey || sendClass['SenderProfile.CustomerKey'] || '',
           DeliveryProfileKey: sendClass['DeliveryProfile']?.CustomerKey || sendClass['DeliveryProfile.CustomerKey'] || ''
         },
         SenderProfile: {
           CustomerKey: def.SenderProfileKey,
-          Name: def.SenderProfileName || senderProfile.Name || '',
+          Name: senderProfile.Name || def.SenderProfileKey,
           Description: senderProfile.Description || ''
         },
         DeliveryProfile: {
           CustomerKey: def.DeliveryProfileKey,
-          Name: def.DeliveryProfileName || def.DeliveryProfileKey,
-          Description: def.DeliveryProfileDescription || ''
+          Name: def.DeliveryProfileKey, // Use CustomerKey as name since we can't get the actual name
+          Description: ''
         }
       };
     });
