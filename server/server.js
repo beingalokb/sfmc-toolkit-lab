@@ -1909,6 +1909,13 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
       const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
       // Always return array, and include full nested objects
       const arr = results ? (Array.isArray(results) ? results : [results]) : [];
+      
+      // Debug BCC/CC fields specifically
+      arr.forEach((item, index) => {
+        console.log(`🔍 [Raw SOAP] Item ${index + 1} (${item.CustomerKey}) - Raw BccEmail:`, JSON.stringify(item.BccEmail));
+        console.log(`🔍 [Raw SOAP] Item ${index + 1} (${item.CustomerKey}) - Raw CCEmail:`, JSON.stringify(item.CCEmail));
+      });
+      
       return arr.map(item => ({
         Name: item.Name,
         CustomerKey: item.CustomerKey,
@@ -1917,8 +1924,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
         SenderProfileKey: item['SenderProfile']?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
         DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || '',
-        BccEmail: item.BccEmail || '',
-        CCEmail: item.CCEmail || ''
+        BccEmail: typeof item.BccEmail === 'string' ? item.BccEmail : (item.BccEmail || ''),
+        CCEmail: typeof item.CCEmail === 'string' ? item.CCEmail : (item.CCEmail || '')
       }));
     })();
 

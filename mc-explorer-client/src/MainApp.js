@@ -653,10 +653,12 @@ export default function MainApp() {
         setEditESDModal(prev => ({ ...prev, loading: false, open: false }));
         // Show success toast/snackbar
         alert('✅ Updated successfully');
-        // Add a longer delay (3 seconds) to ensure Marketing Cloud has fully propagated the update
+        // BCC/CC email fields need longer propagation time than profile fields
+        const hasBccCcUpdate = editESDModal.bccEmail !== undefined || editESDModal.ccEmail !== undefined;
+        const delay = hasBccCcUpdate ? 5000 : 2000; // 5s for email fields, 2s for profiles
         setTimeout(async () => {
           await refreshResolvedEmailSendDefs();
-        }, 3000);
+        }, delay);
       } else {
         setEditESDModal(prev => ({ ...prev, loading: false, error: data.message || 'Update failed' }));
         alert('❌ Update failed: ' + (data.message || 'Unknown error'));
