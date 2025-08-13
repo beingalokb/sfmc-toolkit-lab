@@ -1644,6 +1644,9 @@ app.post('/update/emailsenddefinition', async (req, res) => {
   try {
     // Log the incoming payload for debugging
     console.log('🔵 [Update ESD] Payload:', req.body);
+    console.log('🔵 [Update ESD] Raw BccEmail:', JSON.stringify(BccEmail));
+    console.log('🔵 [Update ESD] Raw CCEmail:', JSON.stringify(CCEmail));
+    console.log('🔵 [Update ESD] CustomerKey:', CustomerKey);
     const soapEnvelope = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <soapenv:Header>

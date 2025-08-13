@@ -614,8 +614,9 @@ export default function MainApp() {
       sendClassification: currentEsd.SendClassification?.CustomerKey || '',
       senderProfile: currentEsd.SenderProfile?.CustomerKey || '',
       deliveryProfile: currentEsd.DeliveryProfile?.CustomerKey || '',
-      bccEmail: cleanBccEmail,
-      ccEmail: cleanCcEmail
+      // Start with empty fields to avoid accidental concatenation
+      bccEmail: '',
+      ccEmail: ''
     });
   }
 
@@ -1419,9 +1420,11 @@ export default function MainApp() {
                   </div>
                   <div className="mb-4">
                     <label className="block mb-1 font-semibold">BCC Email</label>
-                    {editESDModal.esd?.BccEmail && editESDModal.esd.BccEmail !== cleanEmailString(editESDModal.esd.BccEmail) && (
-                      <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
-                        <strong>Current value:</strong> {editESDModal.esd.BccEmail}
+                    {editESDModal.esd?.BccEmail && (
+                      <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                        <strong>Current value in Marketing Cloud:</strong> {editESDModal.esd.BccEmail}
+                        <br />
+                        <span className="text-gray-600">Leave empty to clear, or enter new value(s) to replace</span>
                       </div>
                     )}
                     <input
@@ -1434,9 +1437,11 @@ export default function MainApp() {
                   </div>
                   <div className="mb-4">
                     <label className="block mb-1 font-semibold">CC Email</label>
-                    {editESDModal.esd?.CCEmail && editESDModal.esd.CCEmail !== cleanEmailString(editESDModal.esd.CCEmail) && (
-                      <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
-                        <strong>Current value:</strong> {editESDModal.esd.CCEmail}
+                    {editESDModal.esd?.CCEmail && (
+                      <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                        <strong>Current value in Marketing Cloud:</strong> {editESDModal.esd.CCEmail}
+                        <br />
+                        <span className="text-gray-600">Leave empty to clear, or enter new value(s) to replace</span>
                       </div>
                     )}
                     <input
