@@ -1312,8 +1312,8 @@ app.get('/search/emailsenddefinition', async (req, res) => {
           SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
           SenderProfileKey: item['SenderProfile']?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
           DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || '',
-          BccEmail: item.BccEmail || '',
-          CCEmail: item.CCEmail || ''
+          BccEmail: typeof item.BccEmail === 'string' ? item.BccEmail : (item.BccEmail !== undefined ? String(item.BccEmail) : ''),
+          CCEmail: typeof item.CCEmail === 'string' ? item.CCEmail : (item.CCEmail !== undefined ? String(item.CCEmail) : '')
         }));
         
         console.log(`✅ Mapped ${sendDefs.length} EmailSendDefinition records for frontend`);
@@ -1927,8 +1927,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
         SenderProfileKey: item['SenderProfile']?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
         DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || '',
-        BccEmail: typeof item.BccEmail === 'string' ? item.BccEmail : (item.BccEmail || ''),
-        CCEmail: typeof item.CCEmail === 'string' ? item.CCEmail : (item.CCEmail || '')
+        BccEmail: typeof item.BccEmail === 'string' ? item.BccEmail : (item.BccEmail !== undefined ? String(item.BccEmail) : ''),
+        CCEmail: typeof item.CCEmail === 'string' ? item.CCEmail : (item.CCEmail !== undefined ? String(item.CCEmail) : '')
       }));
     })();
 
@@ -1959,8 +1959,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         CustomerKey: def.CustomerKey,
         CategoryID: def.CategoryID,
         ModifiedDate: def.ModifiedDate || '',
-        BccEmail: def.BccEmail || '',
-        CCEmail: def.CCEmail || '',
+        BccEmail: typeof def.BccEmail === 'string' ? def.BccEmail : (def.BccEmail !== undefined ? String(def.BccEmail) : ''),
+        CCEmail: typeof def.CCEmail === 'string' ? def.CCEmail : (def.CCEmail !== undefined ? String(def.CCEmail) : ''),
         SendClassification: {
           CustomerKey: def.SendClassificationKey,
           Name: sendClass.Name || def.SendClassificationKey,
@@ -2989,7 +2989,7 @@ app.get('/api/email-archive/send', async (req, res) => {
       UniqueOpens: r.UniqueOpens || '',
       Unsubscribes: r.Unsubscribes || '',
       Duplicates: r.Duplicates || '',
-      BccEmail: r.BccEmail || '',
+      BccEmail: typeof r.BccEmail === 'string' ? r.BccEmail : (r.BccEmail !== undefined ? String(r.BccEmail) : ''),
     }));
     res.json({ results: mapped });
   } catch (err) {
