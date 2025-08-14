@@ -1312,8 +1312,8 @@ app.get('/search/emailsenddefinition', async (req, res) => {
           SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
           SenderProfileKey: item['SenderProfile']?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
           DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || '',
-          BccEmail: typeof item.BccEmail === 'string' ? item.BccEmail : (item.BccEmail !== undefined ? String(item.BccEmail) : ''),
-          CCEmail: typeof item.CCEmail === 'string' ? item.CCEmail : (item.CCEmail !== undefined ? String(item.CCEmail) : '')
+          BccEmail: item.BccEmail ?? '',
+          CCEmail: item.CCEmail ?? ''
         }));
         
         console.log(`✅ Mapped ${sendDefs.length} EmailSendDefinition records for frontend`);
@@ -1647,6 +1647,44 @@ app.post('/update/emailsenddefinition', async (req, res) => {
     console.log('🔵 [Update ESD] Raw BccEmail:', JSON.stringify(BccEmail));
     console.log('🔵 [Update ESD] Raw CCEmail:', JSON.stringify(CCEmail));
     console.log('🔵 [Update ESD] CustomerKey:', CustomerKey);
+    
+    // Step 1: If BccEmail or CCEmail are provided, first clear them to prevent accumulation
+    if (BccEmail !== undefined || CCEmail !== undefined) {
+      console.log('🔵 [Update ESD] Step 1: Clearing BCC/CC fields first to prevent accumulation...');
+      const clearEnvelope = `
+        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <soapenv:Header>
+            <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+          </soapenv:Header>
+          <soapenv:Body>
+            <UpdateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <Objects xsi:type="EmailSendDefinition">
+                <CustomerKey>${CustomerKey}</CustomerKey>
+                <BccEmail></BccEmail>
+                <CCEmail></CCEmail>
+              </Objects>
+            </UpdateRequest>
+          </soapenv:Body>
+        </soapenv:Envelope>
+      `;
+      
+      const clearResponse = await axios.post(
+        `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+        clearEnvelope,
+        {
+          headers: {
+            'Content-Type': 'text/xml',
+            SOAPAction: 'Update',
+          },
+        }
+      );
+      console.log('🔵 [Update ESD] Clear Response Status:', clearResponse.status);
+      
+      // Wait a moment for the clear to propagate
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // Step 2: Now perform the main update
     const soapEnvelope = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <soapenv:Header>
@@ -1667,7 +1705,7 @@ app.post('/update/emailsenddefinition', async (req, res) => {
       </soapenv:Envelope>
     `;
     // Log the SOAP envelope for debugging
-    console.log('🔵 [Update ESD] SOAP Envelope:', soapEnvelope);
+    console.log('🔵 [Update ESD] Step 2: Main update SOAP Envelope:', soapEnvelope);
     const response = await axios.post(
       `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
       soapEnvelope,
@@ -1927,8 +1965,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         SendClassificationKey: item['SendClassification']?.CustomerKey || item['SendClassification.CustomerKey'] || '',
         SenderProfileKey: item['SenderProfile']?.CustomerKey || item['SenderProfile.CustomerKey'] || '',
         DeliveryProfileKey: item['DeliveryProfile']?.CustomerKey || item['DeliveryProfile.CustomerKey'] || '',
-        BccEmail: typeof item.BccEmail === 'string' ? item.BccEmail : (item.BccEmail !== undefined ? String(item.BccEmail) : ''),
-        CCEmail: typeof item.CCEmail === 'string' ? item.CCEmail : (item.CCEmail !== undefined ? String(item.CCEmail) : '')
+        BccEmail: item.BccEmail ?? '',
+        CCEmail: item.CCEmail ?? ''
       }));
     })();
 
@@ -1959,8 +1997,8 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
         CustomerKey: def.CustomerKey,
         CategoryID: def.CategoryID,
         ModifiedDate: def.ModifiedDate || '',
-        BccEmail: typeof def.BccEmail === 'string' ? def.BccEmail : (def.BccEmail !== undefined ? String(def.BccEmail) : ''),
-        CCEmail: typeof def.CCEmail === 'string' ? def.CCEmail : (def.CCEmail !== undefined ? String(def.CCEmail) : ''),
+        BccEmail: def.BccEmail ?? '',
+        CCEmail: def.CCEmail ?? '',
         SendClassification: {
           CustomerKey: def.SendClassificationKey,
           Name: sendClass.Name || def.SendClassificationKey,
@@ -2989,7 +3027,7 @@ app.get('/api/email-archive/send', async (req, res) => {
       UniqueOpens: r.UniqueOpens || '',
       Unsubscribes: r.Unsubscribes || '',
       Duplicates: r.Duplicates || '',
-      BccEmail: typeof r.BccEmail === 'string' ? r.BccEmail : (r.BccEmail !== undefined ? String(r.BccEmail) : ''),
+      BccEmail: r.BccEmail ?? '',
     }));
     res.json({ results: mapped });
   } catch (err) {

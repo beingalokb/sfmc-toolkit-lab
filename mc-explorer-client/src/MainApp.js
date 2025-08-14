@@ -602,19 +602,15 @@ export default function MainApp() {
     // Always use the most up-to-date data from resolvedEmailSendDefs
     const currentEsd = resolvedEmailSendDefs.find(item => item.CustomerKey === esd.CustomerKey) || esd;
     
-    // Clean up the BCC/CC email strings to remove duplicates and normalize format
-    const cleanBccEmail = cleanEmailString(currentEsd.BccEmail);
-    const cleanCcEmail = cleanEmailString(currentEsd.CCEmail);
-    
     setEditESDModal({
       open: true,
       loading: false,
       error: null,
-      esd: currentEsd,
+      esd: currentEsd, // Keep reference to original data for display
       sendClassification: currentEsd.SendClassification?.CustomerKey || '',
       senderProfile: currentEsd.SenderProfile?.CustomerKey || '',
       deliveryProfile: currentEsd.DeliveryProfile?.CustomerKey || '',
-      // Start with empty fields to avoid accidental concatenation
+      // Start with empty fields - user must explicitly enter what they want
       bccEmail: '',
       ccEmail: ''
     });
@@ -649,6 +645,8 @@ export default function MainApp() {
       const sendClassificationKey = getCustomerKey(sendClassifications, editESDModal.sendClassification);
       const senderProfileKey = getCustomerKey(senderProfiles, editESDModal.senderProfile);
       const deliveryProfileKey = getCustomerKey(deliveryProfiles, editESDModal.deliveryProfile);
+      
+      // Update the record
       const res = await fetch(`${baseURL}/update/emailsenddefinition`, {
         method: 'POST',
         headers: {
@@ -661,21 +659,20 @@ export default function MainApp() {
           SendClassification: sendClassificationKey,
           SenderProfile: senderProfileKey,
           DeliveryProfile: deliveryProfileKey,
-          BccEmail: editESDModal.bccEmail,
-          CCEmail: editESDModal.ccEmail
+          BccEmail: editESDModal.bccEmail, // Use exact values from form
+          CCEmail: editESDModal.ccEmail    // Use exact values from form
         })
       });
       const data = await res.json();
+      
       if (data.status === 'OK') {
         setEditESDModal(prev => ({ ...prev, loading: false, open: false }));
-        // Show success toast/snackbar
         alert('✅ Updated successfully');
-        // BCC/CC email fields need longer propagation time than profile fields
-        const hasBccCcUpdate = editESDModal.bccEmail !== undefined || editESDModal.ccEmail !== undefined;
-        const delay = hasBccCcUpdate ? 5000 : 2000; // 5s for email fields, 2s for profiles
+        
+        // Always refresh after any update - cache-busting with timestamp
         setTimeout(async () => {
           await refreshResolvedEmailSendDefs();
-        }, delay);
+        }, 3000); // 3 second delay for Marketing Cloud propagation
       } else {
         setEditESDModal(prev => ({ ...prev, loading: false, error: data.message || 'Update failed' }));
         alert('❌ Update failed: ' + (data.message || 'Unknown error'));
