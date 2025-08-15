@@ -659,8 +659,8 @@ export default function MainApp() {
           SendClassification: sendClassificationKey,
           SenderProfile: senderProfileKey,
           DeliveryProfile: deliveryProfileKey,
-          BccEmail: editESDModal.bccEmail, // Use exact values from form
-          CCEmail: editESDModal.ccEmail    // Use exact values from form
+          BccEmail: '', // Hidden from UI - always clear
+          CCEmail: ''   // Hidden from UI - always clear
         })
       });
       const data = await res.json();
@@ -787,8 +787,8 @@ export default function MainApp() {
           SendClassification: sendClassificationKey,
           SenderProfile: senderProfileKey,
           DeliveryProfile: deliveryProfileKey,
-          BccEmail: massEditModal.bccEmail,
-          CCEmail: massEditModal.ccEmail
+          BccEmail: '', // Hidden from UI - always clear
+          CCEmail: ''   // Hidden from UI - always clear
         })
       });
       const data = await res.json();
@@ -1415,40 +1415,7 @@ export default function MainApp() {
                       ))}
                     </select>
                   </div>
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">BCC Email</label>
-                    {editESDModal.esd?.BccEmail && (
-                      <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-                        <strong>Current value in Marketing Cloud:</strong> {editESDModal.esd.BccEmail}
-                        <br />
-                        <span className="text-gray-600">Leave empty to clear, or enter new value(s) to replace</span>
-                      </div>
-                    )}
-                    <input
-                      type="text"
-                      className="w-full border rounded p-2"
-                      value={editESDModal.bccEmail}
-                      onChange={e => handleEditESDChange('bccEmail', e.target.value)}
-                      placeholder="Enter BCC email(s), semicolon separated"
-                    />
-                  </div>
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">CC Email</label>
-                    {editESDModal.esd?.CCEmail && (
-                      <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-                        <strong>Current value in Marketing Cloud:</strong> {editESDModal.esd.CCEmail}
-                        <br />
-                        <span className="text-gray-600">Leave empty to clear, or enter new value(s) to replace</span>
-                      </div>
-                    )}
-                    <input
-                      type="text"
-                      className="w-full border rounded p-2"
-                      value={editESDModal.ccEmail}
-                      onChange={e => handleEditESDChange('ccEmail', e.target.value)}
-                      placeholder="Enter CC email(s), semicolon separated"
-                    />
-                  </div>
+                  {/* BCC/CC Email fields hidden for cleaner UI */}
                   <div className="flex justify-end gap-2">
                     <button onClick={closeEditESDModal} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
                     <button onClick={submitEditESDModal} className="px-4 py-2 bg-blue-600 text-white rounded" disabled={editESDModal.loading}>
@@ -1504,26 +1471,7 @@ export default function MainApp() {
                       ))}
                     </select>
                   </div>
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">BCC Email</label>
-                    <input
-                      type="text"
-                      className="w-full border rounded p-2"
-                      value={massEditModal.bccEmail}
-                      onChange={e => handleMassEditChange('bccEmail', e.target.value)}
-                      placeholder="(No Change)"
-                    />
-                  </div>
-                  <div className="mb-4">
-                    <label className="block mb-1 font-semibold">CC Email</label>
-                    <input
-                      type="text"
-                      className="w-full border rounded p-2"
-                      value={massEditModal.ccEmail}
-                      onChange={e => handleMassEditChange('ccEmail', e.target.value)}
-                      placeholder="(No Change)"
-                    />
-                  </div>
+                  {/* BCC/CC Email fields hidden for cleaner UI */}
                   <div className="flex justify-end gap-2">
                     <button onClick={() => setMassEditModal({ open: false, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '', loading: false, error: null })} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
                     <button onClick={submitMassEditModal} className="px-4 py-2 bg-blue-600 text-white rounded" disabled={massEditModal.loading}>
