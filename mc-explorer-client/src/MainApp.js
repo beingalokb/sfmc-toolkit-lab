@@ -22,7 +22,26 @@ const Btn = ({children, variant = 'ghost', size = 'default', ...props}) => {
     default: "px-4 py-2 text-sm h-9",
     lg: "px-6 py-2.5 text-base h-10"
   };
-  return <button className={`${base} ${variants[variant]} ${sizes[size]}`} {...props}>{children}</button>;
+  return <button type="button" className={`${base} ${variants[variant]} ${sizes[size]}`} {...props}>{children}</button>;
+};
+
+const Tab = ({label, active, onClick, ...props}) => {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`h-8 px-3 rounded-md border transition-all duration-200 text-sm font-medium ${
+        active
+          ? 'bg-brand text-white border-brand shadow-[0_0_0_2px_rgba(59,130,246,.25)]'
+          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+      }`}
+      {...props}
+    >
+      {label}
+    </button>
+  );
 };
 
 const Tag = ({children, variant = 'default'}) => {
@@ -53,7 +72,7 @@ function KpiCard({title, value, subtitle, trend, icon}) {
           )}
           {subtitle && <div className="mt-2 text-xs text-gray-500 line-clamp-2">{subtitle}</div>}
         </div>
-        {icon && <div className="ml-4 p-3 bg-brand/10 rounded-lg text-brand">{icon}</div>}
+        {icon && <div className="ml-4 p-3 bg-brand/10 rounded-lg text-slate-400">{icon}</div>}
       </div>
     </div>
   );
@@ -1046,42 +1065,53 @@ export default function MainApp() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 text-xs rounded-md border border-green-200">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-xs">
+                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
                 Connected
-              </div>
+              </span>
               <Btn variant="ghost" onClick={handleLogout}>Logout</Btn>
             </div>
           </div>
 
           {/* Refined Navigation Tabs */}
-          <nav className="mt-4 flex items-center gap-1 overflow-x-auto">
-            {['Search Assets','Distributed Marketing','Preference Center','Email Auditing','Email Archiving','Settings'].map(label => (
-              <button
-                key={label}
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-transparent hover:bg-gray-50 
-                         data-[active=true]:bg-brand data-[active=true]:text-white data-[active=true]:shadow-sm 
-                         transition-all duration-200 whitespace-nowrap"
-                data-active={
-                  (label === 'Search Assets' && parentNav === 'search') ||
-                  (label === 'Distributed Marketing' && parentNav === 'distributedMarketing') ||
-                  (label === 'Preference Center' && parentNav === 'preferencecenter') ||
-                  (label === 'Email Auditing' && parentNav === 'emailArchiving') ||
-                  (label === 'Email Archiving' && parentNav === 'emailArchivingSetup') ||
-                  (label === 'Settings' && parentNav === 'settings')
-                }
-                onClick={() => {
-                  if (label === 'Search Assets') setParentNav('search');
-                  else if (label === 'Distributed Marketing') setParentNav('distributedMarketing');
-                  else if (label === 'Preference Center') setParentNav('preferencecenter');
-                  else if (label === 'Email Auditing') setParentNav('emailArchiving');
-                  else if (label === 'Email Archiving') setParentNav('emailArchivingSetup');
-                  else if (label === 'Settings') setParentNav('settings');
-                }}
-              >
-                {label}
-              </button>
-            ))}
+          <nav className="mt-4" role="tablist" aria-label="Main navigation">
+            <div className="flex items-center gap-1 overflow-x-auto">
+              {['Search Assets','Distributed Marketing','Preference Center','Email Auditing','Email Archiving','Settings'].map(label => (
+                <button
+                  key={label}
+                  type="button"
+                  role="tab"
+                  aria-selected={
+                    (label === 'Search Assets' && parentNav === 'search') ||
+                    (label === 'Distributed Marketing' && parentNav === 'distributedMarketing') ||
+                    (label === 'Preference Center' && parentNav === 'preferencecenter') ||
+                    (label === 'Email Auditing' && parentNav === 'emailArchiving') ||
+                    (label === 'Email Archiving' && parentNav === 'emailArchivingSetup') ||
+                    (label === 'Settings' && parentNav === 'settings')
+                  }
+                  className={`px-4 py-2 text-sm font-medium rounded-lg border border-transparent hover:bg-gray-50 transition-all duration-200 whitespace-nowrap ${
+                    ((label === 'Search Assets' && parentNav === 'search') ||
+                    (label === 'Distributed Marketing' && parentNav === 'distributedMarketing') ||
+                    (label === 'Preference Center' && parentNav === 'preferencecenter') ||
+                    (label === 'Email Auditing' && parentNav === 'emailArchiving') ||
+                    (label === 'Email Archiving' && parentNav === 'emailArchivingSetup') ||
+                    (label === 'Settings' && parentNav === 'settings'))
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'text-gray-600'
+                  }`}
+                  onClick={() => {
+                    if (label === 'Search Assets') setParentNav('search');
+                    else if (label === 'Distributed Marketing') setParentNav('distributedMarketing');
+                    else if (label === 'Preference Center') setParentNav('preferencecenter');
+                    else if (label === 'Email Auditing') setParentNav('emailArchiving');
+                    else if (label === 'Email Archiving') setParentNav('emailArchivingSetup');
+                    else if (label === 'Settings') setParentNav('settings');
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </nav>
         </header>
 
@@ -1137,57 +1167,58 @@ export default function MainApp() {
             {/* Modern Search & Filter Section */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="p-6 border-b border-gray-200">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1">
-                    <div className="relative">
-                      <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                      <input
-                        placeholder="Search across all assets..."
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg bg-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-brand focus:border-brand transition-colors"
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <Btn variant="primary">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 relative">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
+                    <input
+                      type="search"
+                      placeholder="Search across all assets..."
+                      aria-label="Search assets"
+                      className="h-9 w-full pl-10 pr-4 border border-slate-200 rounded-md bg-white text-sm placeholder-slate-400 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(37,99,235,.35)]"
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <button 
+                    type="button"
+                    className="h-9 px-3 rounded-md bg-brand text-white hover:bg-brand-600 transition-colors"
+                  >
                     Search
-                  </Btn>
+                  </button>
                 </div>
                 
-                {/* Asset Type Filters */}
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {[
-                    { key: 'de', label: 'Data Extensions' },
-                    { key: 'automation', label: 'Automations' },
-                    { key: 'datafilter', label: 'Data Filters' },
-                    { key: 'journey', label: 'Journeys' },
-                    { key: 'emailsenddefinition', label: 'Email Send Definitions' },
-                    { key: 'publication', label: 'Publications' }
-                  ].map(tab => (
-                    <button
-                      key={tab.key}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-all ${
-                        activeTab === tab.key 
-                          ? 'bg-brand text-white border-brand shadow-sm' 
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                      }`}
-                      onClick={() => setActiveTab(tab.key)}
+                {/* Asset Type Filters with proper accessibility */}
+                <div className="mt-4 flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Asset type filters">
+                    {[
+                      { key: 'de', label: 'Data Extensions' },
+                      { key: 'automation', label: 'Automations' },
+                      { key: 'datafilter', label: 'Data Filters' },
+                      { key: 'journey', label: 'Journeys' },
+                      { key: 'emailsenddefinition', label: 'Email Send Definitions' },
+                      { key: 'publication', label: 'Publications' }
+                    ].map(tab => (
+                      <Tab
+                        key={tab.key}
+                        label={tab.label}
+                        active={activeTab === tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Export action separated from filters */}
+                  <div className="ml-auto">
+                    <button 
+                      type="button"
+                      onClick={downloadCSV}
+                      className="h-9 px-3 rounded-md border border-slate-200 hover:bg-slate-50 text-sm transition-colors"
                     >
-                      {tab.label}
+                      Export CSV
                     </button>
-                  ))}
-                  <div className="flex-1"></div>
-                  <Btn variant="secondary" onClick={downloadCSV}>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Export CSV
-                  </Btn>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1240,6 +1271,7 @@ export default function MainApp() {
                               type="checkbox" 
                               checked={allSelected} 
                               onChange={toggleSelectAllESD}
+                              aria-label="Select all email send definitions"
                               className="rounded border-gray-300 text-brand focus:ring-brand"
                             />
                           </th>
@@ -1258,6 +1290,7 @@ export default function MainApp() {
                                 type="checkbox" 
                                 checked={selectedESDKeys.includes(esd.CustomerKey)} 
                                 onChange={() => toggleSelectESD(esd.CustomerKey)}
+                                aria-label={`Select ${esd.Name}`}
                                 className="rounded border-gray-300 text-brand focus:ring-brand"
                               />
                             </td>
@@ -1270,12 +1303,12 @@ export default function MainApp() {
                             <td className="px-6 py-4 text-gray-900">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-2">
-                                <Btn variant="ghost" size="sm" onClick={() => openEditESDModal(esd)} title="Edit">
+                                <Btn variant="ghost" size="sm" onClick={() => openEditESDModal(esd)} title="Edit email send definition" aria-label={`Edit ${esd.Name}`}>
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                   </svg>
                                 </Btn>
-                                <Btn variant="ghost" size="sm" title="Open in Marketing Cloud">
+                                <Btn variant="ghost" size="sm" title="Open in Marketing Cloud" aria-label={`Open ${esd.Name} in Marketing Cloud`}>
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                   </svg>
