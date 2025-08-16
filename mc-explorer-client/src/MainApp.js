@@ -8,6 +8,31 @@ import Settings from './Settings';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
+// Modern Design System Components
+const Btn = ({children, variant = 'ghost', ...props}) => {
+  const base = "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm border transition";
+  const variants = {
+    primary: "bg-brand text-white border-brand hover:bg-brand-600",
+    ghost: "bg-transparent text-text border-border hover:bg-white/5",
+    danger: "bg-err text-white border-err hover:bg-red-600"
+  };
+  return <button className={`${base} ${variants[variant]}`} {...props}>{children}</button>;
+};
+
+const Tag = ({children}) => (
+  <span className="px-2 py-0.5 rounded-full text-xs border border-border text-faint">{children}</span>
+);
+
+function KpiCard({title, value, subtitle}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 min-h-[112px]">
+      <div className="text-xs uppercase tracking-wide text-faint">{title}</div>
+      <div className="mt-1 text-2xl font-semibold">{value}</div>
+      <div className="mt-2 text-xs text-muted">{subtitle}</div>
+    </div>
+  );
+}
+
 export default function MainApp() {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -978,125 +1003,99 @@ export default function MainApp() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* App Title and Header */}
-      <div id="mc-explorer-root" className="bg-white rounded-xl shadow-lg p-6 mt-6 mb-8 mx-auto" style={{maxWidth: '1100px'}}>
-        <header className="bg-indigo-800 text-white p-4 shadow flex items-center gap-4 rounded-t-lg">
-          <img src={require('./logo.svg').default} alt="MC Explorer Logo" className="h-10 w-10" />
-          <h1 className="text-2xl font-bold tracking-wide" style={{ color: '#61DAFB', letterSpacing: '0.04em' }}>MC Explorer</h1>
+    <div className="App">
+      <div id="mc-explorer-root">
+        {/* Modern Header */}
+        <header className="rounded-2xl bg-panel border border-border px-4 py-3 mb-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-base font-semibold tracking-tight">MC Explorer</h1>
+            <Btn variant="ghost" onClick={handleLogout}>Logout</Btn>
+          </div>
+
+          {/* Modern Navigation Tabs */}
+          <nav className="mt-3 flex items-center gap-2 overflow-x-auto">
+            {['Search Assets','Distributed Marketing','Preference Center','Email Auditing','Email Archiving','Settings'].map(label => (
+              <button
+                key={label}
+                className="px-3 py-1.5 text-sm rounded-md border border-border bg-card hover:bg-white/5 data-[active=true]:bg-brand data-[active=true]:text-white transition"
+                data-active={
+                  (label === 'Search Assets' && parentNav === 'search') ||
+                  (label === 'Distributed Marketing' && parentNav === 'distributedMarketing') ||
+                  (label === 'Preference Center' && parentNav === 'preferencecenter') ||
+                  (label === 'Email Auditing' && parentNav === 'emailArchiving') ||
+                  (label === 'Email Archiving' && parentNav === 'emailArchivingSetup') ||
+                  (label === 'Settings' && parentNav === 'settings')
+                }
+                onClick={() => {
+                  if (label === 'Search Assets') setParentNav('search');
+                  else if (label === 'Distributed Marketing') setParentNav('distributedMarketing');
+                  else if (label === 'Preference Center') setParentNav('preferencecenter');
+                  else if (label === 'Email Auditing') setParentNav('emailArchiving');
+                  else if (label === 'Email Archiving') setParentNav('emailArchivingSetup');
+                  else if (label === 'Settings') setParentNav('settings');
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
         </header>
-        {/* Parent Navigation */}
-        <div className="flex gap-4 p-4 bg-white shadow mb-4 rounded-b-lg">
-          <button
-            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'search' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-            onClick={() => setParentNav('search')}
-          >
-            Search Assets
-          </button>
-          {/* Guided Preference Center tab hidden as requested */}
-          {/* <button
-            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'preference' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-            onClick={() => setParentNav('preference')}
-          >
-            Guided Preference Center
-          </button> */}
-          <button
-            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'distributedMarketing' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-            onClick={() => setParentNav('distributedMarketing')}
-          >
-            Distributed Marketing
-          </button>
-          <button
-            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'preferencecenter' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-            onClick={() => setParentNav('preferencecenter')}
-          >
-            Preference Center
-          </button>
-          <button
-            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'emailArchiving' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-            onClick={() => setParentNav('emailArchiving')}
-          >
-            Email Auditing
-          </button>
-          <button
-            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'emailArchivingSetup' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-            onClick={() => setParentNav('emailArchivingSetup')}
-          >
-            Email Archiving
-          </button>
-          <button
-            className={`px-4 py-2 rounded text-sm font-semibold ${parentNav === 'settings' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
-            onClick={() => setParentNav('settings')}
-          >
-            Settings
-          </button>
-        </div>
+
+        {/* Main Content */}
+        <div className="space-y-6">
         {/* Render content based on parentNav */}
         {parentNav === 'search' ? (
           <>
-            <div className="flex justify-between items-center mb-4">
-              <h1 className="text-3xl font-bold text-indigo-700">MC Explorer</h1>
-              <button onClick={handleLogout} className="text-sm bg-red-500 px-3 py-1 rounded text-white">
-                Logout
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white rounded shadow p-4">
-                <div className="text-lg font-bold text-indigo-700">Data Extensions</div>
-                <div className="text-2xl font-bold">{dataExtensions.length}</div>
-                <div className="text-xs text-gray-500 mt-2">Last 7d: {deGroups.last7} | 30d: {deGroups.last30} | 6mo: {deGroups.last180} | 1yr: {deGroups.last365}</div>
-              </div>
-              <div className="bg-white rounded shadow p-4">
-                <div className="text-lg font-bold text-indigo-700">Automations</div>
-                <div className="text-2xl font-bold">{automations.length}</div>
-                <div className="text-xs text-gray-500 mt-2">Last 7d: {autoGroups.last7} | 30d: {autoGroups.last30} | 6mo: {autoGroups.last180} | 1yr: {autoGroups.last365}</div>
-              </div>
-              <div className="bg-white rounded shadow p-4">
-                <div className="text-lg font-bold text-indigo-700">Data Filters</div>
-                <div className="text-2xl font-bold">{dataFilters.length}</div>
-                <div className="text-xs text-gray-500 mt-2">Last 7d: {dfGroups.last7} | 30d: {dfGroups.last30} | 6mo: {dfGroups.last180} | 1yr: {dfGroups.last365}</div>
-              </div>
-              <div className="bg-white rounded shadow p-4">
-                <div className="text-lg font-bold text-indigo-700">Journeys</div>
-                <div className="text-2xl font-bold">{journeys.length}</div>
-                <div className="text-xs text-gray-500 mt-2">Last 7d: {journeyGroups.last7} | 30d: {journeyGroups.last30} | 6mo: {journeyGroups.last180} | 1yr: {journeyGroups.last365}</div>
-              </div>
-              <div className="bg-white rounded shadow p-4">
-                <div className="text-lg font-bold text-indigo-700">Publications</div>
-                <div className="text-2xl font-bold">{publications.length}</div>
-                <div className="text-xs text-gray-500 mt-2">Last 7d: {pubGroups.last7} | 30d: {pubGroups.last30} | 6mo: {pubGroups.last180} | 1yr: {pubGroups.last365}</div>
-              </div>
-            </div>
-
-            {/* Responsive search bar row */}
-            <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-2">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="border px-3 py-2 rounded w-full sm:w-64"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                style={{ maxWidth: 320 }}
+            {/* Modern KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+              <KpiCard 
+                title="Data Extensions" 
+                value={dataExtensions.length} 
+                subtitle={`Last 7d: ${deGroups.last7} · 30d: ${deGroups.last30} · 6mo: ${deGroups.last180} · 1yr: ${deGroups.last365}`} 
               />
+              <KpiCard 
+                title="Automations" 
+                value={automations.length}  
+                subtitle={`Last 7d: ${autoGroups.last7} · 30d: ${autoGroups.last30} · 6mo: ${autoGroups.last180} · 1yr: ${autoGroups.last365}`} 
+              />
+              <KpiCard 
+                title="Data Filters" 
+                value={dataFilters.length} 
+                subtitle={`Last 7d: ${dfGroups.last7} · 30d: ${dfGroups.last30} · 6mo: ${dfGroups.last180} · 1yr: ${dfGroups.last365}`} 
+              />
+              <KpiCard 
+                title="Journeys" 
+                value={journeys.length} 
+                subtitle={`Last 7d: ${journeyGroups.last7} · 30d: ${journeyGroups.last30} · 6mo: ${journeyGroups.last180} · 1yr: ${journeyGroups.last365}`} 
+              />
+            </div>
+
+            {/* Modern Search Header */}
+            <div className="sticky top-0 z-20 -mx-4 -mt-2 px-4 py-2 bg-panel/80 backdrop-blur border-b border-border mb-4">
+              <div className="flex items-center gap-2">
+                <input
+                  placeholder="Search assets…"
+                  className="flex-1 rounded-md bg-panel border border-border px-3 py-2 text-sm placeholder-faint focus-visible:shadow-ring"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+                <Btn variant="primary">Search</Btn>
+              </div>
             </div>
             {/* Tab buttons and CSV download */}
             <div className="flex flex-wrap gap-2 mb-4 items-center">
               {['de', 'automation', 'datafilter', 'journey', 'emailsenddefinition', 'publication'].map(tab => (
-                <button
+                <Btn
                   key={tab}
+                  variant={activeTab === tab ? 'primary' : 'ghost'}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 rounded text-sm ${activeTab === tab ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border'}`}
                 >
                   {tab === 'emailsenddefinition' ? 'EmailSendDefinition' : tab.toUpperCase()}
-                </button>
+                </Btn>
               ))}
-              <button
-                onClick={downloadCSV}
-                className="bg-green-600 text-white px-3 py-1 rounded text-sm ml-2"
-              >
+              <Btn variant="primary" onClick={downloadCSV}>
                 Download CSV
-              </button>
+              </Btn>
             </div>
 
             <div className="overflow-x-auto bg-white shadow rounded">
@@ -1789,6 +1788,8 @@ export default function MainApp() {
         {parentNav === 'settings' && (
           <Settings />
         )}
+
+        </div>
       </div>
     </div>
   );
