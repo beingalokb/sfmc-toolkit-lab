@@ -1098,38 +1098,42 @@ export default function MainApp() {
               </Btn>
             </div>
 
-            <div className="overflow-x-auto bg-white shadow rounded">
+            {/* Modern Table Container */}
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
               {activeTab === 'emailsenddefinition' ? (
-                <div className="bg-white shadow rounded p-4 mt-4">
-                  <h2 className="text-xl font-bold mb-4 text-indigo-700">EmailSendDefinition Details</h2>
-                  <div className="overflow-x-auto">
+                <>
+                  <div className="p-3 border-b border-border">
+                    <h2 className="text-sm font-semibold">EmailSendDefinition Details</h2>
+                  </div>
+                  <div className="max-h-[72vh] overflow-auto">
                     <table className="min-w-full text-sm">
-                      <thead>
+                      <thead className="sticky top-0 bg-panel text-faint border-b border-border">
                         <tr>
-                          <th className="p-2">
+                          <th className="text-left font-medium px-3 py-2">
                             <input type="checkbox" checked={allSelected} onChange={toggleSelectAllESD} />
                           </th>
-                          <th className="text-left p-2">Name</th>
-                          <th className="text-left p-2">SendClassification</th>
-                          <th className="text-left p-2">SenderProfile</th>
-                          <th className="text-left p-2">DeliveryProfile</th>
-                          <th className="text-left p-2">Actions</th>
+                          <th className="text-left font-medium px-3 py-2">Name</th>
+                          <th className="text-left font-medium px-3 py-2">Send Classification</th>
+                          <th className="text-left font-medium px-3 py-2">Sender Profile</th>
+                          <th className="text-left font-medium px-3 py-2">Delivery Profile</th>
+                          <th className="text-left font-medium px-3 py-2">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(searchTerm ? getFilteredData().filter(item => item._type === 'EmailSendDefinition') : resolvedEmailSendDefs).map((esd, idx) => (
-                          <tr key={esd.CustomerKey} className="border-t">
-                            <td className="p-2">
+                        {(searchTerm ? getFilteredData().filter(item => item._type === 'EmailSendDefinition') : resolvedEmailSendDefs).map((esd) => (
+                          <tr key={esd.CustomerKey} className="hover:bg-white/5">
+                            <td className="px-3 py-2 border-t border-border/60">
                               <input type="checkbox" checked={selectedESDKeys.includes(esd.CustomerKey)} onChange={() => toggleSelectESD(esd.CustomerKey)} />
                             </td>
-                            <td className="p-2 font-medium">{esd.Name}</td>
-                            <td className="p-2">{getProfileName(sendClassifications, esd.SendClassification?.CustomerKey)}</td>
-                            <td className="p-2">{getProfileName(senderProfiles, esd.SenderProfile?.CustomerKey)}</td>
-                            <td className="p-2">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
-                            <td className="p-2">
-                              <button className="text-blue-600 hover:underline mr-2" onClick={() => openEditESDModal(esd)}>
-                                <span role="img" aria-label="Edit">✏️</span>
-                              </button>
+                            <td className="px-3 py-2 border-t border-border/60 font-medium">{esd.Name}</td>
+                            <td className="px-3 py-2 border-t border-border/60">{getProfileName(sendClassifications, esd.SendClassification?.CustomerKey)}</td>
+                            <td className="px-3 py-2 border-t border-border/60">{getProfileName(senderProfiles, esd.SenderProfile?.CustomerKey)}</td>
+                            <td className="px-3 py-2 border-t border-border/60">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
+                            <td className="px-3 py-2 border-t border-border/60">
+                              <div className="flex items-center gap-2">
+                                <button title="Edit" className="px-2 py-1 rounded-md border border-border hover:bg-white/5" onClick={() => openEditESDModal(esd)}>✎</button>
+                                <button title="Open in MC" className="px-2 py-1 rounded-md border border-border hover:bg-white/5">↗</button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1137,119 +1141,124 @@ export default function MainApp() {
                     </table>
                   </div>
                   {selectedESDKeys.length > 0 && (
-                    <button
-                      className="mt-2 px-4 py-2 bg-blue-700 text-white rounded font-semibold"
-                      onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '', loading: false, error: null })}
-                    >
-                      Bulk Edit Selected ({selectedESDKeys.length})
-                    </button>
+                    <div className="flex items-center justify-between px-3 py-2 bg-panel border-t border-border text-xs text-faint">
+                      <span>{selectedESDKeys.length} selected</span>
+                      <Btn variant="primary" onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '', loading: false, error: null })}>
+                        Bulk Edit Selected
+                      </Btn>
+                    </div>
                   )}
-                  {/* Debug block and other details remain hidden */}
-                </div>
+                </>
               ) : activeTab === 'publication' ? (
-                <div className="bg-white shadow rounded p-4 mt-4">
-                  <h2 className="text-xl font-bold mb-4 text-indigo-700">Publication Details</h2>
-                  <div className="overflow-x-auto">
+                <>
+                  <div className="p-3 border-b border-border">
+                    <h2 className="text-sm font-semibold">Publication Details</h2>
+                  </div>
+                  <div className="max-h-[72vh] overflow-auto">
                     <table className="min-w-full text-sm">
-                      <thead>
+                      <thead className="sticky top-0 bg-panel text-faint border-b border-border">
                         <tr>
-                          <th className="text-left p-2">ID</th>
-                          <th className="text-left p-2">Name</th>
-                          <th className="text-left p-2">Category</th>
-                          <th className="text-left p-2">CustomerKey</th>
-                          <th className="text-left p-2">BusinessUnit</th>
+                          <th className="text-left font-medium px-3 py-2">ID</th>
+                          <th className="text-left font-medium px-3 py-2">Name</th>
+                          <th className="text-left font-medium px-3 py-2">Category</th>
+                          <th className="text-left font-medium px-3 py-2">Customer Key</th>
+                          <th className="text-left font-medium px-3 py-2">Business Unit</th>
                         </tr>
                       </thead>
                       <tbody>
                         {(searchTerm ? getFilteredData().filter(item => item._type === 'Publication') : publications).map((pub, idx) => (
-                          <tr key={pub.id || idx} className="border-t">
-                            <td className="p-2">{pub.id}</td>
-                            <td className="p-2 font-medium">{pub.name}</td>
-                            <td className="p-2">{pub.category}</td>
-                            <td className="p-2">{pub.customerKey || ''}</td>
-                            <td className="p-2">{pub.businessUnit || ''}</td>
+                          <tr key={pub.id || idx} className="hover:bg-white/5">
+                            <td className="px-3 py-2 border-t border-border/60">{pub.id}</td>
+                            <td className="px-3 py-2 border-t border-border/60 font-medium">{pub.name}</td>
+                            <td className="px-3 py-2 border-t border-border/60">{pub.category}</td>
+                            <td className="px-3 py-2 border-t border-border/60">{pub.customerKey || ''}</td>
+                            <td className="px-3 py-2 border-t border-border/60">{pub.businessUnit || ''}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </>
               ) : (
-                // ...existing code for other tabs and search...
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th className="text-left p-2">Type</th>
-                      <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
-                      {/* Remove Created column for Automations */}
-                      <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
-                      {/* Hide 'View in folder' column for Automation and Journey */}
-                      {!(activeTab === 'automation' || activeTab === 'journey') && (
-                        <th className="text-left p-2">View in folder</th>
-                      )}
-                      {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
-                        <th className="text-left p-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
-                      ) : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedData().map((item, idx) => (
-                      <tr key={idx} className={`border-t ${item._type === 'Data Extension' ? 'cursor-pointer hover:bg-indigo-50' : item._type === 'Automation' ? 'cursor-pointer hover:bg-green-50' : ''}`}
-                        onClick={() => {
-                          if (item._type === 'Data Extension') fetchDeDetails(item.name);
-                          if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
-                        }}
-                      >
-                        <td className="p-2">{item._type}</td>
-                        <td className="p-2 font-medium">{item.name}</td>
-                        {/* Remove Created column for Automations */}
-                        <td className="p-2">{item.path || 'N/A'}</td>
-                        {/* Hide 'View in folder' cell for Automation and Journey */}
-                        {!(item._type === 'Automation' || item._type === 'Journey') && (
-                          <td className="p-2">
-                            {/* Existing View in folder links for DE and Data Filter */}
-                            {item._type === 'Data Extension' && item.categoryId && item.id && (
-                              <a
-                                href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 underline hover:text-blue-800"
-                                onClick={e => e.stopPropagation()}
-                              >
-                                View
-                              </a>
+                <>
+                  <div className="p-3 border-b border-border">
+                    <h2 className="text-sm font-semibold">{activeTab.toUpperCase()} Details</h2>
+                  </div>
+                  <div className="max-h-[72vh] overflow-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="sticky top-0 bg-panel text-faint border-b border-border">
+                        <tr>
+                          <th className="text-left font-medium px-3 py-2">Type</th>
+                          <th className="text-left font-medium px-3 py-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
+                          <th className="text-left font-medium px-3 py-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
+                          {!(activeTab === 'automation' || activeTab === 'journey') && (
+                            <th className="text-left font-medium px-3 py-2">View in folder</th>
+                          )}
+                          {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
+                            <th className="text-left font-medium px-3 py-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
+                          ) : null}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedData().map((item, idx) => (
+                          <tr 
+                            key={idx} 
+                            className={`hover:bg-white/5 ${item._type === 'Data Extension' || item._type === 'Automation' ? 'cursor-pointer' : ''}`}
+                            onClick={() => {
+                              if (item._type === 'Data Extension') fetchDeDetails(item.name);
+                              if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
+                            }}
+                          >
+                            <td className="px-3 py-2 border-t border-border/60">
+                              <Tag>{item._type}</Tag>
+                            </td>
+                            <td className="px-3 py-2 border-t border-border/60 font-medium">{item.name}</td>
+                            <td className="px-3 py-2 border-t border-border/60">{item.path || 'N/A'}</td>
+                            {!(item._type === 'Automation' || item._type === 'Journey') && (
+                              <td className="px-3 py-2 border-t border-border/60">
+                                {item._type === 'Data Extension' && item.categoryId && item.id && (
+                                  <button 
+                                    className="px-2 py-1 rounded-md border border-border hover:bg-white/5" 
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      window.open(`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`, '_blank');
+                                    }}
+                                  >
+                                    View
+                                  </button>
+                                )}
+                                {item._type === 'Data Filter' && item.id && (
+                                  <button 
+                                    className="px-2 py-1 rounded-md border border-border hover:bg-white/5" 
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      window.open(`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`, '_blank');
+                                    }}
+                                  >
+                                    View
+                                  </button>
+                                )}
+                              </td>
                             )}
-                            {item._type === 'Data Filter' && item.id && (
-                              <a
-                                href={`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 underline hover:text-blue-800 ml-2"
-                                onClick={e => e.stopPropagation()}
-                              >
-                                View
-                              </a>
+                            {(item._type === 'Automation' || item._type === 'Journey') && (
+                              <td className="px-3 py-2 border-t border-border/60">
+                                <Tag>{item.status || 'N/A'}</Tag>
+                              </td>
                             )}
-                          </td>
-                        )}
-                        {((!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && (item._type === 'Automation' || item._type === 'Journey'))) && (
-                          <td className="p-2">{item.status || 'N/A'}</td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-between px-3 py-2 bg-panel border-t border-border text-xs text-faint">
+                    <span>Page {currentPage} of {totalPages}</span>
+                    <div className="flex gap-2">
+                      <button className="px-2 py-1 rounded border border-border hover:bg-white/5" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>Prev</button>
+                      <button className="px-2 py-1 rounded border border-border hover:bg-white/5" disabled={currentPage === totalPages || totalPages <= 1} onClick={() => setCurrentPage(p => p + 1)}>Next</button>
+                    </div>
+                  </div>
+                </>
               )}
-            </div>
-
-            <div className="flex justify-between items-center mt-4 text-sm">
-              <div>
-                Page {currentPage} of {totalPages}
-              </div>
-              <div className="flex gap-2">
-                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-2 py-1 border rounded">Prev</button>
-                <button disabled={currentPage === totalPages || totalPages <= 1} onClick={() => setCurrentPage(p => p + 1)} className="px-2 py-1 border rounded">Next</button>
-              </div>
             </div>
 
             {/* Modal for DE details */}
