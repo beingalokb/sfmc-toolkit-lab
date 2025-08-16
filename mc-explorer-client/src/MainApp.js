@@ -5,6 +5,7 @@ import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
 import PreferenceCenterConfigForm from './PreferenceCenterConfigForm';
 import EmailArchiving from './EmailArchiving';
 import Settings from './Settings';
+import ExportMenu from './components/ExportMenu';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -35,7 +36,7 @@ const Tab = ({label, active, onClick, ...props}) => {
       className={`h-8 px-3 rounded-md border transition-all duration-200 text-sm font-medium ${
         active
           ? 'bg-brand text-white border-brand shadow-[0_0_0_2px_rgba(59,130,246,.25)]'
-          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+          : 'border-slate-200 text-slate-700 bg-white hover:bg-slate-50 hover:border-slate-300'
       }`}
       {...props}
     >
@@ -495,6 +496,123 @@ export default function MainApp() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  // Enhanced export functions for different contexts
+  const exportSearchResults = () => {
+    const filteredData = getFilteredData();
+    if (filteredData.length === 0) return;
+    
+    exportDataAsCSV(filteredData, `${activeTab}_search_results`);
+    console.log(`Exported ${filteredData.length} search results for ${getActiveTabLabel()}`);
+  };
+
+  const exportAllInCategory = () => {
+    let allData = [];
+    if (activeTab === 'de') allData = dataExtensions.map(item => ({ ...item, _type: 'Data Extension' }));
+    else if (activeTab === 'automation') allData = automations.map(item => ({ ...item, _type: 'Automation' }));
+    else if (activeTab === 'datafilter') allData = dataFilters.map(item => ({ ...item, _type: 'Data Filter' }));
+    else if (activeTab === 'journey') allData = journeys.map(item => ({ ...item, _type: 'Journey' }));
+    else if (activeTab === 'emailsenddefinition') allData = resolvedEmailSendDefs.map(item => ({ ...item, _type: 'EmailSendDefinition' }));
+    else if (activeTab === 'publication') allData = publications.map(item => ({ ...item, _type: 'Publication' }));
+    
+    exportDataAsCSV(allData, `${activeTab}_all_data`);
+    console.log(`Exported all ${allData.length} items in ${getActiveTabLabel()}`);
+  };
+
+  const exportDataAsCSV = (data, filename) => {
+    if (data.length === 0) return;
+    
+    let headers = [];
+    let rows = [];
+    
+    // Get the first item type to determine columns
+    const firstItem = data[0];
+    const itemType = firstItem._type || 'Unknown';
+    
+    if (itemType === 'Data Extension') {
+      headers = ['Type', 'Name', 'Path', 'Created By', 'Modified By', 'Row Count', 'Is Sendable', 'Is Testable'];
+      rows = data.map(item => [
+        '"' + (item._type || 'Data Extension') + '"',
+        '"' + (item.name || item.Name || '') + '"',
+        '"' + (item.path || item.Path || '') + '"',
+        '"' + (item.createdByName || item.CreatedByName || '') + '"',
+        '"' + (item.modifiedByName || item.ModifiedByName || '') + '"',
+        '"' + (item.rowCount != null ? item.rowCount : (item.RowCount != null ? item.RowCount : '')) + '"',
+        '"' + (item.isSendable != null ? (item.isSendable ? 'Yes' : 'No') : (item.IsSendable ? 'Yes' : 'No')) + '"',
+        '"' + (item.isTestable != null ? (item.isTestable ? 'Yes' : 'No') : (item.IsTestable ? 'Yes' : 'No')) + '"'
+      ]);
+    } else if (itemType === 'Automation') {
+      headers = ['Type', 'Name', 'Path', 'Status', 'Start Date', 'End Date', 'Last Run Time'];
+      rows = data.map(item => [
+        '"' + (item._type || 'Automation') + '"',
+        '"' + (item.name || item.Name || '') + '"',
+        '"' + (item.path || item.Path || '') + '"',
+        '"' + (item.status || item.Status || '') + '"',
+        '"' + (item.startDate || item.StartDate || '') + '"',
+        '"' + (item.endDate || item.EndDate || '') + '"',
+        '"' + (item.lastRunTime || item.LastRunTime || '') + '"'
+      ]);
+    } else if (itemType === 'Data Filter') {
+      headers = ['Type', 'Name', 'Path'];
+      rows = data.map(item => [
+        '"' + (item._type || 'Data Filter') + '"',
+        '"' + (item.name || item.Name || '') + '"',
+        '"' + (item.path || item.Path || '') + '"'
+      ]);
+    } else if (itemType === 'Journey') {
+      headers = ['Type', 'Name', 'Path', 'Status'];
+      rows = data.map(item => [
+        '"' + (item._type || 'Journey') + '"',
+        '"' + (item.name || item.Name || '') + '"',
+        '"' + (item.path || item.Path || '') + '"',
+        '"' + (item.status || item.Status || '') + '"'
+      ]);
+    } else if (itemType === 'EmailSendDefinition') {
+      headers = ['Name', 'Send Classification', 'Sender Profile', 'Delivery Profile'];
+      rows = data.map(esd => [
+        '"' + (esd.Name || '') + '"',
+        '"' + (esd.SendClassification?.CustomerKey || '') + '"',
+        '"' + (esd.SenderProfile?.CustomerKey || '') + '"',
+        '"' + (esd.DeliveryProfile?.CustomerKey || '') + '"'
+      ]);
+    } else if (itemType === 'Publication') {
+      headers = ['ID', 'Name', 'Category', 'Customer Key', 'Business Unit'];
+      rows = data.map(pub => [
+        '"' + (pub.id || '') + '"',
+        '"' + (pub.name || '') + '"',
+        '"' + (pub.category || '') + '"',
+        '"' + (pub.customerKey || '') + '"',
+        '"' + (pub.businessUnit || '') + '"'
+      ]);
+    } else {
+      // Fallback: use all available keys
+      headers = Object.keys(firstItem);
+      rows = data.map(item => headers.map(h => '"' + (item[h] || '').toString().replace(/"/g, '""') + '"'));
+    }
+    
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const getActiveTabLabel = () => {
+    const tabLabels = {
+      'de': 'Data Extensions',
+      'automation': 'Automations', 
+      'datafilter': 'Data Filters',
+      'journey': 'Journeys',
+      'emailsenddefinition': 'Email Send Definitions',
+      'publication': 'Publications'
+    };
+    return tabLabels[activeTab] || 'Assets';
   };
 
   // Helper to group by created date
@@ -1167,6 +1285,7 @@ export default function MainApp() {
             {/* Modern Search & Filter Section */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="p-6 border-b border-gray-200">
+                {/* Search Bar */}
                 <div className="flex items-center gap-2">
                   <div className="flex-1 relative">
                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1176,20 +1295,28 @@ export default function MainApp() {
                       type="search"
                       placeholder="Search across all assets..."
                       aria-label="Search assets"
-                      className="h-9 w-full pl-10 pr-4 border border-slate-200 rounded-md bg-white text-sm placeholder-slate-400 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(37,99,235,.35)]"
+                      className="h-9 w-full pl-10 pr-4 border border-slate-200 rounded-md bg-white text-sm placeholder-slate-400 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(37,99,235,.35)] transition-colors"
                       value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
                     />
                   </div>
                   <button 
                     type="button"
-                    className="h-9 px-3 rounded-md bg-brand text-white hover:bg-brand-600 transition-colors"
+                    className="h-9 px-3 rounded-md border border-slate-200 hover:bg-slate-50 transition-colors text-sm"
                   >
                     Search
                   </button>
+                  
+                  {/* Enhanced Export Menu */}
+                  <ExportMenu
+                    searchCount={getFilteredData().length}
+                    category={getActiveTabLabel()}
+                    onExportSearch={exportSearchResults}
+                    onExportAll={exportAllInCategory}
+                  />
                 </div>
                 
-                {/* Asset Type Filters with proper accessibility */}
+                {/* Asset Type Filters with clear separation */}
                 <div className="mt-4 flex items-center gap-2">
                   <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Asset type filters">
                     {[
@@ -1208,16 +1335,18 @@ export default function MainApp() {
                       />
                     ))}
                   </div>
-                  
-                  {/* Export action separated from filters */}
-                  <div className="ml-auto">
-                    <button 
-                      type="button"
-                      onClick={downloadCSV}
-                      className="h-9 px-3 rounded-md border border-slate-200 hover:bg-slate-50 text-sm transition-colors"
-                    >
-                      Export CSV
-                    </button>
+                </div>
+                
+                {/* Helper text for export clarity */}
+                <div className="mt-3 text-xs text-slate-500 bg-slate-50 rounded-md p-3">
+                  <div className="flex items-start gap-4">
+                    <div>
+                      <span className="font-medium text-slate-700">Export search results</span> downloads only what's shown in the table below ({getFilteredData().length} items).
+                    </div>
+                    <div className="text-slate-300">•</div>
+                    <div>
+                      <span className="font-medium text-slate-700">Export all in category</span> downloads every item in {getActiveTabLabel()}.
+                    </div>
                   </div>
                 </div>
               </div>
