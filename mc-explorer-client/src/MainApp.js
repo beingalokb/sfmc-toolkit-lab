@@ -8,27 +8,53 @@ import Settings from './Settings';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
-// Modern Design System Components
-const Btn = ({children, variant = 'ghost', ...props}) => {
-  const base = "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm border transition";
+// Enhanced Design System Components
+const Btn = ({children, variant = 'ghost', size = 'default', ...props}) => {
+  const base = "inline-flex items-center justify-center gap-2 rounded-lg border font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
   const variants = {
-    primary: "bg-brand text-white border-brand hover:bg-brand-600",
-    ghost: "bg-transparent text-text border-border hover:bg-white/5",
-    danger: "bg-err text-white border-err hover:bg-red-600"
+    primary: "bg-brand text-white border-brand hover:bg-brand-600 shadow-sm",
+    secondary: "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm",
+    ghost: "bg-transparent text-gray-600 border-transparent hover:bg-gray-100 hover:text-gray-900",
+    danger: "bg-red-600 text-white border-red-600 hover:bg-red-700 shadow-sm"
   };
-  return <button className={`${base} ${variants[variant]}`} {...props}>{children}</button>;
+  const sizes = {
+    sm: "px-3 py-1.5 text-sm h-8",
+    default: "px-4 py-2 text-sm h-9",
+    lg: "px-6 py-2.5 text-base h-10"
+  };
+  return <button className={`${base} ${variants[variant]} ${sizes[size]}`} {...props}>{children}</button>;
 };
 
-const Tag = ({children}) => (
-  <span className="px-2 py-0.5 rounded-full text-xs border border-border text-faint">{children}</span>
-);
-
-function KpiCard({title, value, subtitle}) {
+const Tag = ({children, variant = 'default'}) => {
+  const variants = {
+    default: "bg-gray-100 text-gray-700 border-gray-200",
+    success: "bg-green-100 text-green-700 border-green-200",
+    warning: "bg-yellow-100 text-yellow-700 border-yellow-200",
+    error: "bg-red-100 text-red-700 border-red-200"
+  };
   return (
-    <div className="rounded-xl border border-border bg-card p-4 min-h-[112px]">
-      <div className="text-xs uppercase tracking-wide text-faint">{title}</div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
-      <div className="mt-2 text-xs text-muted">{subtitle}</div>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${variants[variant]}`}>
+      {children}
+    </span>
+  );
+};
+
+function KpiCard({title, value, subtitle, trend, icon}) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <div className="text-sm font-medium text-gray-600 uppercase tracking-wide">{title}</div>
+          <div className="mt-2 text-3xl font-bold text-gray-900">{value}</div>
+          {trend && (
+            <div className={`mt-1 text-sm ${trend.positive ? 'text-green-600' : 'text-red-600'}`}>
+              {trend.positive ? '↗' : '↘'} {trend.value}
+            </div>
+          )}
+          {subtitle && <div className="mt-2 text-xs text-gray-500 line-clamp-2">{subtitle}</div>}
+        </div>
+        {icon && <div className="ml-4 p-3 bg-brand/10 rounded-lg text-brand">{icon}</div>}
+      </div>
     </div>
   );
 }
@@ -1003,21 +1029,39 @@ export default function MainApp() {
   );
 
   return (
-    <div className="App">
-      <div id="mc-explorer-root">
-        {/* Modern Header */}
-        <header className="rounded-2xl bg-panel border border-border px-4 py-3 mb-4">
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto max-w-7xl">
+        {/* Product-Grade Header with Logo */}
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-base font-semibold tracking-tight">MC Explorer</h1>
-            <Btn variant="ghost" onClick={handleLogout}>Logout</Btn>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold tracking-tight text-gray-900">MC Explorer</h1>
+                <p className="text-xs text-gray-500">Marketing Cloud Management Platform</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 text-xs rounded-md border border-green-200">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                Connected
+              </div>
+              <Btn variant="ghost" onClick={handleLogout}>Logout</Btn>
+            </div>
           </div>
 
-          {/* Modern Navigation Tabs */}
-          <nav className="mt-3 flex items-center gap-2 overflow-x-auto">
+          {/* Refined Navigation Tabs */}
+          <nav className="mt-4 flex items-center gap-1 overflow-x-auto">
             {['Search Assets','Distributed Marketing','Preference Center','Email Auditing','Email Archiving','Settings'].map(label => (
               <button
                 key={label}
-                className="px-3 py-1.5 text-sm rounded-md border border-border bg-card hover:bg-white/5 data-[active=true]:bg-brand data-[active=true]:text-white transition"
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-transparent hover:bg-gray-50 
+                         data-[active=true]:bg-brand data-[active=true]:text-white data-[active=true]:shadow-sm 
+                         transition-all duration-200 whitespace-nowrap"
                 data-active={
                   (label === 'Search Assets' && parentNav === 'search') ||
                   (label === 'Distributed Marketing' && parentNav === 'distributedMarketing') ||
@@ -1042,97 +1086,200 @@ export default function MainApp() {
         </header>
 
         {/* Main Content */}
-        <div className="space-y-6">
+        <main className="px-6 py-8 space-y-8">
         {/* Render content based on parentNav */}
         {parentNav === 'search' ? (
           <>
-            {/* Modern KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            {/* Enhanced KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <KpiCard 
                 title="Data Extensions" 
                 value={dataExtensions.length} 
-                subtitle={`Last 7d: ${deGroups.last7} · 30d: ${deGroups.last30} · 6mo: ${deGroups.last180} · 1yr: ${deGroups.last365}`} 
+                subtitle={`Last 7d: ${deGroups.last7} · 30d: ${deGroups.last30} · 6mo: ${deGroups.last180} · 1yr: ${deGroups.last365}`}
+                icon={
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                  </svg>
+                }
               />
               <KpiCard 
                 title="Automations" 
                 value={automations.length}  
-                subtitle={`Last 7d: ${autoGroups.last7} · 30d: ${autoGroups.last30} · 6mo: ${autoGroups.last180} · 1yr: ${autoGroups.last365}`} 
+                subtitle={`Last 7d: ${autoGroups.last7} · 30d: ${autoGroups.last30} · 6mo: ${autoGroups.last180} · 1yr: ${autoGroups.last365}`}
+                icon={
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                  </svg>
+                }
               />
               <KpiCard 
                 title="Data Filters" 
                 value={dataFilters.length} 
-                subtitle={`Last 7d: ${dfGroups.last7} · 30d: ${dfGroups.last30} · 6mo: ${dfGroups.last180} · 1yr: ${dfGroups.last365}`} 
+                subtitle={`Last 7d: ${dfGroups.last7} · 30d: ${dfGroups.last30} · 6mo: ${dfGroups.last180} · 1yr: ${dfGroups.last365}`}
+                icon={
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+                  </svg>
+                }
               />
               <KpiCard 
                 title="Journeys" 
                 value={journeys.length} 
-                subtitle={`Last 7d: ${journeyGroups.last7} · 30d: ${journeyGroups.last30} · 6mo: ${journeyGroups.last180} · 1yr: ${journeyGroups.last365}`} 
+                subtitle={`Last 7d: ${journeyGroups.last7} · 30d: ${journeyGroups.last30} · 6mo: ${journeyGroups.last180} · 1yr: ${journeyGroups.last365}`}
+                icon={
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" />
+                  </svg>
+                }
               />
             </div>
 
-            {/* Modern Search Header */}
-            <div className="sticky top-0 z-20 -mx-4 -mt-2 px-4 py-2 bg-panel/80 backdrop-blur border-b border-border mb-4">
-              <div className="flex items-center gap-2">
-                <input
-                  placeholder="Search assets…"
-                  className="flex-1 rounded-md bg-panel border border-border px-3 py-2 text-sm placeholder-faint focus-visible:shadow-ring"
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                />
-                <Btn variant="primary">Search</Btn>
+            {/* Modern Search & Filter Section */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <input
+                        placeholder="Search across all assets..."
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg bg-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-brand focus:border-brand transition-colors"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <Btn variant="primary">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Search
+                  </Btn>
+                </div>
+                
+                {/* Asset Type Filters */}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {[
+                    { key: 'de', label: 'Data Extensions' },
+                    { key: 'automation', label: 'Automations' },
+                    { key: 'datafilter', label: 'Data Filters' },
+                    { key: 'journey', label: 'Journeys' },
+                    { key: 'emailsenddefinition', label: 'Email Send Definitions' },
+                    { key: 'publication', label: 'Publications' }
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-all ${
+                        activeTab === tab.key 
+                          ? 'bg-brand text-white border-brand shadow-sm' 
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                      onClick={() => setActiveTab(tab.key)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                  <div className="flex-1"></div>
+                  <Btn variant="secondary" onClick={downloadCSV}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export CSV
+                  </Btn>
+                </div>
               </div>
             </div>
-            {/* Tab buttons and CSV download */}
-            <div className="flex flex-wrap gap-2 mb-4 items-center">
+
+            {/* Enhanced Table Container */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
               {['de', 'automation', 'datafilter', 'journey', 'emailsenddefinition', 'publication'].map(tab => (
-                <Btn
+                <button
                   key={tab}
-                  variant={activeTab === tab ? 'primary' : 'ghost'}
+                  className="h-8 px-3 rounded-md border border-border bg-white hover:bg-slate-50 
+                             data-[active=true]:bg-brand data-[active=true]:text-white data-[active=true]:border-brand
+                             data-[active=true]:shadow-[0_0_0_2px_rgba(59,130,246,.25)] transition"
+                  data-active={activeTab === tab}
                   onClick={() => setActiveTab(tab)}
                 >
                   {tab === 'emailsenddefinition' ? 'EmailSendDefinition' : tab.toUpperCase()}
-                </Btn>
+                </button>
               ))}
-              <Btn variant="primary" onClick={downloadCSV}>
+              <button className="h-9 px-3 rounded-md bg-brand text-white hover:bg-brand-600" onClick={downloadCSV}>
                 Download CSV
-              </Btn>
+              </button>
             </div>
 
             {/* Modern Table Container */}
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               {activeTab === 'emailsenddefinition' ? (
                 <>
-                  <div className="p-3 border-b border-border">
-                    <h2 className="text-sm font-semibold">EmailSendDefinition Details</h2>
+                  <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">Email Send Definitions</h3>
+                        <p className="text-sm text-gray-600">Manage and configure your email send definitions</p>
+                      </div>
+                      {selectedESDKeys.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Tag variant="success">{selectedESDKeys.length} selected</Tag>
+                          <Btn variant="primary" onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '', loading: false, error: null })}>
+                            Bulk Edit
+                          </Btn>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="max-h-[72vh] overflow-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="sticky top-0 bg-panel text-faint border-b border-border">
+                  <div className="overflow-auto max-h-[70vh]">
+                    <table className="w-full">
+                      <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
                         <tr>
-                          <th className="text-left font-medium px-3 py-2">
-                            <input type="checkbox" checked={allSelected} onChange={toggleSelectAllESD} />
+                          <th className="text-left font-semibold text-gray-900 px-6 py-3 text-sm">
+                            <input 
+                              type="checkbox" 
+                              checked={allSelected} 
+                              onChange={toggleSelectAllESD}
+                              className="rounded border-gray-300 text-brand focus:ring-brand"
+                            />
                           </th>
-                          <th className="text-left font-medium px-3 py-2">Name</th>
-                          <th className="text-left font-medium px-3 py-2">Send Classification</th>
-                          <th className="text-left font-medium px-3 py-2">Sender Profile</th>
-                          <th className="text-left font-medium px-3 py-2">Delivery Profile</th>
-                          <th className="text-left font-medium px-3 py-2">Actions</th>
+                          <th className="text-left font-semibold text-gray-900 px-6 py-3 text-sm">Name</th>
+                          <th className="text-left font-semibold text-gray-900 px-6 py-3 text-sm">Send Classification</th>
+                          <th className="text-left font-semibold text-gray-900 px-6 py-3 text-sm">Sender Profile</th>
+                          <th className="text-left font-semibold text-gray-900 px-6 py-3 text-sm">Delivery Profile</th>
+                          <th className="text-left font-semibold text-gray-900 px-6 py-3 text-sm">Actions</th>
                         </tr>
                       </thead>
-                      <tbody>
-                        {(searchTerm ? getFilteredData().filter(item => item._type === 'EmailSendDefinition') : resolvedEmailSendDefs).map((esd) => (
-                          <tr key={esd.CustomerKey} className="hover:bg-white/5">
-                            <td className="px-3 py-2 border-t border-border/60">
-                              <input type="checkbox" checked={selectedESDKeys.includes(esd.CustomerKey)} onChange={() => toggleSelectESD(esd.CustomerKey)} />
+                      <tbody className="divide-y divide-gray-200">
+                        {(searchTerm ? getFilteredData().filter(item => item._type === 'EmailSendDefinition') : resolvedEmailSendDefs).map((esd, index) => (
+                          <tr key={esd.CustomerKey} className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                            <td className="px-6 py-4">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedESDKeys.includes(esd.CustomerKey)} 
+                                onChange={() => toggleSelectESD(esd.CustomerKey)}
+                                className="rounded border-gray-300 text-brand focus:ring-brand"
+                              />
                             </td>
-                            <td className="px-3 py-2 border-t border-border/60 font-medium">{esd.Name}</td>
-                            <td className="px-3 py-2 border-t border-border/60">{getProfileName(sendClassifications, esd.SendClassification?.CustomerKey)}</td>
-                            <td className="px-3 py-2 border-t border-border/60">{getProfileName(senderProfiles, esd.SenderProfile?.CustomerKey)}</td>
-                            <td className="px-3 py-2 border-t border-border/60">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
-                            <td className="px-3 py-2 border-t border-border/60">
+                            <td className="px-6 py-4">
+                              <div className="font-medium text-gray-900">{esd.Name}</div>
+                              <div className="text-sm text-gray-500">{esd.CustomerKey}</div>
+                            </td>
+                            <td className="px-6 py-4 text-gray-900">{getProfileName(sendClassifications, esd.SendClassification?.CustomerKey)}</td>
+                            <td className="px-6 py-4 text-gray-900">{getProfileName(senderProfiles, esd.SenderProfile?.CustomerKey)}</td>
+                            <td className="px-6 py-4 text-gray-900">{getProfileName(deliveryProfiles, esd.DeliveryProfile?.CustomerKey)}</td>
+                            <td className="px-6 py-4">
                               <div className="flex items-center gap-2">
-                                <button title="Edit" className="px-2 py-1 rounded-md border border-border hover:bg-white/5" onClick={() => openEditESDModal(esd)}>✎</button>
-                                <button title="Open in MC" className="px-2 py-1 rounded-md border border-border hover:bg-white/5">↗</button>
+                                <Btn variant="ghost" size="sm" onClick={() => openEditESDModal(esd)} title="Edit">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </Btn>
+                                <Btn variant="ghost" size="sm" title="Open in Marketing Cloud">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                </Btn>
                               </div>
                             </td>
                           </tr>
@@ -1140,14 +1287,6 @@ export default function MainApp() {
                       </tbody>
                     </table>
                   </div>
-                  {selectedESDKeys.length > 0 && (
-                    <div className="flex items-center justify-between px-3 py-2 bg-panel border-t border-border text-xs text-faint">
-                      <span>{selectedESDKeys.length} selected</span>
-                      <Btn variant="primary" onClick={() => setMassEditModal({ open: true, sendClassification: '', senderProfile: '', deliveryProfile: '', bccEmail: '', ccEmail: '', loading: false, error: null })}>
-                        Bulk Edit Selected
-                      </Btn>
-                    </div>
-                  )}
                 </>
               ) : activeTab === 'publication' ? (
                 <>
@@ -1785,26 +1924,26 @@ export default function MainApp() {
 
         {/* Email Archiving content */}
         {parentNav === 'emailArchivingSetup' && (
-          <div className="rounded-xl border border-border bg-card p-6">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
             <EmailArchiving />
           </div>
         )}
 
         {/* Settings content */}
         {activeTab === 'settings' && (
-          <div className="rounded-xl border border-border bg-card p-6">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
             <Settings />
           </div>
         )}
 
         {/* Settings parent navigation content */}
         {parentNav === 'settings' && (
-          <div className="rounded-xl border border-border bg-card p-6">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
             <Settings />
           </div>
         )}
 
-        </div>
+        </main>
       </div>
     </div>
   );
