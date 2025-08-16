@@ -1575,14 +1575,14 @@ export default function MainApp() {
             )}
           </div>
         ) : parentNav === 'distributedMarketing' ? (
-          <div className="bg-white shadow rounded p-6 max-w-xl mx-auto">
+          <div className="rounded-xl border border-border bg-card p-6">
             {renderDMQuickSend()}
           </div>
         ) : null}
 
         {/* Render content for Preference Center config */}
         {parentNav === 'preferencecenter' && (
-          <div className="bg-white shadow rounded p-6 max-w-xl mx-auto" id="preferencecenter-success-section">
+          <div className="rounded-xl border border-border bg-card p-6" id="preferencecenter-success-section">
             {/* Only show success message for Preference Center flow */}
             {preferenceCenterStatus && preferenceCenterStatus.startsWith('✅') && (
               <div className="bg-green-50 border border-green-300 text-green-800 rounded p-4 mb-4" id="preferencecenter-success-message">
@@ -1629,8 +1629,8 @@ export default function MainApp() {
 
         {/* Email Auditing content */}
         {parentNav === 'emailArchiving' && (
-          <div className="bg-white shadow rounded p-6 max-w-6xl mx-auto">
-            <h2 className="text-2xl font-bold text-indigo-700 mb-4">Email Auditing</h2>
+          <div className="rounded-xl border border-border bg-card p-6">
+            <h2 className="text-sm font-semibold mb-4">Email Auditing</h2>
             {/* Search Fields */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div>
@@ -1785,17 +1785,23 @@ export default function MainApp() {
 
         {/* Email Archiving content */}
         {parentNav === 'emailArchivingSetup' && (
-          <EmailArchiving />
+          <div className="rounded-xl border border-border bg-card p-6">
+            <EmailArchiving />
+          </div>
         )}
 
         {/* Settings content */}
         {activeTab === 'settings' && (
-          <Settings />
+          <div className="rounded-xl border border-border bg-card p-6">
+            <Settings />
+          </div>
         )}
 
         {/* Settings parent navigation content */}
         {parentNav === 'settings' && (
-          <Settings />
+          <div className="rounded-xl border border-border bg-card p-6">
+            <Settings />
+          </div>
         )}
 
         </div>
@@ -1847,11 +1853,11 @@ function CloudPageCodeSample() {
     <div className="mb-2">
       <div className="flex items-center mb-1">
         <span className="font-semibold mr-2">Show Code:</span>
-        <button onClick={handleCopy} className="bg-indigo-600 text-white px-2 py-1 rounded text-xs mr-2">{copied ? 'Copied!' : 'Copy'}</button>
-        <button onClick={handleDownload} className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs">Download as .html</button>
+        <Btn variant="primary" onClick={handleCopy}>{copied ? 'Copied!' : 'Copy'}</Btn>
+        <Btn variant="ghost" onClick={handleDownload}>Download as .html</Btn>
       </div>
       <textarea
-        className="w-full font-mono text-xs p-2 border rounded bg-gray-100"
+        className="w-full font-mono text-xs p-2 border border-border rounded bg-panel"
         rows={16}
         value={codeSample}
         readOnly
