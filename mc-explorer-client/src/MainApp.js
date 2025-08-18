@@ -1352,25 +1352,6 @@ export default function MainApp() {
               </div>
             </div>
 
-            {/* Enhanced Table Container */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-              {['de', 'automation', 'datafilter', 'journey', 'emailsenddefinition', 'publication'].map(tab => (
-                <button
-                  key={tab}
-                  className="h-8 px-3 rounded-md border border-border bg-white hover:bg-slate-50 
-                             data-[active=true]:bg-brand data-[active=true]:text-white data-[active=true]:border-brand
-                             data-[active=true]:shadow-[0_0_0_2px_rgba(59,130,246,.25)] transition"
-                  data-active={activeTab === tab}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab === 'emailsenddefinition' ? 'EmailSendDefinition' : tab.toUpperCase()}
-                </button>
-              ))}
-              <button className="h-9 px-3 rounded-md bg-brand text-white hover:bg-brand-600" onClick={downloadCSV}>
-                Download CSV
-              </button>
-            </div>
-
             {/* Modern Table Container */}
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               {activeTab === 'emailsenddefinition' ? (
@@ -1482,68 +1463,141 @@ export default function MainApp() {
                 </>
               ) : (
                 <>
-                  <div className="p-3 border-b border-border">
-                    <h2 className="text-sm font-semibold">{activeTab.toUpperCase()} Details</h2>
+                  <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {activeTab === 'de' ? 'Data Extensions' :
+                           activeTab === 'automation' ? 'Automations' :
+                           activeTab === 'datafilter' ? 'Data Filters' :
+                           activeTab === 'journey' ? 'Journeys' :
+                           activeTab === 'publication' ? 'Publications' :
+                           activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {activeTab === 'de' ? 'Manage and configure your data extensions' :
+                           activeTab === 'automation' ? 'View and monitor automation workflows' :
+                           activeTab === 'datafilter' ? 'Manage data filtering criteria' :
+                           activeTab === 'journey' ? 'View and monitor customer journeys' :
+                           activeTab === 'publication' ? 'Manage publication lists and settings' :
+                           `Browse and manage ${activeTab} assets`}
+                        </p>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {getFilteredData().length} items
+                      </div>
+                    </div>
                   </div>
-                  <div className="max-h-[72vh] overflow-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="sticky top-0 bg-panel text-faint border-b border-border">
+                  <div className="overflow-auto max-h-[70vh]">
+                    <table className="w-full">{/* Modern table styling to match Email Send Definitions */}
+                      <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
                         <tr>
-                          <th className="text-left font-medium px-3 py-2">Type</th>
-                          <th className="text-left font-medium px-3 py-2 cursor-pointer" onClick={() => requestSort('name')}>Name</th>
-                          <th className="text-left font-medium px-3 py-2 cursor-pointer" onClick={() => requestSort('path')}>Path</th>
+                          <th className="text-left font-semibold text-gray-900 px-6 py-3 text-sm">Type</th>
+                          <th className="text-left font-semibold text-gray-900 px-6 py-3 text-sm cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('name')}>
+                            <span className="flex items-center gap-1">
+                              Name
+                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                              </svg>
+                            </span>
+                          </th>
+                          <th className="text-left font-semibold text-gray-900 px-6 py-3 text-sm cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('path')}>
+                            <span className="flex items-center gap-1">
+                              Path
+                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                              </svg>
+                            </span>
+                          </th>
                           {!(activeTab === 'automation' || activeTab === 'journey') && (
-                            <th className="text-left font-medium px-3 py-2">View in folder</th>
+                            <th className="text-left font-semibold text-gray-900 px-6 py-3 text-sm">Actions</th>
                           )}
                           {(!searchTerm && (activeTab === 'automation' || activeTab === 'journey')) || (searchTerm && getFilteredData().some(item => item._type === 'Automation' || item._type === 'Journey')) ? (
-                            <th className="text-left font-medium px-3 py-2 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
+                            <th className="text-left font-semibold text-gray-900 px-6 py-3 text-sm cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('status')}>
+                              <span className="flex items-center gap-1">
+                                Status
+                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                                </svg>
+                              </span>
+                            </th>
                           ) : null}
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-gray-200">
                         {paginatedData().map((item, idx) => (
                           <tr 
                             key={idx} 
-                            className={`hover:bg-white/5 ${item._type === 'Data Extension' || item._type === 'Automation' ? 'cursor-pointer' : ''}`}
+                            className={`hover:bg-gray-50 transition-colors ${item._type === 'Data Extension' || item._type === 'Automation' ? 'cursor-pointer' : ''} ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
                             onClick={() => {
                               if (item._type === 'Data Extension') fetchDeDetails(item.name);
                               if (item._type === 'Automation') fetchAutomationDetails(item.name, item.id);
                             }}
                           >
-                            <td className="px-3 py-2 border-t border-border/60">
-                              <Tag>{item._type}</Tag>
+                            <td className="px-6 py-4">
+                              <Tag variant={
+                                item._type === 'Data Extension' ? 'default' :
+                                item._type === 'Automation' ? 'success' :
+                                item._type === 'Data Filter' ? 'warning' :
+                                'default'
+                              }>
+                                {item._type}
+                              </Tag>
                             </td>
-                            <td className="px-3 py-2 border-t border-border/60 font-medium">{item.name}</td>
-                            <td className="px-3 py-2 border-t border-border/60">{item.path || 'N/A'}</td>
+                            <td className="px-6 py-4">
+                              <div className="font-medium text-gray-900">{item.name}</div>
+                            </td>
+                            <td className="px-6 py-4 text-gray-600">{item.path || 'N/A'}</td>
                             {!(item._type === 'Automation' || item._type === 'Journey') && (
-                              <td className="px-3 py-2 border-t border-border/60">
-                                {item._type === 'Data Extension' && item.categoryId && item.id && (
-                                  <button 
-                                    className="px-2 py-1 rounded-md border border-border hover:bg-white/5" 
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      window.open(`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`, '_blank');
-                                    }}
-                                  >
-                                    View
-                                  </button>
-                                )}
-                                {item._type === 'Data Filter' && item.id && (
-                                  <button 
-                                    className="px-2 py-1 rounded-md border border-border hover:bg-white/5" 
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      window.open(`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`, '_blank');
-                                    }}
-                                  >
-                                    View
-                                  </button>
-                                )}
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-2">
+                                  {item._type === 'Data Extension' && item.categoryId && item.id && (
+                                    <Btn 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        window.open(`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/CustomObjects/${item.categoryId}/?ts=${item.id}/view`, '_blank');
+                                      }}
+                                      title="View in Marketing Cloud"
+                                      aria-label={`View ${item.name} in Marketing Cloud`}
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                      </svg>
+                                      View
+                                    </Btn>
+                                  )}
+                                  {item._type === 'Data Filter' && item.id && (
+                                    <Btn 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        window.open(`https://mc.s4.exacttarget.com/cloud/#app/Email/C12/Default.aspx?entityType=none&entityID=0&ks=ks%23Subscribers/filters/${item.id}/view`, '_blank');
+                                      }}
+                                      title="View in Marketing Cloud"
+                                      aria-label={`View ${item.name} in Marketing Cloud`}
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                      </svg>
+                                      View
+                                    </Btn>
+                                  )}
+                                </div>
                               </td>
                             )}
                             {(item._type === 'Automation' || item._type === 'Journey') && (
-                              <td className="px-3 py-2 border-t border-border/60">
-                                <Tag>{item.status || 'N/A'}</Tag>
+                              <td className="px-6 py-4">
+                                <Tag variant={
+                                  item.status === 'Running' || item.status === 'Active' ? 'success' :
+                                  item.status === 'Paused' || item.status === 'Stopped' ? 'warning' :
+                                  item.status === 'Error' || item.status === 'Failed' ? 'error' :
+                                  'default'
+                                }>
+                                  {item.status || 'N/A'}
+                                </Tag>
                               </td>
                             )}
                           </tr>
@@ -1551,11 +1605,33 @@ export default function MainApp() {
                       </tbody>
                     </table>
                   </div>
-                  <div className="flex items-center justify-between px-3 py-2 bg-panel border-t border-border text-xs text-faint">
-                    <span>Page {currentPage} of {totalPages}</span>
-                    <div className="flex gap-2">
-                      <button className="px-2 py-1 rounded border border-border hover:bg-white/5" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>Prev</button>
-                      <button className="px-2 py-1 rounded border border-border hover:bg-white/5" disabled={currentPage === totalPages || totalPages <= 1} onClick={() => setCurrentPage(p => p + 1)}>Next</button>
+                  <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-200">
+                    <div className="text-sm text-gray-500">
+                      Page {currentPage} of {totalPages} · Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, getFilteredData().length)} of {getFilteredData().length} items
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Btn 
+                        variant="ghost" 
+                        size="sm" 
+                        disabled={currentPage === 1} 
+                        onClick={() => setCurrentPage(p => p - 1)}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Previous
+                      </Btn>
+                      <Btn 
+                        variant="ghost" 
+                        size="sm" 
+                        disabled={currentPage === totalPages || totalPages <= 1} 
+                        onClick={() => setCurrentPage(p => p + 1)}
+                      >
+                        Next
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Btn>
                     </div>
                   </div>
                 </>
