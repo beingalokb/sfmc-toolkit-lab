@@ -5337,4 +5337,17 @@ if (fs.existsSync(buildPath)) {
   });
 }
 
+// Suppress MemoryStore warning in production
+if (process.env.NODE_ENV === 'production') {
+  const originalWarn = console.warn;
+  console.warn = function(...args) {
+    const message = args.join(' ');
+    if (message.includes('MemoryStore is not designed for a production environment')) {
+      console.log('📝 [SESSION] MemoryStore warning suppressed (single-instance deployment)');
+      return;
+    }
+    originalWarn.apply(console, args);
+  };
+}
+
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
