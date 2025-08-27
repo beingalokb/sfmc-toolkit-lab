@@ -4187,6 +4187,74 @@ app.post('/emails/add-archiving-block', async (req, res) => {
       };
     };
     
+    // Process regular HTML emails
+    async function processRegularEmail(emailId, emailData, accessToken, subdomain, appendAmpScript) {
+      if (!emailData.views?.html?.content) {
+        return { emailId, status: 'skipped', message: 'No HTML content found' };
+      }
+
+      const originalHtml = emailData.views.html.content;
+      const modificationResult = appendAmpScript(originalHtml);
+      
+      if (!modificationResult.modified) {
+        return { emailId, status: 'skipped', message: modificationResult.reason };
+      }
+
+      const patchPayload = { views: { html: { content: modificationResult.html } } };
+      await axios.patch(
+        `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets/${emailId}`,
+        patchPayload,
+        { headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+      );
+
+      return { emailId, status: 'success', message: `Archive block added (${modificationResult.reason})` };
+    }
+    
+    // Process template-based emails 
+    async function processTemplateBasedEmail(emailId, emailData, accessToken, subdomain) {
+      if (!emailData.views?.html?.slots) {
+        return { emailId, status: 'skipped', message: 'No slots structure found' };
+      }
+
+      const slots = emailData.views.html.slots;
+      const slotPriority = ['content', 'main', 'body', 'footer'];
+      let targetSlotName = slotPriority.find(name => slots[name]) || Object.keys(slots)[0];
+      
+      if (!targetSlotName) {
+        return { emailId, status: 'skipped', message: 'No suitable slot found' };
+      }
+      
+      const targetSlot = slots[targetSlotName];
+      const archiveBlockExists = targetSlot.blocks?.some(block => 
+        block.content?.includes('%%=ContentBlockByName("MCX_ArchivingBlock")=%%')
+      );
+      
+      if (archiveBlockExists) {
+        return { emailId, status: 'skipped', message: 'Archive block already exists' };
+      }
+      
+      const newBlock = {
+        type: 'html',
+        content: '%%=ContentBlockByName("MCX_ArchivingBlock")=%%',
+        name: 'MC Explorer Archive Block'
+      };
+      
+      const updatedSlots = { ...slots };
+      updatedSlots[targetSlotName] = {
+        ...targetSlot,
+        blocks: [...(targetSlot.blocks || []), newBlock]
+      };
+      
+      const patchPayload = { views: { html: { slots: updatedSlots } } };
+      await axios.patch(
+        `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets/${emailId}`,
+        patchPayload,
+        { headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+      );
+
+      return { emailId, status: 'success', message: `Archive block added to slot '${targetSlotName}'` };
+    }
+    
     for (const emailId of emailIds) {
       try {
         console.log(`📧 [Email Archive Block] Processing email ID: ${emailId}`);
@@ -4206,79 +4274,29 @@ app.post('/emails/add-archiving-block', async (req, res) => {
         console.log(`📧 [Email Archive Block] Received response for email ${emailId}:`, {
           id: getResponse.data.id,
           name: getResponse.data.name,
+          assetType: getResponse.data.assetType?.name || getResponse.data.assetType,
           hasViews: !!getResponse.data.views,
           hasHtml: !!getResponse.data.views?.html,
-          hasContent: !!getResponse.data.views?.html?.content
+          hasContent: !!getResponse.data.views?.html?.content,
+          hasSlots: !!getResponse.data.views?.html?.slots
         });
 
-        // Step 2: Check if email has HTML content
-        if (!getResponse.data.views?.html?.content) {
-          console.warn(`📧 [Email Archive Block] Email ${emailId} has no HTML content`);
-          results.push({
-            emailId: emailId,
-            status: 'skipped',
-            message: 'No HTML content found'
-          });
-          continue;
-        }
-
-        const originalHtml = getResponse.data.views.html.content;
-        console.log(`📧 [Email Archive Block] Original HTML length for email ${emailId}: ${originalHtml.length} characters`);
-        console.log(`📧 [Email Archive Block] Original HTML preview (first 200 chars):`, originalHtml.substring(0, 200));
-        console.log(`📧 [Email Archive Block] Original HTML preview (last 200 chars):`, originalHtml.substring(Math.max(0, originalHtml.length - 200)));
-
-        // Step 3: Append AMPscript to HTML content
-        const modificationResult = appendAmpScript(originalHtml);
+        const emailData = getResponse.data;
+        const assetType = emailData.assetType?.name || emailData.assetType;
         
-        if (!modificationResult.modified) {
-          console.log(`📧 [Email Archive Block] Email ${emailId} skipped: ${modificationResult.reason}`);
-          results.push({
-            emailId: emailId,
-            status: 'skipped',
-            message: modificationResult.reason
-          });
-          continue;
+        // Determine email type and processing method
+        if (assetType === 'templatebasedemail') {
+          console.log(`📧 [Email Archive Block] Processing template-based email ${emailId}`);
+          const templateResult = await processTemplateBasedEmail(emailId, emailData, accessToken, subdomain);
+          results.push(templateResult);
+        } else {
+          console.log(`📧 [Email Archive Block] Processing regular HTML email ${emailId}`);
+          const regularResult = await processRegularEmail(emailId, emailData, accessToken, subdomain, appendAmpScript);
+          results.push(regularResult);
         }
-
-        const updatedHtml = modificationResult.html;
-        console.log(`📧 [Email Archive Block] Modified HTML length for email ${emailId}: ${updatedHtml.length} characters (${modificationResult.reason})`);
-        console.log(`📧 [Email Archive Block] Modified HTML preview (last 200 chars):`, updatedHtml.substring(Math.max(0, updatedHtml.length - 200)));
-
-        // Step 4: Update email via PATCH request
-        console.log(`📧 [Email Archive Block] Updating email ${emailId} with new content`);
-        const patchPayload = {
-          views: {
-            html: {
-              content: updatedHtml
-            }
-          }
-        };
-
-        const patchResponse = await axios.patch(
-          `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets/${emailId}`,
-          patchPayload,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        console.log(`📧 [Email Archive Block] Successfully updated email ${emailId}:`, {
-          status: patchResponse.status,
-          id: patchResponse.data.id,
-          name: patchResponse.data.name
-        });
-
-        results.push({
-          emailId: emailId,
-          status: 'success',
-          message: `Archive block added successfully (${modificationResult.reason})`
-        });
         
       } catch (emailError) {
-        console.error(`❌ [Email Archive Block] Failed to update email ${emailId}:`, {
+        console.error(`❌ [Email Archive Block] Failed to process email ${emailId}:`, {
           message: emailError.message,
           status: emailError.response?.status,
           statusText: emailError.response?.statusText,
@@ -4295,7 +4313,7 @@ app.post('/emails/add-archiving-block', async (req, res) => {
         results.push({
           emailId: emailId,
           status: 'error',
-          message: `Failed to update: ${errorMessage}`
+          message: `Failed to process: ${errorMessage}`
         });
       }
     }
