@@ -4230,10 +4230,11 @@ app.post('/emails/add-archiving-block', async (req, res) => {
       const targetSlot = slots[targetSlotName];
       console.log(`📧 [Email Archive Block] Target slot "${targetSlotName}" structure:`, JSON.stringify(targetSlot, null, 2));
       
-      // Ensure blocks is an array
-      const blocks = Array.isArray(targetSlot.blocks) ? targetSlot.blocks : [];
+      // For template emails, blocks is an object with block IDs as keys
+      const existingBlocks = targetSlot.blocks || {};
       
-      const archiveBlockExists = blocks.some(block => 
+      // Check if archive block already exists by examining block content
+      const archiveBlockExists = Object.values(existingBlocks).some(block => 
         block.content?.includes('%%=ContentBlockByName("MCX_ArchivingBlock")=%%')
       );
       
@@ -4241,16 +4242,52 @@ app.post('/emails/add-archiving-block', async (req, res) => {
         return { emailId, status: 'skipped', message: 'Archive block already exists' };
       }
       
+      // Generate a unique block ID (using timestamp + random)
+      const newBlockId = `mcx_archive_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       const newBlock = {
-        type: 'html',
+        assetType: {
+          id: 195, // HTML block type
+          name: 'htmlblock'
+        },
         content: '%%=ContentBlockByName("MCX_ArchivingBlock")=%%',
-        name: 'MC Explorer Archive Block'
+        design: '%%=ContentBlockByName("MCX_ArchivingBlock")=%%',
+        meta: {
+          wrapperStyles: {
+            mobile: { visible: true },
+            styling: {}
+          }
+        },
+        availableViews: [],
+        data: {
+          email: {
+            options: {
+              generateFrom: ""
+            }
+          }
+        },
+        modelVersion: 2
       };
       
-      const updatedSlots = { ...slots };
-      updatedSlots[targetSlotName] = {
-        ...targetSlot,
-        blocks: [...(targetSlot.blocks || []), newBlock]
+      // Add the new block to the blocks object
+      const updatedBlocks = {
+        ...existingBlocks,
+        [newBlockId]: newBlock
+      };
+      
+      // Update the content HTML to include the new block at the end
+      const currentContent = targetSlot.content || '';
+      const newBlockDiv = `<div data-type="block" data-key="${newBlockId}"></div>`;
+      const updatedContent = currentContent + newBlockDiv;
+      
+      // Update the slot with new blocks and content
+      const updatedSlots = { 
+        ...slots,
+        [targetSlotName]: {
+          ...targetSlot,
+          blocks: updatedBlocks,
+          content: updatedContent
+        }
       };
       
       const patchPayload = { views: { html: { slots: updatedSlots } } };
