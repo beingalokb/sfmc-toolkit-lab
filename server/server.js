@@ -4201,11 +4201,13 @@ app.post('/emails/add-archiving-block', async (req, res) => {
       }
 
       const patchPayload = { views: { html: { content: modificationResult.html } } };
-      await axios.patch(
+      console.log(`📧 [Email Archive Block] Making PATCH request for regular email ${emailId}...`);
+      const patchResponse = await axios.patch(
         `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets/${emailId}`,
         patchPayload,
         { headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
       );
+      console.log(`📧 [Email Archive Block] PATCH response status: ${patchResponse.status}`);
 
       return { emailId, status: 'success', message: `Archive block added (${modificationResult.reason})` };
     }
@@ -4218,7 +4220,7 @@ app.post('/emails/add-archiving-block', async (req, res) => {
 
       const slots = emailData.views.html.slots;
       console.log(`📧 [Email Archive Block] Template email slots:`, Object.keys(slots));
-      console.log(`📧 [Email Archive Block] Slots structure:`, JSON.stringify(slots, null, 2));
+      console.log(`📧 [Email Archive Block] Original emailData.views.html structure:`, JSON.stringify(emailData.views.html, null, 2));
       
       const slotPriority = ['content', 'main', 'body', 'footer'];
       let targetSlotName = slotPriority.find(name => slots[name]) || Object.keys(slots)[0];
@@ -4242,8 +4244,16 @@ app.post('/emails/add-archiving-block', async (req, res) => {
         return { emailId, status: 'skipped', message: 'Archive block already exists' };
       }
       
-      // Generate a unique block ID (using timestamp + random)
-      const newBlockId = `mcx_archive_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Generate a unique block ID matching the existing pattern (lowercase alphanumeric, 13 chars)
+      const generateBlockId = () => {
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let result = '';
+        for (let i = 0; i < 13; i++) {
+          result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+      };
+      const newBlockId = generateBlockId();
       
       const newBlock = {
         assetType: {
@@ -4290,12 +4300,38 @@ app.post('/emails/add-archiving-block', async (req, res) => {
         }
       };
       
-      const patchPayload = { views: { html: { slots: updatedSlots } } };
-      await axios.patch(
+      console.log(`📧 [Email Archive Block] Updated slots structure:`, JSON.stringify(updatedSlots, null, 2));
+      
+      // Preserve the full original structure and only update the slots
+      const patchPayload = {
+        views: {
+          html: {
+            ...emailData.views.html,
+            slots: updatedSlots
+          }
+        }
+      };
+      
+      console.log(`📧 [Email Archive Block] PATCH payload:`, JSON.stringify(patchPayload, null, 2));
+      
+      console.log(`📧 [Email Archive Block] Making PATCH request to update email ${emailId}...`);
+      const patchResponse = await axios.patch(
         `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets/${emailId}`,
         patchPayload,
         { headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
       );
+      
+      console.log(`📧 [Email Archive Block] PATCH response status: ${patchResponse.status}`);
+      console.log(`📧 [Email Archive Block] PATCH response data:`, JSON.stringify(patchResponse.data, null, 2));
+      
+      // Verify the update by fetching the email again
+      console.log(`📧 [Email Archive Block] Verifying update by fetching email ${emailId} again...`);
+      const verifyResponse = await axios.get(
+        `https://${subdomain}.rest.marketingcloudapis.com/asset/v1/content/assets/${emailId}`,
+        { headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+      );
+      console.log(`📧 [Email Archive Block] Verification - email still has content:`, !!verifyResponse.data.views?.html?.slots);
+      console.log(`📧 [Email Archive Block] Verification - target slot still exists:`, !!verifyResponse.data.views?.html?.slots?.[targetSlotName]);
 
       return { emailId, status: 'success', message: `Archive block added to slot '${targetSlotName}'` };
     }
