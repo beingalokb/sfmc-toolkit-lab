@@ -4217,6 +4217,9 @@ app.post('/emails/add-archiving-block', async (req, res) => {
       }
 
       const slots = emailData.views.html.slots;
+      console.log(`📧 [Email Archive Block] Template email slots:`, Object.keys(slots));
+      console.log(`📧 [Email Archive Block] Slots structure:`, JSON.stringify(slots, null, 2));
+      
       const slotPriority = ['content', 'main', 'body', 'footer'];
       let targetSlotName = slotPriority.find(name => slots[name]) || Object.keys(slots)[0];
       
@@ -4225,7 +4228,12 @@ app.post('/emails/add-archiving-block', async (req, res) => {
       }
       
       const targetSlot = slots[targetSlotName];
-      const archiveBlockExists = targetSlot.blocks?.some(block => 
+      console.log(`📧 [Email Archive Block] Target slot "${targetSlotName}" structure:`, JSON.stringify(targetSlot, null, 2));
+      
+      // Ensure blocks is an array
+      const blocks = Array.isArray(targetSlot.blocks) ? targetSlot.blocks : [];
+      
+      const archiveBlockExists = blocks.some(block => 
         block.content?.includes('%%=ContentBlockByName("MCX_ArchivingBlock")=%%')
       );
       
