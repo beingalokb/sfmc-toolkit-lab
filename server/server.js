@@ -4157,18 +4157,33 @@ app.post('/emails/add-archiving-block', async (req, res) => {
         return { modified: false, html: html, reason: 'AMPscript already exists' };
       }
       
-      if (html.includes('</body>')) {
+      // Try to find </body> tag (case insensitive)
+      const bodyCloseRegex = /<\/body\s*>/i;
+      if (bodyCloseRegex.test(html)) {
+        const updatedHtml = html.replace(bodyCloseRegex, amp + '\n$&');
         return { 
           modified: true, 
-          html: html.replace('</body>', amp + '\n</body>'),
+          html: updatedHtml,
           reason: 'Added before </body> tag'
         };
       }
       
+      // Try to find </html> tag (case insensitive)
+      const htmlCloseRegex = /<\/html\s*>/i;
+      if (htmlCloseRegex.test(html)) {
+        const updatedHtml = html.replace(htmlCloseRegex, amp + '\n$&');
+        return { 
+          modified: true, 
+          html: updatedHtml,
+          reason: 'Added before </html> tag'
+        };
+      }
+      
+      // If no closing tags found, append to the end
       return { 
         modified: true, 
         html: html + '\n' + amp,
-        reason: 'Added at end of content'
+        reason: 'Added at end of content (no closing tags found)'
       };
     };
     
@@ -4209,6 +4224,8 @@ app.post('/emails/add-archiving-block', async (req, res) => {
 
         const originalHtml = getResponse.data.views.html.content;
         console.log(`📧 [Email Archive Block] Original HTML length for email ${emailId}: ${originalHtml.length} characters`);
+        console.log(`📧 [Email Archive Block] Original HTML preview (first 200 chars):`, originalHtml.substring(0, 200));
+        console.log(`📧 [Email Archive Block] Original HTML preview (last 200 chars):`, originalHtml.substring(Math.max(0, originalHtml.length - 200)));
 
         // Step 3: Append AMPscript to HTML content
         const modificationResult = appendAmpScript(originalHtml);
@@ -4225,6 +4242,7 @@ app.post('/emails/add-archiving-block', async (req, res) => {
 
         const updatedHtml = modificationResult.html;
         console.log(`📧 [Email Archive Block] Modified HTML length for email ${emailId}: ${updatedHtml.length} characters (${modificationResult.reason})`);
+        console.log(`📧 [Email Archive Block] Modified HTML preview (last 200 chars):`, updatedHtml.substring(Math.max(0, updatedHtml.length - 200)));
 
         // Step 4: Update email via PATCH request
         console.log(`📧 [Email Archive Block] Updating email ${emailId} with new content`);
