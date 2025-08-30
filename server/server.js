@@ -182,14 +182,43 @@ function getSubdomainFromRequest(req) {
 async function getMCAccessToken(req) {
   const creds = req.session.mcCreds;
   if (!creds) throw new Error('No Marketing Cloud credentials in session');
-  const url = `https://${creds.subdomain}.auth.marketingcloudapis.com/v2/token`;
-  const resp = await axios.post(url, {
-    grant_type: 'client_credentials',
-    client_id: creds.clientId,
-    client_secret: creds.clientSecret,
-    account_id: creds.accountId
-  });
-  return resp.data.access_token;
+  
+  // First, try to use existing access token from session
+  if (req.session.accessToken) {
+    console.log('✅ [Auth] Using existing access token from session');
+    return req.session.accessToken;
+  }
+  
+  // If no access token, try to use refresh token if available
+  if (req.session.refreshToken) {
+    console.log('🔄 [Auth] Refreshing access token using refresh token');
+    try {
+      const url = `https://${creds.subdomain}.auth.marketingcloudapis.com/v2/token`;
+      const resp = await axios.post(url, {
+        grant_type: 'refresh_token',
+        refresh_token: req.session.refreshToken,
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret
+      });
+      
+      // Update session with new tokens
+      req.session.accessToken = resp.data.access_token;
+      if (resp.data.refresh_token) {
+        req.session.refreshToken = resp.data.refresh_token;
+      }
+      
+      console.log('✅ [Auth] Successfully refreshed access token');
+      return resp.data.access_token;
+    } catch (refreshError) {
+      console.error('❌ [Auth] Failed to refresh token:', refreshError.response?.data || refreshError.message);
+      // Clear invalid tokens
+      delete req.session.accessToken;
+      delete req.session.refreshToken;
+    }
+  }
+  
+  // If we reach here, we need the user to complete OAuth flow
+  throw new Error('No valid access token available. User needs to complete OAuth authentication flow.');
 }
 
 // Endpoint to check if backend has credentials (per session)
@@ -6202,25 +6231,32 @@ app.get('/objects', async (req, res) => {
       subdomain: mcCreds?.subdomain 
     });
     
-    if (mode === 'live' && mcCreds && mcCreds.subdomain && mcCreds.clientId && mcCreds.clientSecret) {
+    if (mode === 'live' && mcCreds && mcCreds.subdomain) {
       // Live mode - fetch from SFMC
       console.log('📡 [Objects API] Fetching live data from Marketing Cloud...');
       
       try {
-        // Get fresh access token
-        const accessToken = await getMCAccessToken(req);
-        console.log('✅ [Objects API] Successfully obtained access token');
+        // Get existing access token from session (like Search Assets module)
+        const accessToken = getAccessTokenFromRequest(req);
+        const subdomain = getSubdomainFromRequest(req);
+        
+        if (!accessToken || !subdomain) {
+          console.log('⚠️ [Objects API] Missing access token or subdomain for live mode');
+          throw new Error('Missing access token or subdomain. Please ensure you are logged in to Marketing Cloud.');
+        }
+        
+        console.log('✅ [Objects API] Using existing access token from session');
         
         // Determine REST endpoint
-        const restEndpoint = mcCreds.restEndpoint || `https://${mcCreds.subdomain}.rest.marketingcloudapis.com`;
+        const restEndpoint = mcCreds.restEndpoint || `https://${subdomain}.rest.marketingcloudapis.com`;
         
         console.log('🔧 [Objects API] Using endpoints:', {
-          subdomain: mcCreds.subdomain,
+          subdomain: subdomain,
           restEndpoint: restEndpoint
         });
         
         // Fetch all objects from SFMC
-        const sfmcObjects = await fetchAllSFMCObjects(accessToken, mcCreds.subdomain, restEndpoint);
+        const sfmcObjects = await fetchAllSFMCObjects(accessToken, subdomain, restEndpoint);
         
         console.log('✅ [Objects API] Successfully fetched SFMC objects:', {
           dataExtensions: sfmcObjects['Data Extensions'].length,
@@ -6256,11 +6292,10 @@ app.get('/objects', async (req, res) => {
       console.log('🎭 [Objects API] Returning mock data...');
       
       if (mode === 'live') {
-        console.log('⚠️ [Objects API] Live mode requested but missing credentials:', {
+        console.log('⚠️ [Objects API] Live mode requested but missing access token or subdomain:', {
           hasCredentials: !!mcCreds,
           hasSubdomain: !!mcCreds?.subdomain,
-          hasClientId: !!mcCreds?.clientId,
-          hasClientSecret: !!mcCreds?.clientSecret
+          hasAccessToken: !!getAccessTokenFromRequest(req)
         });
       }
       
