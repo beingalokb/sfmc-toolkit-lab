@@ -6,6 +6,7 @@ import PreferenceCenterConfigForm from './PreferenceCenterConfigForm';
 import EmailArchiving from './EmailArchiving';
 import Settings from './Settings';
 import ExportMenu from './components/ExportMenu';
+import SchemaBuilder from './SchemaBuilder';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -1194,13 +1195,14 @@ export default function MainApp() {
           {/* Refined Navigation Tabs */}
           <nav className="mt-4" role="tablist" aria-label="Main navigation">
             <div className="flex items-center gap-1 overflow-x-auto">
-              {['Search Assets','Distributed Marketing','Preference Center','Email Auditing','Email Archiving','Settings'].map(label => (
+              {['Search Assets','Schema Builder','Distributed Marketing','Preference Center','Email Auditing','Email Archiving','Settings'].map(label => (
                 <button
                   key={label}
                   type="button"
                   role="tab"
                   aria-selected={
                     (label === 'Search Assets' && parentNav === 'search') ||
+                    (label === 'Schema Builder' && parentNav === 'schemaBuilder') ||
                     (label === 'Distributed Marketing' && parentNav === 'distributedMarketing') ||
                     (label === 'Preference Center' && parentNav === 'preferencecenter') ||
                     (label === 'Email Auditing' && parentNav === 'emailArchiving') ||
@@ -1209,6 +1211,7 @@ export default function MainApp() {
                   }
                   className={`px-4 py-2 text-sm font-medium rounded-lg border border-transparent hover:bg-gray-50 transition-all duration-200 whitespace-nowrap ${
                     ((label === 'Search Assets' && parentNav === 'search') ||
+                    (label === 'Schema Builder' && parentNav === 'schemaBuilder') ||
                     (label === 'Distributed Marketing' && parentNav === 'distributedMarketing') ||
                     (label === 'Preference Center' && parentNav === 'preferencecenter') ||
                     (label === 'Email Auditing' && parentNav === 'emailArchiving') ||
@@ -1219,6 +1222,7 @@ export default function MainApp() {
                   }`}
                   onClick={() => {
                     if (label === 'Search Assets') setParentNav('search');
+                    else if (label === 'Schema Builder') setParentNav('schemaBuilder');
                     else if (label === 'Distributed Marketing') setParentNav('distributedMarketing');
                     else if (label === 'Preference Center') setParentNav('preferencecenter');
                     else if (label === 'Email Auditing') setParentNav('emailArchiving');
@@ -1956,6 +1960,11 @@ export default function MainApp() {
             {renderDMQuickSend()}
           </div>
         ) : null}
+
+        {/* Render content for Schema Builder */}
+        {parentNav === 'schemaBuilder' && (
+          <SchemaBuilder />
+        )}
 
         {/* Render content for Preference Center config */}
         {parentNav === 'preferencecenter' && (
