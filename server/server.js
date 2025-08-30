@@ -5433,6 +5433,503 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
   }
 });
 
+// ==================== SFMC API FUNCTIONS FOR SCHEMA BUILDER ====================
+
+/**
+ * Fetch Data Extensions from SFMC using SOAP API
+ */
+async function fetchSFMCDataExtensions(accessToken, subdomain) {
+  try {
+    console.log('🔍 [SFMC API] Fetching Data Extensions...');
+    
+    const soapBody = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
+                      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                      xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+      <soapenv:Header>
+        <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+      </soapenv:Header>
+      <soapenv:Body>
+        <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+          <RetrieveRequest>
+            <ObjectType>DataExtension</ObjectType>
+            <Properties>ObjectID</Properties>
+            <Properties>Name</Properties>
+            <Properties>CustomerKey</Properties>
+            <Properties>Description</Properties>
+            <Properties>CreatedDate</Properties>
+            <Properties>ModifiedDate</Properties>
+            <Properties>CategoryID</Properties>
+            <Properties>IsSendable</Properties>
+            <Properties>IsTestable</Properties>
+            <Properties>DataRetentionPeriodLength</Properties>
+            <Properties>DataRetentionPeriod</Properties>
+          </RetrieveRequest>
+        </RetrieveRequestMsg>
+      </soapenv:Body>
+    </soapenv:Envelope>`;
+
+    const response = await axios.post(`https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`, soapBody, {
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': 'Retrieve'
+      },
+      timeout: 30000 // 30 second timeout
+    });
+
+    console.log('📡 [SFMC API] Data Extensions SOAP response received');
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
+    
+    const retrieveResponse = result['soap:Envelope']['soap:Body']['RetrieveResponseMsg'];
+    const results = retrieveResponse?.Results;
+    
+    if (!results) {
+      console.log('⚠️ [SFMC API] No Data Extensions found');
+      return [];
+    }
+    
+    const dataExtensions = Array.isArray(results) ? results : [results];
+    
+    console.log(`✅ [SFMC API] Found ${dataExtensions.length} Data Extensions`);
+    
+    return dataExtensions.map(de => ({
+      id: `de_${de.CustomerKey || de.ObjectID}`,
+      name: de.Name || 'Unnamed Data Extension',
+      externalKey: de.CustomerKey,
+      description: de.Description || '',
+      createdDate: de.CreatedDate,
+      modifiedDate: de.ModifiedDate,
+      isSendable: de.IsSendable === 'true',
+      type: 'DataExtension'
+    }));
+    
+  } catch (error) {
+    console.error('❌ [SFMC API] Error fetching Data Extensions:', error.message);
+    if (error.response) {
+      console.error('❌ [SFMC API] Response status:', error.response.status);
+      console.error('❌ [SFMC API] Response data:', error.response.data?.substring(0, 500));
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch SQL Queries from SFMC using REST API
+ */
+async function fetchSFMCQueries(accessToken, restEndpoint) {
+  try {
+    console.log('🔍 [SFMC API] Fetching SQL Queries...');
+    
+    const response = await axios.get(`${restEndpoint}/automation/v1/queries`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 30000 // 30 second timeout
+    });
+
+    console.log('📡 [SFMC API] SQL Queries REST response received');
+
+    const queries = response.data?.items || [];
+    
+    console.log(`✅ [SFMC API] Found ${queries.length} SQL Queries`);
+    
+    return queries.map(query => ({
+      id: `query_${query.queryDefinitionId || query.id}`,
+      name: query.name || 'Unnamed Query',
+      description: query.description || '',
+      queryType: query.queryType || 'Unknown',
+      createdDate: query.createdDate,
+      modifiedDate: query.modifiedDate,
+      status: query.status,
+      type: 'Query'
+    }));
+    
+  } catch (error) {
+    console.error('❌ [SFMC API] Error fetching Queries:', error.message);
+    if (error.response) {
+      console.error('❌ [SFMC API] Response status:', error.response.status);
+      console.error('❌ [SFMC API] Response data:', JSON.stringify(error.response.data, null, 2));
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch Automations from SFMC using REST API
+ */
+async function fetchSFMCAutomations(accessToken, restEndpoint) {
+  try {
+    console.log('🔍 [SFMC API] Fetching Automations...');
+    
+    const response = await axios.get(`${restEndpoint}/automation/v1/automations`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 30000 // 30 second timeout
+    });
+
+    console.log('📡 [SFMC API] Automations REST response received');
+
+    const automations = response.data?.items || [];
+    
+    console.log(`✅ [SFMC API] Found ${automations.length} Automations`);
+    
+    return automations.map(automation => ({
+      id: `auto_${automation.id}`,
+      name: automation.name || 'Unnamed Automation',
+      description: automation.description || '',
+      status: automation.status,
+      createdDate: automation.createdDate,
+      modifiedDate: automation.modifiedDate,
+      type: 'Automation'
+    }));
+    
+  } catch (error) {
+    console.error('❌ [SFMC API] Error fetching Automations:', error.message);
+    if (error.response) {
+      console.error('❌ [SFMC API] Response status:', error.response.status);
+      console.error('❌ [SFMC API] Response data:', JSON.stringify(error.response.data, null, 2));
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch Journeys from SFMC using REST API
+ */
+async function fetchSFMCJourneys(accessToken, restEndpoint) {
+  try {
+    const axios = require('axios');
+    
+    // First get interactions (journeys)
+    const interactionsResponse = await axios.get(`${restEndpoint}/interaction/v1/interactions`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const interactions = interactionsResponse.data?.items || [];
+    
+    return interactions.map(journey => ({
+      id: `journey_${journey.id}`,
+      name: journey.name,
+      description: journey.description || '',
+      status: journey.status,
+      createdDate: journey.createdDate,
+      modifiedDate: journey.modifiedDate,
+      version: journey.version,
+      type: 'Journey'
+    }));
+    
+  } catch (error) {
+    console.error('❌ [SFMC API] Error fetching Journeys:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetch Triggered Sends from SFMC using SOAP API
+ */
+async function fetchSFMCTriggeredSends(accessToken, subdomain) {
+  try {
+    const axios = require('axios');
+    const xml2js = require('xml2js');
+    
+    const soapBody = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
+                      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                      xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+      <soapenv:Header>
+        <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+      </soapenv:Header>
+      <soapenv:Body>
+        <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+          <RetrieveRequest>
+            <ObjectType>TriggeredSendDefinition</ObjectType>
+            <Properties>ObjectID</Properties>
+            <Properties>Name</Properties>
+            <Properties>CustomerKey</Properties>
+            <Properties>Description</Properties>
+            <Properties>TriggeredSendStatus</Properties>
+            <Properties>CreatedDate</Properties>
+            <Properties>ModifiedDate</Properties>
+          </RetrieveRequest>
+        </RetrieveRequestMsg>
+      </soapenv:Body>
+    </soapenv:Envelope>`;
+
+    const response = await axios.post(`https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`, soapBody, {
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': 'Retrieve'
+      }
+    });
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
+    
+    const retrieveResponse = result['soap:Envelope']['soap:Body']['RetrieveResponseMsg'];
+    const results = retrieveResponse?.Results;
+    
+    if (!results) return [];
+    
+    const triggeredSends = Array.isArray(results) ? results : [results];
+    
+    return triggeredSends.map(ts => ({
+      id: `ts_${ts.CustomerKey}`,
+      name: ts.Name,
+      customerKey: ts.CustomerKey,
+      description: ts.Description || '',
+      status: ts.TriggeredSendStatus,
+      createdDate: ts.CreatedDate,
+      modifiedDate: ts.ModifiedDate,
+      type: 'TriggeredSend'
+    }));
+    
+  } catch (error) {
+    console.error('❌ [SFMC API] Error fetching Triggered Sends:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetch Data Filters from SFMC using SOAP API
+ */
+async function fetchSFMCFilters(accessToken, subdomain) {
+  try {
+    const axios = require('axios');
+    const xml2js = require('xml2js');
+    
+    const soapBody = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
+                      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                      xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+      <soapenv:Header>
+        <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+      </soapenv:Header>
+      <soapenv:Body>
+        <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+          <RetrieveRequest>
+            <ObjectType>FilterDefinition</ObjectType>
+            <Properties>ObjectID</Properties>
+            <Properties>Name</Properties>
+            <Properties>CustomerKey</Properties>
+            <Properties>Description</Properties>
+            <Properties>CreatedDate</Properties>
+            <Properties>ModifiedDate</Properties>
+          </RetrieveRequest>
+        </RetrieveRequestMsg>
+      </soapenv:Body>
+    </soapenv:Envelope>`;
+
+    const response = await axios.post(`https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`, soapBody, {
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': 'Retrieve'
+      }
+    });
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
+    
+    const retrieveResponse = result['soap:Envelope']['soap:Body']['RetrieveResponseMsg'];
+    const results = retrieveResponse?.Results;
+    
+    if (!results) return [];
+    
+    const filters = Array.isArray(results) ? results : [results];
+    
+    return filters.map(filter => ({
+      id: `filter_${filter.CustomerKey}`,
+      name: filter.Name,
+      customerKey: filter.CustomerKey,
+      description: filter.Description || '',
+      createdDate: filter.CreatedDate,
+      modifiedDate: filter.ModifiedDate,
+      type: 'Filter'
+    }));
+    
+  } catch (error) {
+    console.error('❌ [SFMC API] Error fetching Filters:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetch File Transfers from SFMC using REST API
+ */
+async function fetchSFMCFileTransfers(accessToken, restEndpoint) {
+  try {
+    const axios = require('axios');
+    
+    const response = await axios.get(`${restEndpoint}/automation/v1/filetransfers`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const fileTransfers = response.data?.items || [];
+    
+    return fileTransfers.map(ft => ({
+      id: `ft_${ft.id}`,
+      name: ft.name,
+      description: ft.description || '',
+      fileTransferType: ft.fileTransferType,
+      status: ft.status,
+      createdDate: ft.createdDate,
+      modifiedDate: ft.modifiedDate,
+      type: 'FileTransfer'
+    }));
+    
+  } catch (error) {
+    console.error('❌ [SFMC API] Error fetching File Transfers:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetch Data Extracts from SFMC using REST API
+ */
+async function fetchSFMCDataExtracts(accessToken, restEndpoint) {
+  try {
+    const axios = require('axios');
+    
+    const response = await axios.get(`${restEndpoint}/automation/v1/dataextracts`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const dataExtracts = response.data?.items || [];
+    
+    return dataExtracts.map(extract => ({
+      id: `extract_${extract.id}`,
+      name: extract.name,
+      description: extract.description || '',
+      extractType: extract.extractType,
+      status: extract.status,
+      createdDate: extract.createdDate,
+      modifiedDate: extract.modifiedDate,
+      type: 'DataExtract'
+    }));
+    
+  } catch (error) {
+    console.error('❌ [SFMC API] Error fetching Data Extracts:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Main function to fetch all SFMC objects
+ */
+async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
+  console.log('🔍 [SFMC API] Fetching all objects from Marketing Cloud...');
+  
+  const allObjects = {
+    'Data Extensions': [],
+    'SQL Queries': [],
+    'Automations': [],
+    'Journeys': [],
+    'Triggered Sends': [],
+    'Filters': [],
+    'File Transfers': [],
+    'Data Extracts': []
+  };
+
+  try {
+    // Fetch all object types in parallel for better performance
+    const [
+      dataExtensions,
+      queries,
+      automations,
+      journeys,
+      triggeredSends,
+      filters,
+      fileTransfers,
+      dataExtracts
+    ] = await Promise.allSettled([
+      fetchSFMCDataExtensions(accessToken, subdomain),
+      fetchSFMCQueries(accessToken, restEndpoint),
+      fetchSFMCAutomations(accessToken, restEndpoint),
+      fetchSFMCJourneys(accessToken, restEndpoint),
+      fetchSFMCTriggeredSends(accessToken, subdomain),
+      fetchSFMCFilters(accessToken, subdomain),
+      fetchSFMCFileTransfers(accessToken, restEndpoint),
+      fetchSFMCDataExtracts(accessToken, restEndpoint)
+    ]);
+
+    // Process results and handle any failures
+    if (dataExtensions.status === 'fulfilled') {
+      allObjects['Data Extensions'] = dataExtensions.value;
+      console.log(`✅ [SFMC API] Fetched ${dataExtensions.value.length} Data Extensions`);
+    } else {
+      console.error('❌ [SFMC API] Failed to fetch Data Extensions:', dataExtensions.reason.message);
+    }
+
+    if (queries.status === 'fulfilled') {
+      allObjects['SQL Queries'] = queries.value;
+      console.log(`✅ [SFMC API] Fetched ${queries.value.length} SQL Queries`);
+    } else {
+      console.error('❌ [SFMC API] Failed to fetch SQL Queries:', queries.reason.message);
+    }
+
+    if (automations.status === 'fulfilled') {
+      allObjects['Automations'] = automations.value;
+      console.log(`✅ [SFMC API] Fetched ${automations.value.length} Automations`);
+    } else {
+      console.error('❌ [SFMC API] Failed to fetch Automations:', automations.reason.message);
+    }
+
+    if (journeys.status === 'fulfilled') {
+      allObjects['Journeys'] = journeys.value;
+      console.log(`✅ [SFMC API] Fetched ${journeys.value.length} Journeys`);
+    } else {
+      console.error('❌ [SFMC API] Failed to fetch Journeys:', journeys.reason.message);
+    }
+
+    if (triggeredSends.status === 'fulfilled') {
+      allObjects['Triggered Sends'] = triggeredSends.value;
+      console.log(`✅ [SFMC API] Fetched ${triggeredSends.value.length} Triggered Sends`);
+    } else {
+      console.error('❌ [SFMC API] Failed to fetch Triggered Sends:', triggeredSends.reason.message);
+    }
+
+    if (filters.status === 'fulfilled') {
+      allObjects['Filters'] = filters.value;
+      console.log(`✅ [SFMC API] Fetched ${filters.value.length} Filters`);
+    } else {
+      console.error('❌ [SFMC API] Failed to fetch Filters:', filters.reason.message);
+    }
+
+    if (fileTransfers.status === 'fulfilled') {
+      allObjects['File Transfers'] = fileTransfers.value;
+      console.log(`✅ [SFMC API] Fetched ${fileTransfers.value.length} File Transfers`);
+    } else {
+      console.error('❌ [SFMC API] Failed to fetch File Transfers:', fileTransfers.reason.message);
+    }
+
+    if (dataExtracts.status === 'fulfilled') {
+      allObjects['Data Extracts'] = dataExtracts.value;
+      console.log(`✅ [SFMC API] Fetched ${dataExtracts.value.length} Data Extracts`);
+    } else {
+      console.error('❌ [SFMC API] Failed to fetch Data Extracts:', dataExtracts.reason.message);
+    }
+
+    return allObjects;
+    
+  } catch (error) {
+    console.error('❌ [SFMC API] Error in fetchAllSFMCObjects:', error.message);
+    throw error;
+  }
+}
+
 // ==================== GRAPH API UTILITY FUNCTIONS ====================
 
 /**
@@ -5686,6 +6183,136 @@ app.get('/graph/node/:id', async (req, res) => {
     console.error('❌ [Graph API] Error fetching node details:', error);
     res.status(500).json({ 
       error: 'Failed to fetch node details',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Objects endpoint for fetching SFMC objects for the sidebar
+ */
+app.get('/objects', async (req, res) => {
+  try {
+    const { mode = 'mock' } = req.query;
+    const mcCreds = req.session.mcCreds;
+    
+    console.log('🔍 [Objects API] Request received:', { 
+      mode, 
+      hasCredentials: !!mcCreds,
+      subdomain: mcCreds?.subdomain 
+    });
+    
+    if (mode === 'live' && mcCreds && mcCreds.subdomain && mcCreds.clientId && mcCreds.clientSecret) {
+      // Live mode - fetch from SFMC
+      console.log('📡 [Objects API] Fetching live data from Marketing Cloud...');
+      
+      try {
+        // Get fresh access token
+        const accessToken = await getMCAccessToken(req);
+        console.log('✅ [Objects API] Successfully obtained access token');
+        
+        // Determine REST endpoint
+        const restEndpoint = mcCreds.restEndpoint || `https://${mcCreds.subdomain}.rest.marketingcloudapis.com`;
+        
+        console.log('🔧 [Objects API] Using endpoints:', {
+          subdomain: mcCreds.subdomain,
+          restEndpoint: restEndpoint
+        });
+        
+        // Fetch all objects from SFMC
+        const sfmcObjects = await fetchAllSFMCObjects(accessToken, mcCreds.subdomain, restEndpoint);
+        
+        console.log('✅ [Objects API] Successfully fetched SFMC objects:', {
+          dataExtensions: sfmcObjects['Data Extensions'].length,
+          queries: sfmcObjects['SQL Queries'].length,
+          automations: sfmcObjects['Automations'].length,
+          journeys: sfmcObjects['Journeys'].length,
+          triggeredSends: sfmcObjects['Triggered Sends'].length,
+          filters: sfmcObjects['Filters'].length,
+          fileTransfers: sfmcObjects['File Transfers'].length,
+          dataExtracts: sfmcObjects['Data Extracts'].length
+        });
+        
+        res.json(sfmcObjects);
+        
+      } catch (apiError) {
+        console.error('❌ [Objects API] SFMC API Error:', apiError.message);
+        console.error('❌ [Objects API] Error details:', {
+          status: apiError.response?.status,
+          statusText: apiError.response?.statusText,
+          data: apiError.response?.data
+        });
+        
+        // Return error response with details
+        res.status(500).json({ 
+          error: 'Failed to fetch live data from Marketing Cloud',
+          message: apiError.message,
+          details: apiError.response?.data || 'No additional details available'
+        });
+      }
+      
+    } else {
+      // Mock mode - return test data
+      console.log('🎭 [Objects API] Returning mock data...');
+      
+      if (mode === 'live') {
+        console.log('⚠️ [Objects API] Live mode requested but missing credentials:', {
+          hasCredentials: !!mcCreds,
+          hasSubdomain: !!mcCreds?.subdomain,
+          hasClientId: !!mcCreds?.clientId,
+          hasClientSecret: !!mcCreds?.clientSecret
+        });
+      }
+      
+      const mockObjects = {
+        'Data Extensions': [
+          { id: 'de-1', name: 'Customer_Master_DE', externalKey: 'customer_master_001', type: 'DataExtension' },
+          { id: 'de-2', name: 'Email_Preferences_DE', externalKey: 'email_prefs_001', type: 'DataExtension' },
+          { id: 'de-3', name: 'Purchase_History_DE', externalKey: 'purchase_hist_001', type: 'DataExtension' },
+          { id: 'de-4', name: 'Journey_Activity_DE', externalKey: 'journey_activity_001', type: 'DataExtension' },
+          { id: 'de-5', name: 'Campaign_Results_DE', externalKey: 'campaign_results_001', type: 'DataExtension' }
+        ],
+        'Automations': [
+          { id: 'auto-1', name: 'Daily_Data_Import', description: 'Import customer data daily', type: 'Automation' },
+          { id: 'auto-2', name: 'Email_Cleanup_Process', description: 'Clean bounced emails', type: 'Automation' },
+          { id: 'auto-3', name: 'Journey_Data_Sync', description: 'Sync journey completion data', type: 'Automation' }
+        ],
+        'Journeys': [
+          { id: 'journey-1', name: 'Welcome_Series', status: 'Active', type: 'Journey' },
+          { id: 'journey-2', name: 'Abandonment_Recovery', status: 'Active', type: 'Journey' },
+          { id: 'journey-3', name: 'Birthday_Campaign', status: 'Paused', type: 'Journey' }
+        ],
+        'SQL Queries': [
+          { id: 'sql-1', name: 'Customer_Segmentation_Query', queryType: 'Data Extension Activity', type: 'Query' },
+          { id: 'sql-2', name: 'Email_Performance_Report', queryType: 'Send Job Activity', type: 'Query' },
+          { id: 'sql-3', name: 'Journey_Attribution_Query', queryType: 'Journey Builder Activity', type: 'Query' }
+        ],
+        'Triggered Sends': [
+          { id: 'ts-1', name: 'Password_Reset_Email', status: 'Active', type: 'TriggeredSend' },
+          { id: 'ts-2', name: 'Order_Confirmation', status: 'Active', type: 'TriggeredSend' },
+          { id: 'ts-3', name: 'Weekly_Newsletter', status: 'Paused', type: 'TriggeredSend' }
+        ],
+        'Filters': [
+          { id: 'filter-1', name: 'Active_Subscribers_Filter', description: 'Subscribers with active status', type: 'Filter' },
+          { id: 'filter-2', name: 'High_Value_Customers', description: 'Customers with >$1000 lifetime value', type: 'Filter' }
+        ],
+        'File Transfers': [
+          { id: 'ft-1', name: 'Daily_Customer_Export', destination: 'SFTP Server', type: 'FileTransfer' },
+          { id: 'ft-2', name: 'Campaign_Data_Import', source: 'External API', type: 'FileTransfer' }
+        ],
+        'Data Extracts': [
+          { id: 'extract-1', name: 'Monthly_Performance_Extract', schedule: 'Monthly', type: 'DataExtract' },
+          { id: 'extract-2', name: 'Customer_Export_Extract', schedule: 'Daily', type: 'DataExtract' }
+        ]
+      };
+      
+      res.json(mockObjects);
+    }
+    
+  } catch (error) {
+    console.error('❌ [Objects API] Unexpected error:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch objects',
       message: error.message 
     });
   }
