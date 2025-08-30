@@ -5570,6 +5570,8 @@ async function fetchSFMCQueries(accessToken, restEndpoint) {
       name: query.name || 'Unnamed Query',
       description: query.description || '',
       queryType: query.queryType || 'Unknown',
+      queryText: query.queryText || '',
+      sqlStatement: query.queryText || '',
       createdDate: query.createdDate,
       modifiedDate: query.modifiedDate,
       status: query.status,
@@ -5614,6 +5616,8 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
       status: automation.status,
       createdDate: automation.createdDate,
       modifiedDate: automation.modifiedDate,
+      steps: automation.steps || [],
+      activities: automation.activities || [],
       type: 'Automation'
     }));
     
@@ -5632,31 +5636,42 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
  */
 async function fetchSFMCJourneys(accessToken, restEndpoint) {
   try {
-    const axios = require('axios');
+    console.log('🔍 [SFMC API] Fetching Journeys...');
     
     // First get interactions (journeys)
     const interactionsResponse = await axios.get(`${restEndpoint}/interaction/v1/interactions`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: 30000 // 30 second timeout
     });
+
+    console.log('📡 [SFMC API] Journeys REST response received');
 
     const interactions = interactionsResponse.data?.items || [];
     
+    console.log(`✅ [SFMC API] Found ${interactions.length} Journeys`);
+    
     return interactions.map(journey => ({
       id: `journey_${journey.id}`,
-      name: journey.name,
+      name: journey.name || 'Unnamed Journey',
       description: journey.description || '',
       status: journey.status,
       createdDate: journey.createdDate,
       modifiedDate: journey.modifiedDate,
       version: journey.version,
+      entrySource: journey.entrySource || {},
+      activities: journey.activities || [],
       type: 'Journey'
     }));
     
   } catch (error) {
     console.error('❌ [SFMC API] Error fetching Journeys:', error.message);
+    if (error.response) {
+      console.error('❌ [SFMC API] Response status:', error.response.status);
+      console.error('❌ [SFMC API] Response data:', JSON.stringify(error.response.data, null, 2));
+    }
     throw error;
   }
 }
@@ -5855,6 +5870,377 @@ async function fetchSFMCDataExtracts(accessToken, restEndpoint) {
   }
 }
 
+// ==================== RELATIONSHIP DETECTION FUNCTIONS ====================
+
+/**
+ * Analyze relationships between SFMC assets
+ * Returns edges for the graph visualization
+ */
+
+/**
+ * Detect Data Extension relationships in SQL Queries
+ */
+function detectQueryToDataExtensionRelationships(queries, dataExtensions) {
+  const relationships = [];
+  const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
+  const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
+  
+  queries.forEach(query => {
+    if (!query.queryText && !query.sqlStatement) return;
+    
+    const sqlText = (query.queryText || query.sqlStatement || '').toLowerCase();
+    
+    // Detect READ relationships (FROM, JOIN)
+    const fromMatches = sqlText.match(/(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi);
+    if (fromMatches) {
+      fromMatches.forEach(match => {
+        const deName = match.replace(/(?:from|join)\s+/i, '').trim();
+        const de = deMap.get(deName) || deKeyMap.get(deName);
+        if (de) {
+          relationships.push({
+            id: `${de.id}-${query.id}`,
+            source: de.id,
+            target: query.id,
+            type: 'reads_from',
+            label: 'reads from',
+            description: `Query "${query.name}" reads from DE "${de.name}"`
+          });
+        }
+      });
+    }
+    
+    // Detect WRITE relationships (INTO, OVERWRITE, APPEND)
+    const intoMatches = sqlText.match(/(?:into|overwrite|append)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi);
+    if (intoMatches) {
+      intoMatches.forEach(match => {
+        const deName = match.replace(/(?:into|overwrite|append)\s+/i, '').trim();
+        const de = deMap.get(deName) || deKeyMap.get(deName);
+        if (de) {
+          relationships.push({
+            id: `${query.id}-${de.id}`,
+            source: query.id,
+            target: de.id,
+            type: 'writes_to',
+            label: 'writes to',
+            description: `Query "${query.name}" writes to DE "${de.name}"`
+          });
+        }
+      });
+    }
+  });
+  
+  return relationships;
+}
+
+/**
+ * Detect Data Extension relationships in Filters
+ */
+function detectFilterToDataExtensionRelationships(filters, dataExtensions) {
+  const relationships = [];
+  const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
+  const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
+  
+  filters.forEach(filter => {
+    // Source DE relationship
+    if (filter.dataSource) {
+      const sourceDeName = filter.dataSource.toLowerCase();
+      const sourceDe = deMap.get(sourceDeName) || deKeyMap.get(sourceDeName);
+      if (sourceDe) {
+        relationships.push({
+          id: `${sourceDe.id}-${filter.id}`,
+          source: sourceDe.id,
+          target: filter.id,
+          type: 'filters_from',
+          label: 'filters from',
+          description: `Filter "${filter.name}" uses source DE "${sourceDe.name}"`
+        });
+      }
+    }
+    
+    // Target DE relationship (if filter creates a new DE)
+    if (filter.targetDataExtension) {
+      const targetDeName = filter.targetDataExtension.toLowerCase();
+      const targetDe = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
+      if (targetDe) {
+        relationships.push({
+          id: `${filter.id}-${targetDe.id}`,
+          source: filter.id,
+          target: targetDe.id,
+          type: 'creates_filtered_de',
+          label: 'creates filtered DE',
+          description: `Filter "${filter.name}" creates filtered DE "${targetDe.name}"`
+        });
+      }
+    }
+  });
+  
+  return relationships;
+}
+
+/**
+ * Detect Data Extension relationships in Automations
+ */
+function detectAutomationToDataExtensionRelationships(automations, dataExtensions, queries, fileTransfers, dataExtracts) {
+  const relationships = [];
+  const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
+  const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
+  
+  automations.forEach(automation => {
+    // Check if automation contains query activities
+    if (automation.steps || automation.activities) {
+      const activities = automation.steps || automation.activities || [];
+      
+      activities.forEach(activity => {
+        // Query Activity relationships
+        if (activity.type === 'query' || activity.activityType === 'query') {
+          const query = queries.find(q => q.id === activity.queryDefinitionId || q.name === activity.queryName);
+          if (query) {
+            relationships.push({
+              id: `${automation.id}-${query.id}`,
+              source: automation.id,
+              target: query.id,
+              type: 'contains_query',
+              label: 'contains query',
+              description: `Automation "${automation.name}" contains Query "${query.name}"`
+            });
+          }
+        }
+        
+        // File Transfer relationships
+        if (activity.type === 'fileTransfer' || activity.activityType === 'fileTransfer') {
+          const fileTransfer = fileTransfers.find(ft => ft.id === activity.fileTransferId);
+          if (fileTransfer) {
+            relationships.push({
+              id: `${automation.id}-${fileTransfer.id}`,
+              source: automation.id,
+              target: fileTransfer.id,
+              type: 'contains_file_transfer',
+              label: 'contains file transfer',
+              description: `Automation "${automation.name}" contains File Transfer "${fileTransfer.name}"`
+            });
+          }
+        }
+        
+        // Data Extract relationships
+        if (activity.type === 'dataExtract' || activity.activityType === 'dataExtract') {
+          const dataExtract = dataExtracts.find(de => de.id === activity.dataExtractId);
+          if (dataExtract) {
+            relationships.push({
+              id: `${automation.id}-${dataExtract.id}`,
+              source: automation.id,
+              target: dataExtract.id,
+              type: 'contains_data_extract',
+              label: 'contains data extract',
+              description: `Automation "${automation.name}" contains Data Extract "${dataExtract.name}"`
+            });
+          }
+        }
+        
+        // Direct DE relationships (import activities, etc.)
+        if (activity.targetDataExtension) {
+          const targetDeName = activity.targetDataExtension.toLowerCase();
+          const targetDe = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
+          if (targetDe) {
+            relationships.push({
+              id: `${automation.id}-${targetDe.id}`,
+              source: automation.id,
+              target: targetDe.id,
+              type: 'imports_to_de',
+              label: 'imports to DE',
+              description: `Automation "${automation.name}" imports data to DE "${targetDe.name}"`
+            });
+          }
+        }
+      });
+    }
+  });
+  
+  return relationships;
+}
+
+/**
+ * Detect Data Extension relationships in Journeys
+ */
+function detectJourneyToDataExtensionRelationships(journeys, dataExtensions) {
+  const relationships = [];
+  const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
+  const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
+  
+  journeys.forEach(journey => {
+    // Entry Event DE relationships
+    if (journey.entrySource) {
+      if (journey.entrySource.type === 'dataExtension' || journey.entrySource.type === 'apiEvent') {
+        const entryDeName = journey.entrySource.dataExtensionName?.toLowerCase();
+        const entryDe = deMap.get(entryDeName) || deKeyMap.get(entryDeName);
+        if (entryDe) {
+          relationships.push({
+            id: `${entryDe.id}-${journey.id}`,
+            source: entryDe.id,
+            target: journey.id,
+            type: 'journey_entry_source',
+            label: 'journey entry source',
+            description: `DE "${entryDe.name}" is entry source for Journey "${journey.name}"`
+          });
+        }
+      }
+    }
+    
+    // Decision Split and Exit Criteria DE relationships
+    if (journey.activities) {
+      journey.activities.forEach(activity => {
+        if (activity.type === 'decision' || activity.type === 'wait') {
+          if (activity.configurationData && activity.configurationData.dataExtension) {
+            const deName = activity.configurationData.dataExtension.toLowerCase();
+            const de = deMap.get(deName) || deKeyMap.get(deName);
+            if (de) {
+              relationships.push({
+                id: `${de.id}-${journey.id}`,
+                source: de.id,
+                target: journey.id,
+                type: 'journey_decision_source',
+                label: 'journey decision source',
+                description: `DE "${de.name}" used in decision/wait activity in Journey "${journey.name}"`
+              });
+            }
+          }
+        }
+      });
+    }
+  });
+  
+  return relationships;
+}
+
+/**
+ * Detect Triggered Send relationships with Data Extensions
+ */
+function detectTriggeredSendToDataExtensionRelationships(triggeredSends, dataExtensions) {
+  const relationships = [];
+  const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
+  const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
+  
+  triggeredSends.forEach(ts => {
+    // Send Data Extension relationship
+    if (ts.sendDataExtension) {
+      const sendDeName = ts.sendDataExtension.toLowerCase();
+      const sendDe = deMap.get(sendDeName) || deKeyMap.get(sendDeName);
+      if (sendDe) {
+        relationships.push({
+          id: `${sendDe.id}-${ts.id}`,
+          source: sendDe.id,
+          target: ts.id,
+          type: 'triggered_send_source',
+          label: 'triggered send source',
+          description: `DE "${sendDe.name}" is send source for Triggered Send "${ts.name}"`
+        });
+      }
+    }
+    
+    // Suppression List DE relationship
+    if (ts.suppressionListDataExtension) {
+      const suppressionDeName = ts.suppressionListDataExtension.toLowerCase();
+      const suppressionDe = deMap.get(suppressionDeName) || deKeyMap.get(suppressionDeName);
+      if (suppressionDe) {
+        relationships.push({
+          id: `${suppressionDe.id}-${ts.id}`,
+          source: suppressionDe.id,
+          target: ts.id,
+          type: 'suppression_list',
+          label: 'suppression list',
+          description: `DE "${suppressionDe.name}" is suppression list for Triggered Send "${ts.name}"`
+        });
+      }
+    }
+  });
+  
+  return relationships;
+}
+
+/**
+ * Detect File Transfer and Data Extract relationships with Data Extensions
+ */
+function detectFileTransferDataExtractRelationships(fileTransfers, dataExtracts, dataExtensions) {
+  const relationships = [];
+  const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
+  const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
+  
+  // File Transfer relationships
+  fileTransfers.forEach(ft => {
+    if (ft.targetDataExtension) {
+      const targetDeName = ft.targetDataExtension.toLowerCase();
+      const targetDe = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
+      if (targetDe) {
+        relationships.push({
+          id: `${ft.id}-${targetDe.id}`,
+          source: ft.id,
+          target: targetDe.id,
+          type: 'file_transfer_target',
+          label: 'transfers to DE',
+          description: `File Transfer "${ft.name}" transfers data to DE "${targetDe.name}"`
+        });
+      }
+    }
+  });
+  
+  // Data Extract relationships
+  dataExtracts.forEach(extract => {
+    if (extract.sourceDataExtension) {
+      const sourceDeName = extract.sourceDataExtension.toLowerCase();
+      const sourceDe = deMap.get(sourceDeName) || deKeyMap.get(sourceDeName);
+      if (sourceDe) {
+        relationships.push({
+          id: `${sourceDe.id}-${extract.id}`,
+          source: sourceDe.id,
+          target: extract.id,
+          type: 'data_extract_source',
+          label: 'extracts from DE',
+          description: `Data Extract "${extract.name}" extracts data from DE "${sourceDe.name}"`
+        });
+      }
+    }
+  });
+  
+  return relationships;
+}
+
+/**
+ * Main function to detect all relationships between SFMC assets
+ */
+function detectAllAssetRelationships(sfmcObjects) {
+  const dataExtensions = sfmcObjects['Data Extensions'] || [];
+  const queries = sfmcObjects['SQL Queries'] || [];
+  const automations = sfmcObjects['Automations'] || [];
+  const journeys = sfmcObjects['Journeys'] || [];
+  const triggeredSends = sfmcObjects['Triggered Sends'] || [];
+  const filters = sfmcObjects['Filters'] || [];
+  const fileTransfers = sfmcObjects['File Transfers'] || [];
+  const dataExtracts = sfmcObjects['Data Extracts'] || [];
+  
+  console.log('🔍 [Relationships] Detecting relationships between assets...');
+  
+  const allRelationships = [
+    ...detectQueryToDataExtensionRelationships(queries, dataExtensions),
+    ...detectFilterToDataExtensionRelationships(filters, dataExtensions),
+    ...detectAutomationToDataExtensionRelationships(automations, dataExtensions, queries, fileTransfers, dataExtracts),
+    ...detectJourneyToDataExtensionRelationships(journeys, dataExtensions),
+    ...detectTriggeredSendToDataExtensionRelationships(triggeredSends, dataExtensions),
+    ...detectFileTransferDataExtractRelationships(fileTransfers, dataExtracts, dataExtensions)
+  ];
+  
+  console.log(`✅ [Relationships] Detected ${allRelationships.length} relationships`);
+  
+  // Remove duplicates
+  const uniqueRelationships = allRelationships.filter((rel, index, arr) => 
+    arr.findIndex(r => r.id === rel.id) === index
+  );
+  
+  console.log(`✅ [Relationships] After deduplication: ${uniqueRelationships.length} unique relationships`);
+  
+  return uniqueRelationships;
+}
+
+// ==================== END RELATIONSHIP DETECTION FUNCTIONS ====================
+
 /**
  * Main function to fetch all SFMC objects
  */
@@ -5972,7 +6358,7 @@ function generateMockGraphData(types = [], keys = []) {
   const mockEdges = [];
   
   // Mock Data Extensions
-  if (!types.length || types.includes('DE')) {
+  if (!types.length || types.includes('DataExtension')) {
     const dataExtensions = [
       { id: 'de_customer_master', name: 'Customer_Master_DE', type: 'DataExtension' },
       { id: 'de_email_preferences', name: 'Email_Preferences_DE', type: 'DataExtension' },
@@ -5982,13 +6368,16 @@ function generateMockGraphData(types = [], keys = []) {
     ];
     
     dataExtensions.forEach(de => {
-      if (!keys.length || keys.includes(de.id)) {
+      if (!keys.length || keys.some(key => de.name.toLowerCase().includes(key.toLowerCase()) || de.id.includes(key))) {
         mockNodes.push({
           data: {
             id: de.id,
             label: de.name,
             type: de.type,
-            name: de.name
+            category: 'Data Extensions',
+            name: de.name,
+            description: `Mock data extension: ${de.name}`,
+            status: 'Active'
           }
         });
       }
@@ -6004,13 +6393,16 @@ function generateMockGraphData(types = [], keys = []) {
     ];
     
     queries.forEach(query => {
-      if (!keys.length || keys.includes(query.id)) {
+      if (!keys.length || keys.some(key => query.name.toLowerCase().includes(key.toLowerCase()) || query.id.includes(key))) {
         mockNodes.push({
           data: {
             id: query.id,
             label: query.name,
             type: query.type,
-            name: query.name
+            category: 'SQL Queries',
+            name: query.name,
+            description: `Mock SQL query: ${query.name}`,
+            status: 'Active'
           }
         });
       }
@@ -6026,13 +6418,16 @@ function generateMockGraphData(types = [], keys = []) {
     ];
     
     automations.forEach(auto => {
-      if (!keys.length || keys.includes(auto.id)) {
+      if (!keys.length || keys.some(key => auto.name.toLowerCase().includes(key.toLowerCase()) || auto.id.includes(key))) {
         mockNodes.push({
           data: {
             id: auto.id,
             label: auto.name,
             type: auto.type,
-            name: auto.name
+            category: 'Automations',
+            name: auto.name,
+            description: `Mock automation: ${auto.name}`,
+            status: 'Active'
           }
         });
       }
@@ -6043,78 +6438,55 @@ function generateMockGraphData(types = [], keys = []) {
   if (!types.length || types.includes('Journey')) {
     const journeys = [
       { id: 'journey_welcome_series', name: 'Welcome_Series', type: 'Journey' },
-      { id: 'journey_abandonment', name: 'Abandonment_Recovery', type: 'Journey' },
-      { id: 'journey_birthday', name: 'Birthday_Campaign', type: 'Journey' }
+      { id: 'journey_abandonment_recovery', name: 'Abandonment_Recovery', type: 'Journey' },
+      { id: 'journey_birthday_campaign', name: 'Birthday_Campaign', type: 'Journey' }
     ];
     
     journeys.forEach(journey => {
-      if (!keys.length || keys.includes(journey.id)) {
+      if (!keys.length || keys.some(key => journey.name.toLowerCase().includes(key.toLowerCase()) || journey.id.includes(key))) {
         mockNodes.push({
           data: {
             id: journey.id,
             label: journey.name,
             type: journey.type,
-            name: journey.name
+            category: 'Journeys',
+            name: journey.name,
+            description: `Mock journey: ${journey.name}`,
+            status: 'Active'
           }
         });
       }
     });
   }
   
-  // Generate mock relationships
-  const nodeIds = mockNodes.map(n => n.data.id);
+  // Create filter for which nodes exist after filtering
+  const nodeIds = new Set(mockNodes.map(n => n.data.id));
   
-  // Query reads from DE relationships
-  if (nodeIds.includes('query_customer_segmentation') && nodeIds.includes('de_customer_master')) {
-    mockEdges.push({
-      data: {
-        id: 'edge_query_customer_segmentation_reads_customer_master',
-        source: 'query_customer_segmentation',
-        target: 'de_customer_master',
-        type: 'QUERY_READS_FROM',
-        label: 'reads from'
-      }
-    });
-  }
+  // Mock Relationship Edges (only include if both nodes exist)
+  const mockRelationships = [
+    { source: 'query_customer_segmentation', target: 'de_customer_master', label: 'reads from', type: 'reads_from' },
+    { source: 'query_customer_segmentation', target: 'de_email_preferences', label: 'writes to', type: 'writes_to' },
+    { source: 'auto_daily_import', target: 'de_customer_master', label: 'imports to DE', type: 'imports_to_de' },
+    { source: 'de_customer_master', target: 'journey_welcome_series', label: 'journey entry source', type: 'journey_entry_source' },
+    { source: 'journey_welcome_series', target: 'de_journey_activity', label: 'writes activity', type: 'writes_to' },
+    { source: 'auto_journey_sync', target: 'query_journey_attribution', label: 'contains query', type: 'contains_query' },
+    { source: 'query_email_performance', target: 'de_campaign_results', label: 'writes to', type: 'writes_to' }
+  ];
   
-  // Query writes to DE relationships
-  if (nodeIds.includes('query_customer_segmentation') && nodeIds.includes('de_campaign_results')) {
-    mockEdges.push({
-      data: {
-        id: 'edge_query_customer_segmentation_writes_campaign_results',
-        source: 'query_customer_segmentation',
-        target: 'de_campaign_results',
-        type: 'QUERY_WRITES_TO',
-        label: 'writes to'
-      }
-    });
-  }
-  
-  // Journey uses DE relationships
-  if (nodeIds.includes('journey_welcome_series') && nodeIds.includes('de_customer_master')) {
-    mockEdges.push({
-      data: {
-        id: 'edge_journey_welcome_series_uses_customer_master',
-        source: 'journey_welcome_series',
-        target: 'de_customer_master',
-        type: 'JOURNEY_USES',
-        label: 'uses'
-      }
-    });
-  }
-  
-  // Automation contains Query relationships
-  if (nodeIds.includes('auto_daily_import') && nodeIds.includes('query_customer_segmentation')) {
-    mockEdges.push({
-      data: {
-        id: 'edge_auto_daily_import_contains_query_customer_segmentation',
-        source: 'auto_daily_import',
-        target: 'query_customer_segmentation',
-        type: 'AUTOMATION_CONTAINS',
-        label: 'contains'
-      }
-    });
-  }
+  mockRelationships.forEach((rel, index) => {
+    if (nodeIds.has(rel.source) && nodeIds.has(rel.target)) {
+      mockEdges.push({
+        data: {
+          id: `edge_${index}`,
+          source: rel.source,
+          target: rel.target,
+          label: rel.label,
+          type: rel.type,
+          description: `${rel.label} relationship`
+        }
+      });
+    }
+  });
   
   return {
     nodes: mockNodes,
@@ -6143,9 +6515,32 @@ app.get('/graph', async (req, res) => {
     let graphData;
     
     if (mode === 'live' && req.session.mcCreds) {
-      // Live mode - placeholder for future SFMC integration
-      console.log('📡 [Graph API] Live mode requested but not yet implemented');
-      graphData = generateMockGraphData(types, parsedKeys);
+      // Live mode - generate graph from real SFMC data
+      console.log('📡 [Graph API] Generating graph from live SFMC data...');
+      
+      try {
+        // Get existing access token from session
+        const accessToken = getAccessTokenFromRequest(req);
+        const subdomain = getSubdomainFromRequest(req);
+        
+        if (!accessToken || !subdomain) {
+          console.log('⚠️ [Graph API] Missing access token for live mode, falling back to mock');
+          graphData = generateMockGraphData(types, parsedKeys);
+        } else {
+          // Fetch all SFMC objects
+          const restEndpoint = req.session.mcCreds.restEndpoint || `https://${subdomain}.rest.marketingcloudapis.com`;
+          const sfmcObjects = await fetchAllSFMCObjects(accessToken, subdomain, restEndpoint);
+          
+          // Generate graph data from real SFMC objects
+          graphData = generateLiveGraphData(sfmcObjects, types, parsedKeys);
+          
+          console.log('✅ [Graph API] Generated live graph data from SFMC objects');
+        }
+        
+      } catch (error) {
+        console.error('❌ [Graph API] Error fetching live data, falling back to mock:', error.message);
+        graphData = generateMockGraphData(types, parsedKeys);
+      }
     } else {
       // Mock mode - return test data
       console.log('🎭 [Graph API] Returning mock data...');
