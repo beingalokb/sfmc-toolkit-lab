@@ -5433,40 +5433,6 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
   }
 });
 
-// Serve React frontend (must be before app.listen)
-const buildPath = path.join(__dirname, '../mc-explorer-client/build');
-
-// Check if build directory exists
-if (fs.existsSync(buildPath)) {
-  app.use(express.static(buildPath));
-  app.get(/(.*)/, (req, res) => {
-    res.sendFile(path.join(buildPath, 'index.html'));
-  });
-  console.log('✅ Serving React frontend from build directory');
-} else {
-  console.log('⚠️ Build directory not found. Frontend may not be available.');
-  app.get('/', (req, res) => {
-    res.json({ 
-      message: 'MC-Explorer Server is running', 
-      status: 'Build directory not found - please run npm run build',
-      api: 'Available at /api/*'
-    });
-  });
-}
-
-// Suppress MemoryStore warning in production
-if (process.env.NODE_ENV === 'production') {
-  const originalWarn = console.warn;
-  console.warn = function(...args) {
-    const message = args.join(' ');
-    if (message.includes('MemoryStore is not designed for a production environment')) {
-      console.log('📝 [SESSION] MemoryStore warning suppressed (single-instance deployment)');
-      return;
-    }
-    originalWarn.apply(console, args);
-  };
-}
-
 // ==================== GRAPH API UTILITY FUNCTIONS ====================
 
 /**
@@ -5724,5 +5690,39 @@ app.get('/graph/node/:id', async (req, res) => {
     });
   }
 });
+
+// Serve React frontend (must be after API endpoints)
+const buildPath = path.join(__dirname, '../mc-explorer-client/build');
+
+// Check if build directory exists
+if (fs.existsSync(buildPath)) {
+  app.use(express.static(buildPath));
+  app.get(/(.*)/, (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
+  });
+  console.log('✅ Serving React frontend from build directory');
+} else {
+  console.log('⚠️ Build directory not found. Frontend may not be available.');
+  app.get('/', (req, res) => {
+    res.json({ 
+      message: 'MC-Explorer Server is running', 
+      status: 'Build directory not found - please run npm run build',
+      api: 'Available at /api/*'
+    });
+  });
+}
+
+// Suppress MemoryStore warning in production
+if (process.env.NODE_ENV === 'production') {
+  const originalWarn = console.warn;
+  console.warn = function(...args) {
+    const message = args.join(' ');
+    if (message.includes('MemoryStore is not designed for a production environment')) {
+      console.log('📝 [SESSION] MemoryStore warning suppressed (single-instance deployment)');
+      return;
+    }
+    originalWarn.apply(console, args);
+  };
+}
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
