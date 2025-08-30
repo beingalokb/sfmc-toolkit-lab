@@ -1470,7 +1470,7 @@ app.get('/search/deliveryprofile', async (req, res) => {
                           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                           xmlns:xsd="http://www.w3.org/2001/XMLSchema">
           <soapenv:Header>
-            <fueloauth>${accessToken}</fueloauth>
+            <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
           </soapenv:Header>
           <soapenv:Body>
             <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
@@ -1573,8 +1573,11 @@ app.get('/search/deliveryprofile', async (req, res) => {
     res.json(deliveryProfiles);
     
   } catch (e) {
-    console.error('❌ [DeliveryProfile] Failed to extract delivery profiles:', e);
-    res.status(500).json({ error: 'Failed to extract delivery profiles' });
+    console.error('❌ [DeliveryProfile] Failed to extract delivery profiles:', e.response?.data || e.message);
+    if (e.response?.data) {
+      console.log('📋 [DeliveryProfile] Error response sample:', e.response.data.substring(0, 500));
+    }
+    res.status(500).json([]);
   }
 });
 
@@ -1685,7 +1688,7 @@ app.post('/update/emailsenddefinition', async (req, res) => {
     const soapEnvelope = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <soapenv:Header>
-          <fueloauth>${accessToken}</fueloauth>
+          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
         </soapenv:Header>
         <soapenv:Body>
           <UpdateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
@@ -1888,22 +1891,14 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
             </soapenv:Body>
           </soapenv:Envelope>
         `;
-        
         const response = await axios.post(
           `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
           soapEnvelope,
-          {
-            headers: {
-              'Content-Type': 'text/xml',
-              SOAPAction: 'Retrieve',
-            },
-          }
+          { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
         );
-        
         const parser = new xml2js.Parser({ explicitArray: false });
         const result = await parser.parseStringPromise(response.data);
         const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
-        
         if (results) {
           allResults = allResults.concat(Array.isArray(results) ? results : [results]);
         }
@@ -1948,12 +1943,7 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
       const response = await axios.post(
         `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
         soapEnvelope,
-        {
-          headers: {
-            'Content-Type': 'text/xml',
-            SOAPAction: 'Retrieve',
-          },
-        }
+        { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
       );
       const parser = new xml2js.Parser({ explicitArray: false });
       const result = await parser.parseStringPromise(response.data);
@@ -2072,6 +2062,7 @@ app.get('/describe-soap-object', async (req, res) => {
       }
     );
     const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
     const objDef = result?.['soap:Envelope']?.['soap:Body']?.['DescribeResponseMsg']?.['ObjectDefinition'] || {};
     let props = objDef?.Properties?.PropertyDefinition || [];
     if (!Array.isArray(props)) props = [props];
@@ -2351,10 +2342,10 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
                 <Field><Name>sfCampaignId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>sfCampaignMemberId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>sfQuickSendId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
-                <Field><Name>sendFromName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength></Field>
-                <Field><Name>sendFromEmail</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength></Field>
-                <Field><Name>firstName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength></Field>
-                <Field><Name>lastName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength></Field>
+                <Field><Name>sendFromName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>sendFromEmail</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>firstName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>lastName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>sfUserId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>journeyID</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>sfOrgId</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
@@ -3008,13 +2999,22 @@ app.get('/api/email-archive/send', async (req, res) => {
     let results = [];
     try {
       const retrieveResponse = parsed['soap:Envelope']['soap:Body']['RetrieveResponseMsg']['Results'];
-      const resultArray = Array.isArray(retrieveResponse) ? retrieveResponse : [retrieveResponse];
-      results = resultArray.map(r => ({
-        SendDate: r.SendDate || r.SentDate || '',
-        EmailName: r.EmailName || '',
-        Subject: r.Subject || '',
-        ID: r.ID || '',
-        SubscriberKey: r.SubscriberKey || '',
+      if (Array.isArray(retrieveResponse)) {
+        results = retrieveResponse;
+      } else if (retrieveResponse) {
+        results = [retrieveResponse];
+      }
+    } catch (e) {
+      results = [];
+    }
+    // Map to only relevant fields for frontend
+    const mapped = results.map(r => ({
+      SendDate: r.SendDate || r.SentDate || '',
+      EmailName: r.EmailName || '',
+      Subject: r.Subject || '',
+      ID: r.ID || '',
+      SubscriberKey: r.SubscriberKey || '',
+      MID: r['Client']?.ID || r['Client.ID'] || '',
       FromName: r.FromName || '',
       FromAddress: r.FromAddress || '',
       NumberSent: r.NumberSent || '',
@@ -5433,10 +5433,44 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
   }
 });
 
+// Serve React frontend (must be before app.listen)
+const buildPath = path.join(__dirname, '../mc-explorer-client/build');
+
+// Check if build directory exists
+if (fs.existsSync(buildPath)) {
+  app.use(express.static(buildPath));
+  app.get(/(.*)/, (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
+  });
+  console.log('✅ Serving React frontend from build directory');
+} else {
+  console.log('⚠️ Build directory not found. Frontend may not be available.');
+  app.get('/', (req, res) => {
+    res.json({ 
+      message: 'MC-Explorer Server is running', 
+      status: 'Build directory not found - please run npm run build',
+      api: 'Available at /api/*'
+    });
+  });
+}
+
+// Suppress MemoryStore warning in production
+if (process.env.NODE_ENV === 'production') {
+  const originalWarn = console.warn;
+  console.warn = function(...args) {
+    const message = args.join(' ');
+    if (message.includes('MemoryStore is not designed for a production environment')) {
+      console.log('📝 [SESSION] MemoryStore warning suppressed (single-instance deployment)');
+      return;
+    }
+    originalWarn.apply(console, args);
+  };
+}
+
 // ==================== GRAPH API UTILITY FUNCTIONS ====================
 
 /**
- * Generates mock data for testing when SFMC is not available
+ * Generates mock graph data for the Schema Builder
  * @param {Array} types - Array of object types to include
  * @param {Array} keys - Array of specific keys to include
  * @returns {Object} Mock graph data in Cytoscape format
@@ -5690,39 +5724,5 @@ app.get('/graph/node/:id', async (req, res) => {
     });
   }
 });
-
-// Serve React frontend (must be before app.listen)
-const buildPath = path.join(__dirname, '../mc-explorer-client/build');
-
-// Check if build directory exists
-if (fs.existsSync(buildPath)) {
-  app.use(express.static(buildPath));
-  app.get(/(.*)/, (req, res) => {
-    res.sendFile(path.join(buildPath, 'index.html'));
-  });
-  console.log('✅ Serving React frontend from build directory');
-} else {
-  console.log('⚠️ Build directory not found. Frontend may not be available.');
-  app.get('/', (req, res) => {
-    res.json({ 
-      message: 'MC-Explorer Server is running', 
-      status: 'Build directory not found - please run npm run build',
-      api: 'Available at /api/*'
-    });
-  });
-}
-
-// Suppress MemoryStore warning in production
-if (process.env.NODE_ENV === 'production') {
-  const originalWarn = console.warn;
-  console.warn = function(...args) {
-    const message = args.join(' ');
-    if (message.includes('MemoryStore is not designed for a production environment')) {
-      console.log('📝 [SESSION] MemoryStore warning suppressed (single-instance deployment)');
-      return;
-    }
-    originalWarn.apply(console, args);
-  };
-}
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
