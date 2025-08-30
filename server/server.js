@@ -1470,7 +1470,7 @@ app.get('/search/deliveryprofile', async (req, res) => {
                           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                           xmlns:xsd="http://www.w3.org/2001/XMLSchema">
           <soapenv:Header>
-            <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+            <fueloauth>${accessToken}</fueloauth>
           </soapenv:Header>
           <soapenv:Body>
             <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
@@ -1573,11 +1573,8 @@ app.get('/search/deliveryprofile', async (req, res) => {
     res.json(deliveryProfiles);
     
   } catch (e) {
-    console.error('❌ [DeliveryProfile] Failed to extract delivery profiles:', e.response?.data || e.message);
-    if (e.response?.data) {
-      console.log('📋 [DeliveryProfile] Error response sample:', e.response.data.substring(0, 500));
-    }
-    res.status(500).json([]);
+    console.error('❌ [DeliveryProfile] Failed to extract delivery profiles:', e);
+    res.status(500).json({ error: 'Failed to extract delivery profiles' });
   }
 });
 
@@ -1688,7 +1685,7 @@ app.post('/update/emailsenddefinition', async (req, res) => {
     const soapEnvelope = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <soapenv:Header>
-          <fueloauth xmlns="http://exacttarget.com">${accessToken}</fueloauth>
+          <fueloauth>${accessToken}</fueloauth>
         </soapenv:Header>
         <soapenv:Body>
           <UpdateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
@@ -1891,14 +1888,22 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
             </soapenv:Body>
           </soapenv:Envelope>
         `;
+        
         const response = await axios.post(
           `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
           soapEnvelope,
-          { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+          {
+            headers: {
+              'Content-Type': 'text/xml',
+              SOAPAction: 'Retrieve',
+            },
+          }
         );
+        
         const parser = new xml2js.Parser({ explicitArray: false });
         const result = await parser.parseStringPromise(response.data);
         const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        
         if (results) {
           allResults = allResults.concat(Array.isArray(results) ? results : [results]);
         }
@@ -1943,7 +1948,12 @@ app.get('/resolved/emailsenddefinition-relationships', async (req, res) => {
       const response = await axios.post(
         `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
         soapEnvelope,
-        { headers: { 'Content-Type': 'text/xml', SOAPAction: 'Retrieve' } }
+        {
+          headers: {
+            'Content-Type': 'text/xml',
+            SOAPAction: 'Retrieve',
+          },
+        }
       );
       const parser = new xml2js.Parser({ explicitArray: false });
       const result = await parser.parseStringPromise(response.data);
@@ -2062,7 +2072,6 @@ app.get('/describe-soap-object', async (req, res) => {
       }
     );
     const parser = new xml2js.Parser({ explicitArray: false });
-    const result = await parser.parseStringPromise(response.data);
     const objDef = result?.['soap:Envelope']?.['soap:Body']?.['DescribeResponseMsg']?.['ObjectDefinition'] || {};
     let props = objDef?.Properties?.PropertyDefinition || [];
     if (!Array.isArray(props)) props = [props];
@@ -2342,10 +2351,10 @@ console.log('[SOAP Folder Create Raw]', createFolderResp.data);
                 <Field><Name>sfCampaignId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>sfCampaignMemberId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>sfQuickSendId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
-                <Field><Name>sendFromName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
-                <Field><Name>sendFromEmail</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
-                <Field><Name>firstName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
-                <Field><Name>lastName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength><IsRequired>false</IsRequired></Field>
+                <Field><Name>sendFromName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength></Field>
+                <Field><Name>sendFromEmail</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength></Field>
+                <Field><Name>firstName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength></Field>
+                <Field><Name>lastName</Name><FieldType>Text</FieldType><MaxLength>100</MaxLength></Field>
                 <Field><Name>sfUserId</Name><FieldType>Text</FieldType><MaxLength>36</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>journeyID</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
                 <Field><Name>sfOrgId</Name><FieldType>Text</FieldType><MaxLength>50</MaxLength><IsRequired>false</IsRequired></Field>
@@ -2999,22 +3008,13 @@ app.get('/api/email-archive/send', async (req, res) => {
     let results = [];
     try {
       const retrieveResponse = parsed['soap:Envelope']['soap:Body']['RetrieveResponseMsg']['Results'];
-      if (Array.isArray(retrieveResponse)) {
-        results = retrieveResponse;
-      } else if (retrieveResponse) {
-        results = [retrieveResponse];
-      }
-    } catch (e) {
-      results = [];
-    }
-    // Map to only relevant fields for frontend
-    const mapped = results.map(r => ({
-      SendDate: r.SendDate || r.SentDate || '',
-      EmailName: r.EmailName || '',
-      Subject: r.Subject || '',
-      ID: r.ID || '',
-      SubscriberKey: r.SubscriberKey || '',
-      MID: r['Client']?.ID || r['Client.ID'] || '',
+      const resultArray = Array.isArray(retrieveResponse) ? retrieveResponse : [retrieveResponse];
+      results = resultArray.map(r => ({
+        SendDate: r.SendDate || r.SentDate || '',
+        EmailName: r.EmailName || '',
+        Subject: r.Subject || '',
+        ID: r.ID || '',
+        SubscriberKey: r.SubscriberKey || '',
       FromName: r.FromName || '',
       FromAddress: r.FromAddress || '',
       NumberSent: r.NumberSent || '',
@@ -5430,6 +5430,264 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
       console.error('🔍 [Export] Response data:', error.response.data);
     }
     res.status(500).json({ error: 'Failed to export to SFTP: ' + error.message });
+  }
+});
+
+// ==================== GRAPH API UTILITY FUNCTIONS ====================
+
+/**
+ * Generates mock data for testing when SFMC is not available
+ * @param {Array} types - Array of object types to include
+ * @param {Array} keys - Array of specific keys to include
+ * @returns {Object} Mock graph data in Cytoscape format
+ */
+function generateMockGraphData(types = [], keys = []) {
+  const mockNodes = [];
+  const mockEdges = [];
+  
+  // Mock Data Extensions
+  if (!types.length || types.includes('DE')) {
+    const dataExtensions = [
+      { id: 'de_customer_master', name: 'Customer_Master_DE', type: 'DataExtension' },
+      { id: 'de_email_preferences', name: 'Email_Preferences_DE', type: 'DataExtension' },
+      { id: 'de_purchase_history', name: 'Purchase_History_DE', type: 'DataExtension' },
+      { id: 'de_journey_activity', name: 'Journey_Activity_DE', type: 'DataExtension' },
+      { id: 'de_campaign_results', name: 'Campaign_Results_DE', type: 'DataExtension' }
+    ];
+    
+    dataExtensions.forEach(de => {
+      if (!keys.length || keys.includes(de.id)) {
+        mockNodes.push({
+          data: {
+            id: de.id,
+            label: de.name,
+            type: de.type,
+            name: de.name
+          }
+        });
+      }
+    });
+  }
+  
+  // Mock SQL Queries
+  if (!types.length || types.includes('Query')) {
+    const queries = [
+      { id: 'query_customer_segmentation', name: 'Customer_Segmentation_Query', type: 'Query' },
+      { id: 'query_email_performance', name: 'Email_Performance_Report', type: 'Query' },
+      { id: 'query_journey_attribution', name: 'Journey_Attribution_Query', type: 'Query' }
+    ];
+    
+    queries.forEach(query => {
+      if (!keys.length || keys.includes(query.id)) {
+        mockNodes.push({
+          data: {
+            id: query.id,
+            label: query.name,
+            type: query.type,
+            name: query.name
+          }
+        });
+      }
+    });
+  }
+  
+  // Mock Automations
+  if (!types.length || types.includes('Automation')) {
+    const automations = [
+      { id: 'auto_daily_import', name: 'Daily_Data_Import', type: 'Automation' },
+      { id: 'auto_email_cleanup', name: 'Email_Cleanup_Process', type: 'Automation' },
+      { id: 'auto_journey_sync', name: 'Journey_Data_Sync', type: 'Automation' }
+    ];
+    
+    automations.forEach(auto => {
+      if (!keys.length || keys.includes(auto.id)) {
+        mockNodes.push({
+          data: {
+            id: auto.id,
+            label: auto.name,
+            type: auto.type,
+            name: auto.name
+          }
+        });
+      }
+    });
+  }
+  
+  // Mock Journeys
+  if (!types.length || types.includes('Journey')) {
+    const journeys = [
+      { id: 'journey_welcome_series', name: 'Welcome_Series', type: 'Journey' },
+      { id: 'journey_abandonment', name: 'Abandonment_Recovery', type: 'Journey' },
+      { id: 'journey_birthday', name: 'Birthday_Campaign', type: 'Journey' }
+    ];
+    
+    journeys.forEach(journey => {
+      if (!keys.length || keys.includes(journey.id)) {
+        mockNodes.push({
+          data: {
+            id: journey.id,
+            label: journey.name,
+            type: journey.type,
+            name: journey.name
+          }
+        });
+      }
+    });
+  }
+  
+  // Generate mock relationships
+  const nodeIds = mockNodes.map(n => n.data.id);
+  
+  // Query reads from DE relationships
+  if (nodeIds.includes('query_customer_segmentation') && nodeIds.includes('de_customer_master')) {
+    mockEdges.push({
+      data: {
+        id: 'edge_query_customer_segmentation_reads_customer_master',
+        source: 'query_customer_segmentation',
+        target: 'de_customer_master',
+        type: 'QUERY_READS_FROM',
+        label: 'reads from'
+      }
+    });
+  }
+  
+  // Query writes to DE relationships
+  if (nodeIds.includes('query_customer_segmentation') && nodeIds.includes('de_campaign_results')) {
+    mockEdges.push({
+      data: {
+        id: 'edge_query_customer_segmentation_writes_campaign_results',
+        source: 'query_customer_segmentation',
+        target: 'de_campaign_results',
+        type: 'QUERY_WRITES_TO',
+        label: 'writes to'
+      }
+    });
+  }
+  
+  // Journey uses DE relationships
+  if (nodeIds.includes('journey_welcome_series') && nodeIds.includes('de_customer_master')) {
+    mockEdges.push({
+      data: {
+        id: 'edge_journey_welcome_series_uses_customer_master',
+        source: 'journey_welcome_series',
+        target: 'de_customer_master',
+        type: 'JOURNEY_USES',
+        label: 'uses'
+      }
+    });
+  }
+  
+  // Automation contains Query relationships
+  if (nodeIds.includes('auto_daily_import') && nodeIds.includes('query_customer_segmentation')) {
+    mockEdges.push({
+      data: {
+        id: 'edge_auto_daily_import_contains_query_customer_segmentation',
+        source: 'auto_daily_import',
+        target: 'query_customer_segmentation',
+        type: 'AUTOMATION_CONTAINS',
+        label: 'contains'
+      }
+    });
+  }
+  
+  return {
+    nodes: mockNodes,
+    edges: mockEdges
+  };
+}
+
+// ==================== GRAPH API ENDPOINTS ====================
+
+/**
+ * Graph API endpoint that returns nodes and edges in Cytoscape format
+ * Supports query parameters: type, keys, mode
+ */
+app.get('/graph', async (req, res) => {
+  try {
+    const { type, keys, mode = 'mock' } = req.query;
+    
+    // Parse types parameter (comma-separated string to array)
+    const types = type ? type.split(',').map(t => t.trim()) : [];
+    
+    // Parse keys parameter (comma-separated string to array)
+    const parsedKeys = keys ? keys.split(',').map(k => k.trim()) : [];
+    
+    console.log('🔍 [Graph API] Request received:', { types, keys: parsedKeys, mode });
+    
+    let graphData;
+    
+    if (mode === 'live' && req.session.mcCreds) {
+      // Live mode - placeholder for future SFMC integration
+      console.log('📡 [Graph API] Live mode requested but not yet implemented');
+      graphData = generateMockGraphData(types, parsedKeys);
+    } else {
+      // Mock mode - return test data
+      console.log('🎭 [Graph API] Returning mock data...');
+      graphData = generateMockGraphData(types, parsedKeys);
+    }
+    
+    console.log('✅ [Graph API] Returning graph data:', {
+      nodeCount: graphData.nodes.length,
+      edgeCount: graphData.edges.length
+    });
+    
+    res.json(graphData);
+    
+  } catch (error) {
+    console.error('❌ [Graph API] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to retrieve graph data',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Node details endpoint for getting detailed information about a specific node
+ */
+app.get('/graph/node/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { mode = 'mock' } = req.query;
+    
+    console.log('🔍 [Graph API] Node details requested:', { id, mode });
+    
+    if (mode === 'live' && req.session.mcCreds) {
+      // Live mode - placeholder for future SFMC integration
+      console.log('📡 [Graph API] Live mode requested but not yet implemented');
+      res.json({
+        id,
+        message: 'Live mode not yet implemented for node details',
+        mode: 'live'
+      });
+    } else {
+      // Mock mode - return test data
+      const mockDetails = {
+        id,
+        type: id.startsWith('de_') ? 'DataExtension' : 
+              id.startsWith('query_') ? 'Query' :
+              id.startsWith('auto_') ? 'Automation' :
+              id.startsWith('journey_') ? 'Journey' : 'Unknown',
+        name: id.replace(/^(de_|query_|auto_|journey_)/, '').replace(/_/g, ' '),
+        lastModified: new Date().toISOString(),
+        createdDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
+        status: 'Active',
+        metadata: {
+          description: `Mock details for ${id}`,
+          recordCount: Math.floor(Math.random() * 100000),
+          fields: ['EmailAddress', 'FirstName', 'LastName', 'CustomerID']
+        }
+      };
+      
+      res.json(mockDetails);
+    }
+    
+  } catch (error) {
+    console.error('❌ [Graph API] Error fetching node details:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch node details',
+      message: error.message 
+    });
   }
 });
 
