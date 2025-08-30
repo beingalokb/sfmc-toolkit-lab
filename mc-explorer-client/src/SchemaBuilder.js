@@ -131,19 +131,47 @@ const SchemaBuilder = () => {
 
   const objectTypes = Object.keys(objectData);
 
-  // Node colors by type
-  const nodeColors = {
-    'Data Extensions': '#3B82F6', // blue
-    'SQL Queries': '#8B5CF6', // purple
-    'Automations': '#6B7280', // gray
-    'Journeys': '#10B981', // green
-    'Triggered Sends': '#F59E0B', // orange
-    'File Transfers': '#14B8A6', // teal
-    'Data Extracts': '#14B8A6', // teal
-    'Filters': '#EF4444' // red
-  };
+  // Check if any objects are selected
+  const hasSelectedObjects = Object.values(selectedObjects).some(categoryObj => 
+    Object.values(categoryObj || {}).some(selected => selected)
+  );
 
-  // Toggle category expansion
+  // Color mapping for different object types
+const OBJECT_TYPE_COLORS = {
+  'Data Extensions': '#10B981', // Green
+  'SQL Queries': '#3B82F6',    // Blue
+  'Automations': '#8B5CF6',    // Purple
+  'Journeys': '#F59E0B',       // Orange
+  'Triggered Sends': '#EF4444', // Red
+  'Filters': '#06B6D4',        // Cyan
+  'File Transfers': '#84CC16',  // Lime
+  'Data Extracts': '#F97316'   // Orange-red
+};
+
+// Get color for object type
+const getObjectTypeColor = (category) => {
+  return OBJECT_TYPE_COLORS[category] || '#6B7280'; // Default gray
+};
+
+// Node colors mapping for graph styling (consistent with OBJECT_TYPE_COLORS)
+const nodeColors = OBJECT_TYPE_COLORS;
+
+// Get type from category for consistency
+const getTypeFromCategory = (category) => {
+  const mapping = {
+    'Data Extensions': 'DataExtension',
+    'SQL Queries': 'Query',
+    'Automations': 'Automation',
+    'Journeys': 'Journey',
+    'Triggered Sends': 'TriggeredSend',
+    'Filters': 'Filter',
+    'File Transfers': 'FileTransfer',
+    'Data Extracts': 'DataExtract'
+  };
+  return mapping[category] || category;
+};
+
+// Toggle category expansion
   const toggleCategory = (category) => {
     setExpandedCategories(prev => ({
       ...prev,
@@ -486,7 +514,13 @@ const SchemaBuilder = () => {
                 onClick={() => toggleCategory(category)}
                 className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
               >
-                <span className="font-medium text-gray-900">{category}</span>
+                <div className="flex items-center space-x-3">
+                  <div 
+                    className="w-4 h-4 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: getObjectTypeColor(category) }}
+                  ></div>
+                  <span className="font-medium text-gray-900">{category}</span>
+                </div>
                 <svg
                   className={`w-5 h-5 transform transition-transform ${
                     expandedCategories[category] ? 'rotate-180' : ''
@@ -509,6 +543,10 @@ const SchemaBuilder = () => {
                         onChange={(e) => handleObjectSelect(category, object.id, e.target.checked)}
                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
+                      <div 
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: getObjectTypeColor(category) }}
+                      ></div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-900 truncate">
                           {object.name}
@@ -536,7 +574,7 @@ const SchemaBuilder = () => {
       {/* Center Graph Canvas */}
       <div className="flex-1 relative">
         <div className="absolute inset-0">
-          {graphElements.length > 0 ? (
+          {hasSelectedObjects ? (
             <CytoscapeComponent
               elements={graphElements}
               style={{ width: '100%', height: '100%' }}
@@ -548,12 +586,28 @@ const SchemaBuilder = () => {
             />
           ) : (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              <div className="text-center max-w-md mx-auto">
+                <svg className="w-20 h-20 mx-auto text-gray-400 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No objects selected</h3>
-                <p className="text-gray-600">Select objects from the sidebar to visualize their relationships</p>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">Welcome to Schema Builder</h3>
+                <p className="text-gray-600 mb-4">
+                  Visualize relationships between your Salesforce Marketing Cloud assets
+                </p>
+                <div className="text-sm text-gray-500 space-y-2">
+                  <p className="flex items-center justify-center space-x-2">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    <span>Select objects from the sidebar to begin</span>
+                  </p>
+                  <p className="flex items-center justify-center space-x-2">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    <span>See how Data Extensions connect to Queries, Automations & Journeys</span>
+                  </p>
+                  <p className="flex items-center justify-center space-x-2">
+                    <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                    <span>Discover hidden dependencies in your data flow</span>
+                  </p>
+                </div>
               </div>
             </div>
           )}
