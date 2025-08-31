@@ -5879,56 +5879,109 @@ async function fetchSFMCDataExtracts(accessToken, restEndpoint) {
 
 /**
  * Detect Data Extension relationships in SQL Queries
+ * Enhanced to handle various API response formats
  */
 function detectQueryToDataExtensionRelationships(queries, dataExtensions) {
   const relationships = [];
   const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
   const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
   
+  console.log('🔍 [Relationship] Analyzing SQL Query relationships...');
+  console.log(`📊 [Relationship] Processing ${queries.length} queries against ${dataExtensions.length} DEs`);
+  
   queries.forEach(query => {
-    if (!query.queryText && !query.sqlStatement) return;
+    // Try multiple possible fields for SQL text
+    const sqlText = (
+      query.queryText || 
+      query.sqlStatement || 
+      query.queryDefinition?.queryText ||
+      query.text ||
+      ''
+    ).toLowerCase();
     
-    const sqlText = (query.queryText || query.sqlStatement || '').toLowerCase();
+    if (!sqlText) {
+      console.log(`⚠️  [Relationship] No SQL text found for query: ${query.name}`);
+      return;
+    }
+    
+    console.log(`🔍 [Relationship] Analyzing query "${query.name}" (${sqlText.length} chars)`);
+    
+    // Enhanced regex patterns for SQL parsing
+    const patterns = {
+      reads: [
+        /(?:from|join)\s+\[?([a-zA-Z_][a-zA-Z0-9_]*)\]?/gi,
+        /(?:from|join)\s+"([^"]+)"/gi,
+        /(?:from|join)\s+'([^']+)'/gi
+      ],
+      writes: [
+        /(?:into|overwrite|append)\s+\[?([a-zA-Z_][a-zA-Z0-9_]*)\]?/gi,
+        /(?:into|overwrite|append)\s+"([^"]+)"/gi,
+        /(?:into|overwrite|append)\s+'([^']+)'/gi
+      ]
+    };
     
     // Detect READ relationships (FROM, JOIN)
-    const fromMatches = sqlText.match(/(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi);
-    if (fromMatches) {
-      fromMatches.forEach(match => {
-        const deName = match.replace(/(?:from|join)\s+/i, '').trim();
+    patterns.reads.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(sqlText)) !== null) {
+        const deName = match[1].trim();
         const de = deMap.get(deName) || deKeyMap.get(deName);
         if (de) {
+          const relationshipId = `${de.id}-${query.id}`;
           relationships.push({
-            id: `${de.id}-${query.id}`,
+            id: relationshipId,
             source: de.id,
             target: query.id,
             type: 'reads_from',
             label: 'reads from',
             description: `Query "${query.name}" reads from DE "${de.name}"`
           });
+          console.log(`✅ [Relationship] Found READ: ${query.name} → ${de.name}`);
         }
-      });
-    }
+      }
+    });
     
     // Detect WRITE relationships (INTO, OVERWRITE, APPEND)
-    const intoMatches = sqlText.match(/(?:into|overwrite|append)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi);
-    if (intoMatches) {
-      intoMatches.forEach(match => {
-        const deName = match.replace(/(?:into|overwrite|append)\s+/i, '').trim();
+    patterns.writes.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(sqlText)) !== null) {
+        const deName = match[1].trim();
         const de = deMap.get(deName) || deKeyMap.get(deName);
         if (de) {
+          const relationshipId = `${query.id}-${de.id}`;
           relationships.push({
-            id: `${query.id}-${de.id}`,
+            id: relationshipId,
             source: query.id,
             target: de.id,
             type: 'writes_to',
             label: 'writes to',
             description: `Query "${query.name}" writes to DE "${de.name}"`
           });
+          console.log(`✅ [Relationship] Found WRITE: ${query.name} → ${de.name}`);
         }
-      });
+      }
+    });
+    
+    // Target Data Extension ID (common in SFMC query APIs)
+    if (query.targetDataExtensionId || query.targetId) {
+      const targetId = query.targetDataExtensionId || query.targetId;
+      const targetDe = dataExtensions.find(de => de.id === targetId || de.objectId === targetId);
+      if (targetDe) {
+        const relationshipId = `${query.id}-${targetDe.id}`;
+        relationships.push({
+          id: relationshipId,
+          source: query.id,
+          target: targetDe.id,
+          type: 'writes_to',
+          label: 'writes to',
+          description: `Query "${query.name}" writes to DE "${targetDe.name}"`
+        });
+        console.log(`✅ [Relationship] Found TARGET DE: ${query.name} → ${targetDe.name}`);
+      }
     }
   });
   
+  console.log(`📈 [Relationship] SQL Query analysis complete: ${relationships.length} relationships found`);
   return relationships;
 }
 
@@ -5979,66 +6032,105 @@ function detectFilterToDataExtensionRelationships(filters, dataExtensions) {
 
 /**
  * Detect Data Extension relationships in Automations
+ * Enhanced to handle various automation activity types
  */
 function detectAutomationToDataExtensionRelationships(automations, dataExtensions, queries, fileTransfers, dataExtracts) {
   const relationships = [];
   const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
   const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
   
+  console.log('🔍 [Relationship] Analyzing Automation relationships...');
+  console.log(`📊 [Relationship] Processing ${automations.length} automations`);
+  
   automations.forEach(automation => {
-    // Check if automation contains query activities
-    if (automation.steps || automation.activities) {
-      const activities = automation.steps || automation.activities || [];
+    console.log(`🔍 [Relationship] Analyzing automation "${automation.name}"`);
+    
+    // Check various possible activity containers
+    const activities = automation.steps || automation.activities || automation.program?.activities || [];
+    
+    if (activities.length === 0) {
+      console.log(`⚠️  [Relationship] No activities found for automation: ${automation.name}`);
+      return;
+    }
+    
+    console.log(`📋 [Relationship] Found ${activities.length} activities in "${automation.name}"`);
+    
+    activities.forEach((activity, index) => {
+      console.log(`🔍 [Relationship] Activity ${index + 1}: ${activity.type || activity.activityType || 'Unknown'}`);
       
-      activities.forEach(activity => {
-        // Query Activity relationships
-        if (activity.type === 'query' || activity.activityType === 'query') {
-          const query = queries.find(q => q.id === activity.queryDefinitionId || q.name === activity.queryName);
-          if (query) {
-            relationships.push({
-              id: `${automation.id}-${query.id}`,
-              source: automation.id,
-              target: query.id,
-              type: 'contains_query',
-              label: 'contains query',
-              description: `Automation "${automation.name}" contains Query "${query.name}"`
-            });
-          }
+      // Enhanced Query Activity relationships
+      const queryActivityTypes = ['query', 'sql', 'sqlquery', 'dataextensionactivity'];
+      if (queryActivityTypes.includes((activity.type || activity.activityType || '').toLowerCase())) {
+        // Try multiple possible query reference fields
+        const queryId = activity.queryDefinitionId || activity.queryId || activity.definitionId;
+        const queryName = activity.queryName || activity.name;
+        
+        let query = null;
+        if (queryId) {
+          query = queries.find(q => q.id === queryId || q.objectId === queryId);
+        }
+        if (!query && queryName) {
+          query = queries.find(q => q.name === queryName);
         }
         
-        // File Transfer relationships
-        if (activity.type === 'fileTransfer' || activity.activityType === 'fileTransfer') {
-          const fileTransfer = fileTransfers.find(ft => ft.id === activity.fileTransferId);
-          if (fileTransfer) {
-            relationships.push({
-              id: `${automation.id}-${fileTransfer.id}`,
-              source: automation.id,
-              target: fileTransfer.id,
-              type: 'contains_file_transfer',
-              label: 'contains file transfer',
-              description: `Automation "${automation.name}" contains File Transfer "${fileTransfer.name}"`
-            });
-          }
+        if (query) {
+          relationships.push({
+            id: `${automation.id}-${query.id}`,
+            source: automation.id,
+            target: query.id,
+            type: 'contains_query',
+            label: 'contains query',
+            description: `Automation "${automation.name}" contains Query "${query.name}"`
+          });
+          console.log(`✅ [Relationship] Found QUERY: ${automation.name} → ${query.name}`);
         }
-        
-        // Data Extract relationships
-        if (activity.type === 'dataExtract' || activity.activityType === 'dataExtract') {
-          const dataExtract = dataExtracts.find(de => de.id === activity.dataExtractId);
-          if (dataExtract) {
-            relationships.push({
-              id: `${automation.id}-${dataExtract.id}`,
-              source: automation.id,
-              target: dataExtract.id,
-              type: 'contains_data_extract',
-              label: 'contains data extract',
-              description: `Automation "${automation.name}" contains Data Extract "${dataExtract.name}"`
-            });
-          }
+      }
+      
+      // Enhanced File Transfer relationships
+      const fileTransferTypes = ['filetransfer', 'fileimport', 'import', 'transfer'];
+      if (fileTransferTypes.includes((activity.type || activity.activityType || '').toLowerCase())) {
+        const fileTransferId = activity.fileTransferId || activity.transferId || activity.id;
+        const fileTransfer = fileTransfers.find(ft => ft.id === fileTransferId);
+        if (fileTransfer) {
+          relationships.push({
+            id: `${automation.id}-${fileTransfer.id}`,
+            source: automation.id,
+            target: fileTransfer.id,
+            type: 'contains_file_transfer',
+            label: 'contains file transfer',
+            description: `Automation "${automation.name}" contains File Transfer "${fileTransfer.name}"`
+          });
+          console.log(`✅ [Relationship] Found FILE TRANSFER: ${automation.name} → ${fileTransfer.name}`);
         }
-        
-        // Direct DE relationships (import activities, etc.)
-        if (activity.targetDataExtension) {
-          const targetDeName = activity.targetDataExtension.toLowerCase();
+      }
+      
+      // Enhanced Data Extract relationships
+      const dataExtractTypes = ['dataextract', 'extract', 'export'];
+      if (dataExtractTypes.includes((activity.type || activity.activityType || '').toLowerCase())) {
+        const dataExtractId = activity.dataExtractId || activity.extractId || activity.id;
+        const dataExtract = dataExtracts.find(de => de.id === dataExtractId);
+        if (dataExtract) {
+          relationships.push({
+            id: `${automation.id}-${dataExtract.id}`,
+            source: automation.id,
+            target: dataExtract.id,
+            type: 'contains_data_extract',
+            label: 'contains data extract',
+            description: `Automation "${automation.name}" contains Data Extract "${dataExtract.name}"`
+          });
+          console.log(`✅ [Relationship] Found DATA EXTRACT: ${automation.name} → ${dataExtract.name}`);
+        }
+      }
+      
+      // Enhanced Direct DE relationships (import/export activities)
+      const targetDeFields = [
+        'targetDataExtension', 'targetDataExtensionName', 'dataExtensionName',
+        'targetDE', 'destinationDataExtension', 'outputDataExtension'
+      ];
+      
+      targetDeFields.forEach(field => {
+        if (activity[field]) {
+          const targetDeName = activity[field].toLowerCase();
           const targetDe = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
           if (targetDe) {
             relationships.push({
@@ -6049,29 +6141,99 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
               label: 'imports to DE',
               description: `Automation "${automation.name}" imports data to DE "${targetDe.name}"`
             });
+            console.log(`✅ [Relationship] Found DE IMPORT: ${automation.name} → ${targetDe.name}`);
           }
         }
       });
-    }
+      
+      // Source DE relationships (for data extracts/exports)
+      const sourceDeFields = [
+        'sourceDataExtension', 'sourceDataExtensionName', 'sourceDE', 'inputDataExtension'
+      ];
+      
+      sourceDeFields.forEach(field => {
+        if (activity[field]) {
+          const sourceDeName = activity[field].toLowerCase();
+          const sourceDe = deMap.get(sourceDeName) || deKeyMap.get(sourceDeName);
+          if (sourceDe) {
+            relationships.push({
+              id: `${sourceDe.id}-${automation.id}`,
+              source: sourceDe.id,
+              target: automation.id,
+              type: 'exports_from_de',
+              label: 'exports from DE',
+              description: `Automation "${automation.name}" exports data from DE "${sourceDe.name}"`
+            });
+            console.log(`✅ [Relationship] Found DE EXPORT: ${sourceDe.name} → ${automation.name}`);
+          }
+        }
+      });
+    });
   });
   
+  console.log(`📈 [Relationship] Automation analysis complete: ${relationships.length} relationships found`);
   return relationships;
 }
 
 /**
  * Detect Data Extension relationships in Journeys
+ * Enhanced to handle various entry sources and decision points
  */
 function detectJourneyToDataExtensionRelationships(journeys, dataExtensions) {
   const relationships = [];
   const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
   const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
   
+  console.log('🔍 [Relationship] Analyzing Journey relationships...');
+  console.log(`📊 [Relationship] Processing ${journeys.length} journeys`);
+  
   journeys.forEach(journey => {
-    // Entry Event DE relationships
-    if (journey.entrySource) {
-      if (journey.entrySource.type === 'dataExtension' || journey.entrySource.type === 'apiEvent') {
-        const entryDeName = journey.entrySource.dataExtensionName?.toLowerCase();
-        const entryDe = deMap.get(entryDeName) || deKeyMap.get(entryDeName);
+    console.log(`🔍 [Relationship] Analyzing journey "${journey.name}"`);
+    
+    // Enhanced Entry Event DE relationships
+    const entrySourceOptions = [
+      journey.entrySource,
+      journey.entryEvent,
+      journey.entryMode,
+      journey.triggers?.[0]
+    ];
+    
+    entrySourceOptions.forEach(entrySource => {
+      if (!entrySource) return;
+      
+      // Check various entry source types
+      const entryTypes = ['dataExtension', 'apiEvent', 'dataEvent', 'de'];
+      if (entryTypes.includes((entrySource.type || '').toLowerCase())) {
+        // Try multiple possible DE name fields
+        const entryDeNames = [
+          entrySource.dataExtensionName,
+          entrySource.dataExtension,
+          entrySource.name,
+          entrySource.deName,
+          entrySource.sourceName
+        ];
+        
+        entryDeNames.forEach(deName => {
+          if (!deName) return;
+          const entryDe = deMap.get(deName.toLowerCase()) || deKeyMap.get(deName.toLowerCase());
+          if (entryDe) {
+            relationships.push({
+              id: `${entryDe.id}-${journey.id}`,
+              source: entryDe.id,
+              target: journey.id,
+              type: 'journey_entry_source',
+              label: 'journey entry source',
+              description: `DE "${entryDe.name}" is entry source for Journey "${journey.name}"`
+            });
+            console.log(`✅ [Relationship] Found ENTRY SOURCE: ${entryDe.name} → ${journey.name}`);
+          }
+        });
+      }
+      
+      // Entry Source by ID
+      if (entrySource.dataExtensionId || entrySource.deId) {
+        const entryDeId = entrySource.dataExtensionId || entrySource.deId;
+        const entryDe = dataExtensions.find(de => de.id === entryDeId || de.objectId === entryDeId);
         if (entryDe) {
           relationships.push({
             id: `${entryDe.id}-${journey.id}`,
@@ -6081,33 +6243,98 @@ function detectJourneyToDataExtensionRelationships(journeys, dataExtensions) {
             label: 'journey entry source',
             description: `DE "${entryDe.name}" is entry source for Journey "${journey.name}"`
           });
+          console.log(`✅ [Relationship] Found ENTRY SOURCE BY ID: ${entryDe.name} → ${journey.name}`);
         }
       }
-    }
+    });
     
-    // Decision Split and Exit Criteria DE relationships
-    if (journey.activities) {
-      journey.activities.forEach(activity => {
-        if (activity.type === 'decision' || activity.type === 'wait') {
-          if (activity.configurationData && activity.configurationData.dataExtension) {
-            const deName = activity.configurationData.dataExtension.toLowerCase();
-            const de = deMap.get(deName) || deKeyMap.get(deName);
+    // Enhanced Decision Split and Activity DE relationships
+    const activityContainers = [
+      journey.activities,
+      journey.steps,
+      journey.program?.activities,
+      journey.definition?.activities
+    ];
+    
+    activityContainers.forEach(activities => {
+      if (!activities) return;
+      
+      activities.forEach((activity, index) => {
+        console.log(`🔍 [Relationship] Journey activity ${index + 1}: ${activity.type || 'Unknown'}`);
+        
+        // Decision Split activities
+        const decisionTypes = ['decision', 'wait', 'split', 'multiDecision'];
+        if (decisionTypes.includes((activity.type || '').toLowerCase())) {
+          
+          // Check various configuration data locations
+          const configOptions = [
+            activity.configurationData,
+            activity.configuration,
+            activity.config,
+            activity.arguments
+          ];
+          
+          configOptions.forEach(config => {
+            if (!config) return;
+            
+            // Try multiple DE reference fields
+            const deFields = [
+              'dataExtension', 'dataExtensionName', 'sourceName', 
+              'deName', 'targetDataExtension', 'sourceDataExtension'
+            ];
+            
+            deFields.forEach(field => {
+              if (config[field]) {
+                const deName = config[field].toLowerCase();
+                const de = deMap.get(deName) || deKeyMap.get(deName);
+                if (de) {
+                  relationships.push({
+                    id: `${de.id}-${journey.id}`,
+                    source: de.id,
+                    target: journey.id,
+                    type: 'journey_decision_source',
+                    label: 'journey decision source',
+                    description: `DE "${de.name}" used in ${activity.type} activity in Journey "${journey.name}"`
+                  });
+                  console.log(`✅ [Relationship] Found DECISION SOURCE: ${de.name} → ${journey.name}`);
+                }
+              }
+            });
+          });
+        }
+        
+        // Email activities that might reference DEs
+        const emailTypes = ['email', 'emailSend', 'send'];
+        if (emailTypes.includes((activity.type || '').toLowerCase())) {
+          
+          // Check for subscriber source DE
+          const subscriberSources = [
+            activity.subscriberDataExtension,
+            activity.sendDataExtension,
+            activity.audienceDataExtension
+          ];
+          
+          subscriberSources.forEach(sourceName => {
+            if (!sourceName) return;
+            const de = deMap.get(sourceName.toLowerCase()) || deKeyMap.get(sourceName.toLowerCase());
             if (de) {
               relationships.push({
                 id: `${de.id}-${journey.id}`,
                 source: de.id,
                 target: journey.id,
-                type: 'journey_decision_source',
-                label: 'journey decision source',
-                description: `DE "${de.name}" used in decision/wait activity in Journey "${journey.name}"`
+                type: 'journey_email_source',
+                label: 'journey email source',
+                description: `DE "${de.name}" provides subscribers for email in Journey "${journey.name}"`
               });
+              console.log(`✅ [Relationship] Found EMAIL SOURCE: ${de.name} → ${journey.name}`);
             }
-          }
+          });
         }
       });
-    }
+    });
   });
   
+  console.log(`📈 [Relationship] Journey analysis complete: ${relationships.length} relationships found`);
   return relationships;
 }
 
