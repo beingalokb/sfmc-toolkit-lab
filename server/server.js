@@ -6664,45 +6664,85 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
   if (hasAnySelection) {
     console.log('🔗 [Graph] Finding related objects for selected items...');
     
-    // Get all object IDs that are currently in the filtered set
-    const currentNodeIds = new Set(nodes.map(n => n.data.id));
+    // Get all object IDs that are currently in the filtered set (selected objects)
+    const selectedNodeIds = new Set(nodes.map(n => n.data.id));
     
-    // For relationship detection, we need to check against ALL objects, not just filtered ones
-    const allDataExtensions = sfmcObjects['Data Extensions'] || [];
-    const allSqlQueries = sfmcObjects['SQL Queries'] || [];
-    const allAutomations = sfmcObjects['Automations'] || [];
-    const allJourneys = sfmcObjects['Journeys'] || [];
-    const allTriggeredSends = sfmcObjects['Triggered Sends'] || [];
-    const allFilters = sfmcObjects['Filters'] || [];
-    const allFileTransfers = sfmcObjects['File Transfers'] || [];
-    const allDataExtracts = sfmcObjects['Data Extracts'] || [];
-    
-    // Find related objects and add them as additional nodes
+    // For each selected object, find its direct relationships only
     const relatedObjectIds = new Set();
     
-    // Check all possible relationships and add related objects
-    [
-      ...detectQueryToDataExtensionRelationships(allSqlQueries, allDataExtensions),
-      ...detectFilterToDataExtensionRelationships(allFilters, allDataExtensions),
-      ...detectAutomationToDataExtensionRelationships(allAutomations, allDataExtensions, allSqlQueries, allFileTransfers, allDataExtracts),
-      ...detectJourneyToDataExtensionRelationships(allJourneys, allDataExtensions),
-      ...detectTriggeredSendToDataExtensionRelationships(allTriggeredSends, allDataExtensions)
-    ].forEach(rel => {
-      // If source is selected but target is not in current nodes, add target
-      if (currentNodeIds.has(rel.source) && !currentNodeIds.has(rel.target)) {
-        relatedObjectIds.add(rel.target);
+    // Function to find direct relationships for a specific object
+    const findDirectRelationships = (objectId, objectCategory, objectData) => {
+      console.log(`🔍 [Graph] Finding relationships for ${objectCategory}: ${objectData.name} (${objectId})`);
+      
+      // Get all objects for relationship detection
+      const allDataExtensions = sfmcObjects['Data Extensions'] || [];
+      const allSqlQueries = sfmcObjects['SQL Queries'] || [];
+      const allAutomations = sfmcObjects['Automations'] || [];
+      const allJourneys = sfmcObjects['Journeys'] || [];
+      const allTriggeredSends = sfmcObjects['Triggered Sends'] || [];
+      const allFilters = sfmcObjects['Filters'] || [];
+      const allFileTransfers = sfmcObjects['File Transfers'] || [];
+      const allDataExtracts = sfmcObjects['Data Extracts'] || [];
+      
+      let foundRelationships = [];
+      
+      if (objectCategory === 'Automations') {
+        // For automations, find related DEs, queries, filters, file transfers, data extracts
+        foundRelationships = detectAutomationToDataExtensionRelationships([objectData], allDataExtensions, allSqlQueries, allFileTransfers, allDataExtracts);
+      } else if (objectCategory === 'Data Extensions') {
+        // For DEs, find queries that read/write to it, automations that use it, journeys that use it, etc.
+        foundRelationships = [
+          ...detectQueryToDataExtensionRelationships(allSqlQueries, [objectData]),
+          ...detectAutomationToDataExtensionRelationships(allAutomations, [objectData], allSqlQueries, allFileTransfers, allDataExtracts),
+          ...detectJourneyToDataExtensionRelationships(allJourneys, [objectData]),
+          ...detectTriggeredSendToDataExtensionRelationships(allTriggeredSends, [objectData]),
+          ...detectFilterToDataExtensionRelationships(allFilters, [objectData])
+        ];
+      } else if (objectCategory === 'SQL Queries') {
+        // For queries, find DEs they read from/write to
+        foundRelationships = detectQueryToDataExtensionRelationships([objectData], allDataExtensions);
+      } else if (objectCategory === 'Journeys') {
+        // For journeys, find DEs they use
+        foundRelationships = detectJourneyToDataExtensionRelationships([objectData], allDataExtensions);
+      } else if (objectCategory === 'Filters') {
+        // For filters, find DEs they use
+        foundRelationships = detectFilterToDataExtensionRelationships([objectData], allDataExtensions);
+      } else if (objectCategory === 'Triggered Sends') {
+        // For triggered sends, find DEs they use
+        foundRelationships = detectTriggeredSendToDataExtensionRelationships([objectData], allDataExtensions);
       }
-      // If target is selected but source is not in current nodes, add source
-      if (currentNodeIds.has(rel.target) && !currentNodeIds.has(rel.source)) {
-        relatedObjectIds.add(rel.source);
-      }
+      
+      // Add related object IDs
+      foundRelationships.forEach(rel => {
+        if (rel.source === objectId && !selectedNodeIds.has(rel.target)) {
+          relatedObjectIds.add(rel.target);
+        }
+        if (rel.target === objectId && !selectedNodeIds.has(rel.source)) {
+          relatedObjectIds.add(rel.source);
+        }
+      });
+      
+      console.log(`✅ [Graph] Found ${foundRelationships.length} relationships for ${objectData.name}`);
+      return foundRelationships;
+    };
+    
+    // Find relationships for each selected object
+    Object.entries(filteredSfmcObjects).forEach(([category, objects]) => {
+      if (!objects) return;
+      objects.forEach(obj => {
+        if (selectedNodeIds.has(obj.id)) {
+          findDirectRelationships(obj.id, category, obj);
+        }
+      });
     });
+    
+    console.log(`🔍 [Graph] Found ${relatedObjectIds.size} related objects for ${selectedNodeIds.size} selected objects`);
     
     // Add related objects as additional nodes
     Object.entries(sfmcObjects).forEach(([category, objects]) => {
       if (!objects) return;
       objects.forEach(obj => {
-        if (relatedObjectIds.has(obj.id) && !currentNodeIds.has(obj.id)) {
+        if (relatedObjectIds.has(obj.id)) {
           additionalNodes.push({
             data: {
               id: obj.id,
@@ -6753,8 +6793,18 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
     ...detectTriggeredSendToDataExtensionRelationships(finalTriggeredSends, finalDataExtensions)
   ];
 
-  // Convert relationships to graph edges
-  relationships.forEach(rel => {
+  // Get the final set of node IDs that will be in the graph
+  const finalNodeIds = new Set(nodes.map(n => n.data.id));
+  
+  // Filter relationships to only include those between objects that are actually in the graph
+  const filteredRelationships = relationships.filter(rel => 
+    finalNodeIds.has(rel.source) && finalNodeIds.has(rel.target)
+  );
+
+  console.log(`🔗 [Graph] Filtered relationships: ${relationships.length} -> ${filteredRelationships.length} (only between graph nodes)`);
+
+  // Convert filtered relationships to graph edges
+  filteredRelationships.forEach(rel => {
     edges.push({
       data: {
         id: rel.id,
@@ -6771,7 +6821,7 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
     totalNodes: nodes.length,
     totalEdges: edges.length,
     nodesByType: Object.entries(filteredSfmcObjects).map(([type, objs]) => `${type}: ${objs?.length || 0}`),
-    relationshipTypes: [...new Set(relationships.map(r => r.type))],
+    relationshipTypes: [...new Set(filteredRelationships.map(r => r.type))],
     wasFiltered: hasAnySelection
   });
 
