@@ -6687,42 +6687,151 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
       let foundRelationships = [];
       
       if (objectCategory === 'Automations') {
-        // For automations, find related DEs, queries, filters, file transfers, data extracts
-        foundRelationships = detectAutomationToDataExtensionRelationships([objectData], allDataExtensions, allSqlQueries, allFileTransfers, allDataExtracts);
+        // For automations, find ONLY direct activities - limit to immediate children
+        console.log(`🎯 [Graph] Finding direct activities for automation: ${objectData.name}`);
+        const activities = objectData.steps || objectData.activities || objectData.program?.activities || [];
+        
+        activities.forEach(activity => {
+          const activityType = (activity.type || activity.activityType || '').toLowerCase();
+          
+          // Only include direct query activities
+          if (['query', 'sql', 'sqlquery'].includes(activityType)) {
+            const queryId = activity.queryDefinitionId || activity.queryId || activity.definitionId;
+            const queryName = activity.queryName || activity.name;
+            
+            let query = allSqlQueries.find(q => 
+              (queryId && (q.id === queryId || q.objectId === queryId)) ||
+              (queryName && q.name === queryName)
+            );
+            
+            if (query) {
+              foundRelationships.push({
+                id: `${objectId}-${query.id}`,
+                source: objectId,
+                target: query.id,
+                type: 'contains_query',
+                label: 'contains',
+                description: `Automation contains SQL Query`
+              });
+            }
+          }
+          
+          // Only include direct filter activities
+          if (['filter', 'datafilter'].includes(activityType)) {
+            const filterId = activity.filterId || activity.definitionId;
+            const filterName = activity.filterName || activity.name;
+            
+            let filter = allFilters.find(f => 
+              (filterId && (f.id === filterId || f.objectId === filterId)) ||
+              (filterName && f.name === filterName)
+            );
+            
+            if (filter) {
+              foundRelationships.push({
+                id: `${objectId}-${filter.id}`,
+                source: objectId,
+                target: filter.id,
+                type: 'contains_filter',
+                label: 'contains',
+                description: `Automation contains Filter`
+              });
+            }
+          }
+        });
+        
       } else if (objectCategory === 'Data Extensions') {
-        // For DEs, find queries that read/write to it, automations that use it, journeys that use it, etc.
-        foundRelationships = [
-          ...detectQueryToDataExtensionRelationships(allSqlQueries, [objectData]),
-          ...detectAutomationToDataExtensionRelationships(allAutomations, [objectData], allSqlQueries, allFileTransfers, allDataExtracts),
-          ...detectJourneyToDataExtensionRelationships(allJourneys, [objectData]),
-          ...detectTriggeredSendToDataExtensionRelationships(allTriggeredSends, [objectData]),
-          ...detectFilterToDataExtensionRelationships(allFilters, [objectData])
-        ];
+        // For DEs, find ONLY direct references - be very conservative
+        console.log(`🎯 [Graph] Finding direct references for DE: ${objectData.name}`);
+        const deName = objectData.name.toLowerCase();
+        const deKey = objectData.externalKey?.toLowerCase();
+        
+        // Find queries that DIRECTLY reference this DE (by name or key)
+        allSqlQueries.forEach(query => {
+          const queryText = (query.queryText || query.sql || '').toLowerCase();
+          if (queryText.includes(deName) || (deKey && queryText.includes(deKey))) {
+            // Check if it's a direct reference (not just substring match)
+            const hasDirectReference = 
+              queryText.includes(`[${deName}]`) || 
+              queryText.includes(`"${deName}"`) ||
+              queryText.includes(`'${deName}'`) ||
+              queryText.includes(` ${deName} `) ||
+              queryText.includes(`from ${deName}`) ||
+              queryText.includes(`into ${deName}`);
+              
+            if (hasDirectReference) {
+              const isWrite = queryText.includes('insert') || queryText.includes('update') || queryText.includes('into');
+              foundRelationships.push({
+                id: `${query.id}-${objectId}`,
+                source: query.id,
+                target: objectId,
+                type: isWrite ? 'writes_to' : 'reads_from',
+                label: isWrite ? 'writes to' : 'reads from',
+                description: `Query ${isWrite ? 'writes to' : 'reads from'} Data Extension`
+              });
+            }
+          }
+        });
+        
       } else if (objectCategory === 'SQL Queries') {
-        // For queries, find DEs they read from/write to
-        foundRelationships = detectQueryToDataExtensionRelationships([objectData], allDataExtensions);
-      } else if (objectCategory === 'Journeys') {
-        // For journeys, find DEs they use
-        foundRelationships = detectJourneyToDataExtensionRelationships([objectData], allDataExtensions);
+        // For queries, find ONLY DEs they directly reference
+        console.log(`🎯 [Graph] Finding DE references for query: ${objectData.name}`);
+        const queryText = (objectData.queryText || objectData.sql || '').toLowerCase();
+        
+        allDataExtensions.forEach(de => {
+          const deName = de.name.toLowerCase();
+          const deKey = de.externalKey?.toLowerCase();
+          
+          const hasDirectReference = 
+            queryText.includes(`[${deName}]`) || 
+            queryText.includes(`"${deName}"`) ||
+            queryText.includes(`'${deName}'`) ||
+            queryText.includes(` ${deName} `) ||
+            queryText.includes(`from ${deName}`) ||
+            queryText.includes(`into ${deName}`) ||
+            (deKey && (
+              queryText.includes(`[${deKey}]`) || 
+              queryText.includes(`"${deKey}"`) ||
+              queryText.includes(`'${deKey}'`)
+            ));
+            
+          if (hasDirectReference) {
+            const isWrite = queryText.includes('insert') || queryText.includes('update') || queryText.includes('into');
+            foundRelationships.push({
+              id: `${objectId}-${de.id}`,
+              source: objectId,
+              target: de.id,
+              type: isWrite ? 'writes_to' : 'reads_from',
+              label: isWrite ? 'writes to' : 'reads from',
+              description: `Query ${isWrite ? 'writes to' : 'reads from'} Data Extension`
+            });
+          }
+        });
+        
       } else if (objectCategory === 'Filters') {
-        // For filters, find DEs they use
-        foundRelationships = detectFilterToDataExtensionRelationships([objectData], allDataExtensions);
-      } else if (objectCategory === 'Triggered Sends') {
-        // For triggered sends, find DEs they use
-        foundRelationships = detectTriggeredSendToDataExtensionRelationships([objectData], allDataExtensions);
+        // For filters, find ONLY the DE they directly filter
+        console.log(`🎯 [Graph] Finding DE for filter: ${objectData.name}`);
+        const dataSource = objectData.dataSource || objectData.dataExtension || objectData.source;
+        if (dataSource) {
+          let de = allDataExtensions.find(d => 
+            d.id === dataSource || 
+            d.externalKey === dataSource || 
+            d.name === dataSource
+          );
+          
+          if (de) {
+            foundRelationships.push({
+              id: `${objectId}-${de.id}`,
+              source: objectId,
+              target: de.id,
+              type: 'filters_de',
+              label: 'filters',
+              description: `Filter applies to Data Extension`
+            });
+          }
+        }
       }
       
-      // Add related object IDs
-      foundRelationships.forEach(rel => {
-        if (rel.source === objectId && !selectedNodeIds.has(rel.target)) {
-          relatedObjectIds.add(rel.target);
-        }
-        if (rel.target === objectId && !selectedNodeIds.has(rel.source)) {
-          relatedObjectIds.add(rel.source);
-        }
-      });
-      
-      console.log(`✅ [Graph] Found ${foundRelationships.length} relationships for ${objectData.name}`);
+      console.log(`✅ [Graph] Found ${foundRelationships.length} direct relationships for ${objectData.name}`);
       return foundRelationships;
     };
     
@@ -6731,7 +6840,17 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
       if (!objects) return;
       objects.forEach(obj => {
         if (selectedNodeIds.has(obj.id)) {
-          findDirectRelationships(obj.id, category, obj);
+          const relationships = findDirectRelationships(obj.id, category, obj);
+          
+          // Add related object IDs from the found relationships
+          relationships.forEach(rel => {
+            if (rel.source === obj.id && !selectedNodeIds.has(rel.target)) {
+              relatedObjectIds.add(rel.target);
+            }
+            if (rel.target === obj.id && !selectedNodeIds.has(rel.source)) {
+              relatedObjectIds.add(rel.source);
+            }
+          });
         }
       });
     });
