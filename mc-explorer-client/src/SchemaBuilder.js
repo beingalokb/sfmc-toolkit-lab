@@ -2,12 +2,11 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
 
 // API functions for backend integration
-const fetchGraphData = async (type = null, keys = null, mode = 'overview') => {
+const fetchGraphData = async (type = null, keys = null) => {
   try {
     const params = new URLSearchParams();
     if (type) params.append('type', type);
     if (keys) params.append('keys', keys);
-    if (mode) params.append('mode', mode);
     
     const response = await fetch(`/graph?${params.toString()}`);
     if (!response.ok) {
