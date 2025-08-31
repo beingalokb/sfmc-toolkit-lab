@@ -6575,10 +6575,15 @@ async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
 // ==================== GRAPH API UTILITY FUNCTIONS ====================
 
 /**
- * Generate graph data from live SFMC objects
+ * Generate graph data from live SFMC objects with filtering support
  * Creates nodes and edges for visualization
+ * @param {Object} sfmcObjects - The SFMC objects organized by category
+ * @param {Array} types - Optional filter by object types
+ * @param {Array} keys - Optional filter by object keys
+ * @param {Object} selectedObjects - Optional filter by selected objects from frontend
+ * @returns {Object} Graph data with nodes and edges
  */
-function generateLiveGraphData(sfmcObjects, types = [], keys = []) {
+function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjects = {}) {
   const nodes = [];
   const edges = [];
   
@@ -6590,11 +6595,41 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = []) {
     triggeredSends: sfmcObjects['Triggered Sends']?.length || 0,
     filters: sfmcObjects['Filters']?.length || 0,
     fileTransfers: sfmcObjects['File Transfers']?.length || 0,
-    dataExtracts: sfmcObjects['Data Extracts']?.length || 0
+    dataExtracts: sfmcObjects['Data Extracts']?.length || 0,
+    hasSelectedObjects: Object.keys(selectedObjects).length > 0
   });
 
-  // Create nodes for each object type
-  Object.entries(sfmcObjects).forEach(([category, objects]) => {
+  // Helper function to check if any objects are selected
+  const hasAnySelection = Object.keys(selectedObjects).length > 0 && 
+    Object.values(selectedObjects).some(categoryObj => 
+      Object.values(categoryObj || {}).some(selected => selected)
+    );
+
+  // Create filtered objects based on selection
+  let filteredSfmcObjects = { ...sfmcObjects };
+  
+  if (hasAnySelection) {
+    console.log('🎯 [Graph] Filtering objects based on selection...');
+    
+    // First pass: Include all selected objects
+    const selectedObjectIds = new Set();
+    Object.entries(selectedObjects).forEach(([category, categorySelections]) => {
+      if (filteredSfmcObjects[category]) {
+        filteredSfmcObjects[category] = filteredSfmcObjects[category].filter(obj => {
+          const isSelected = categorySelections[obj.id] === true;
+          if (isSelected) {
+            selectedObjectIds.add(obj.id);
+          }
+          return isSelected;
+        });
+      }
+    });
+
+    console.log('🎯 [Graph] Selected objects count:', selectedObjectIds.size);
+  }
+
+  // Create nodes for filtered objects
+  Object.entries(filteredSfmcObjects).forEach(([category, objects]) => {
     if (!objects || objects.length === 0) return;
     
     objects.forEach(obj => {
@@ -6613,23 +6648,109 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = []) {
     });
   });
 
-  // Generate relationships between objects
-  const dataExtensions = sfmcObjects['Data Extensions'] || [];
-  const sqlQueries = sfmcObjects['SQL Queries'] || [];
-  const automations = sfmcObjects['Automations'] || [];
-  const journeys = sfmcObjects['Journeys'] || [];
-  const triggeredSends = sfmcObjects['Triggered Sends'] || [];
-  const filters = sfmcObjects['Filters'] || [];
-  const fileTransfers = sfmcObjects['File Transfers'] || [];
-  const dataExtracts = sfmcObjects['Data Extracts'] || [];
+  // Generate relationships between filtered objects
+  const dataExtensions = filteredSfmcObjects['Data Extensions'] || [];
+  const sqlQueries = filteredSfmcObjects['SQL Queries'] || [];
+  const automations = filteredSfmcObjects['Automations'] || [];
+  const journeys = filteredSfmcObjects['Journeys'] || [];
+  const triggeredSends = filteredSfmcObjects['Triggered Sends'] || [];
+  const filters = filteredSfmcObjects['Filters'] || [];
+  const fileTransfers = filteredSfmcObjects['File Transfers'] || [];
+  const dataExtracts = filteredSfmcObjects['Data Extracts'] || [];
 
-  // Detect and add all relationship types
+  // If we have selected objects, we need to include related objects that aren't selected
+  // but have relationships with selected objects
+  let additionalNodes = [];
+  if (hasAnySelection) {
+    console.log('🔗 [Graph] Finding related objects for selected items...');
+    
+    // Get all object IDs that are currently in the filtered set
+    const currentNodeIds = new Set(nodes.map(n => n.data.id));
+    
+    // For relationship detection, we need to check against ALL objects, not just filtered ones
+    const allDataExtensions = sfmcObjects['Data Extensions'] || [];
+    const allSqlQueries = sfmcObjects['SQL Queries'] || [];
+    const allAutomations = sfmcObjects['Automations'] || [];
+    const allJourneys = sfmcObjects['Journeys'] || [];
+    const allTriggeredSends = sfmcObjects['Triggered Sends'] || [];
+    const allFilters = sfmcObjects['Filters'] || [];
+    const allFileTransfers = sfmcObjects['File Transfers'] || [];
+    const allDataExtracts = sfmcObjects['Data Extracts'] || [];
+    
+    // Find related objects and add them as additional nodes
+    const relatedObjectIds = new Set();
+    
+    // Check all possible relationships and add related objects
+    [
+      ...detectQueryToDataExtensionRelationships(allSqlQueries, allDataExtensions),
+      ...detectFilterToDataExtensionRelationships(allFilters, allDataExtensions),
+      ...detectAutomationToDataExtensionRelationships(allAutomations, allDataExtensions, allSqlQueries, allFileTransfers, allDataExtracts),
+      ...detectJourneyToDataExtensionRelationships(allJourneys, allDataExtensions),
+      ...detectTriggeredSendToDataExtensionRelationships(allTriggeredSends, allDataExtensions)
+    ].forEach(rel => {
+      // If source is selected but target is not in current nodes, add target
+      if (currentNodeIds.has(rel.source) && !currentNodeIds.has(rel.target)) {
+        relatedObjectIds.add(rel.target);
+      }
+      // If target is selected but source is not in current nodes, add source
+      if (currentNodeIds.has(rel.target) && !currentNodeIds.has(rel.source)) {
+        relatedObjectIds.add(rel.source);
+      }
+    });
+    
+    // Add related objects as additional nodes
+    Object.entries(sfmcObjects).forEach(([category, objects]) => {
+      if (!objects) return;
+      objects.forEach(obj => {
+        if (relatedObjectIds.has(obj.id) && !currentNodeIds.has(obj.id)) {
+          additionalNodes.push({
+            data: {
+              id: obj.id,
+              label: obj.name,
+              category: category,
+              type: category,
+              metadata: {
+                ...obj,
+                category: category,
+                isRelated: true // Mark as related object
+              }
+            }
+          });
+          
+          // Update filtered objects to include this related object for relationship detection
+          if (!filteredSfmcObjects[category]) {
+            filteredSfmcObjects[category] = [];
+          }
+          if (!filteredSfmcObjects[category].find(o => o.id === obj.id)) {
+            filteredSfmcObjects[category].push(obj);
+          }
+        }
+      });
+    });
+    
+    console.log('🔗 [Graph] Added related objects:', additionalNodes.length);
+  }
+
+  // Add additional nodes to the main nodes array
+  nodes.push(...additionalNodes);
+
+  // Generate relationships between all objects (selected + related)
+  const finalDataExtensions = filteredSfmcObjects['Data Extensions'] || [];
+  const finalSqlQueries = filteredSfmcObjects['SQL Queries'] || [];
+  const finalAutomations = filteredSfmcObjects['Automations'] || [];
+  const finalJourneys = filteredSfmcObjects['Journeys'] || [];
+  const finalTriggeredSends = filteredSfmcObjects['Triggered Sends'] || [];
+  const finalFilters = filteredSfmcObjects['Filters'] || [];
+  const finalFileTransfers = filteredSfmcObjects['File Transfers'] || [];
+  const finalDataExtracts = filteredSfmcObjects['Data Extracts'] || [];
+
+  // Detect and add all relationship types using final filtered objects
   const relationships = [
-    ...detectQueryToDataExtensionRelationships(sqlQueries, dataExtensions),
-    ...detectFilterToDataExtensionRelationships(filters, dataExtensions),
-    ...detectAutomationToDataExtensionRelationships(automations, dataExtensions, sqlQueries, fileTransfers, dataExtracts),
-    ...detectJourneyToDataExtensionRelationships(journeys, dataExtensions),
-    ...detectTriggeredSendToDataExtensionRelationships(triggeredSends, dataExtensions)
+    ...detectQueryToDataExtensionRelationships(finalSqlQueries, finalDataExtensions),
+    ...detectFilterToDataExtensionRelationships(finalFilters, finalDataExtensions),
+    ...detectAutomationToDataExtensionRelationships(finalAutomations, finalDataExtensions, finalSqlQueries, finalFileTransfers, finalDataExtracts),
+    ...detectJourneyToDataExtensionRelationships(finalJourneys, finalDataExtensions),
+    ...detectTriggeredSendToDataExtensionRelationships(finalTriggeredSends, finalDataExtensions)
   ];
 
   // Convert relationships to graph edges
@@ -6649,8 +6770,9 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = []) {
   console.log('✅ [Graph] Generated graph data:', {
     totalNodes: nodes.length,
     totalEdges: edges.length,
-    nodesByType: Object.entries(sfmcObjects).map(([type, objs]) => `${type}: ${objs?.length || 0}`),
-    relationshipTypes: [...new Set(relationships.map(r => r.type))]
+    nodesByType: Object.entries(filteredSfmcObjects).map(([type, objs]) => `${type}: ${objs?.length || 0}`),
+    relationshipTypes: [...new Set(relationships.map(r => r.type))],
+    wasFiltered: hasAnySelection
   });
 
   return {
@@ -6668,7 +6790,7 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = []) {
  */
 app.get('/graph', async (req, res) => {
   try {
-    const { type, keys } = req.query;
+    const { type, keys, selectedObjects } = req.query;
     
     // Parse types parameter (comma-separated string to array)
     const types = type ? type.split(',').map(t => t.trim()) : [];
@@ -6676,7 +6798,18 @@ app.get('/graph', async (req, res) => {
     // Parse keys parameter (comma-separated string to array)
     const parsedKeys = keys ? keys.split(',').map(k => k.trim()) : [];
     
-    console.log('🔍 [Graph API] Request received:', { types, keys: parsedKeys });
+    // Parse selectedObjects parameter (JSON string to object)
+    let parsedSelectedObjects = {};
+    if (selectedObjects) {
+      try {
+        parsedSelectedObjects = JSON.parse(selectedObjects);
+        console.log('🔍 [Graph API] Parsed selectedObjects:', parsedSelectedObjects);
+      } catch (parseError) {
+        console.warn('⚠️ [Graph API] Failed to parse selectedObjects parameter:', parseError.message);
+      }
+    }
+    
+    console.log('🔍 [Graph API] Request received:', { types, keys: parsedKeys, hasSelectedObjects: Object.keys(parsedSelectedObjects).length > 0 });
     
     if (!req.session.mcCreds) {
       return res.status(401).json({ 
@@ -6702,8 +6835,8 @@ app.get('/graph', async (req, res) => {
       const restEndpoint = req.session.mcCreds.restEndpoint || `https://${subdomain}.rest.marketingcloudapis.com`;
       const sfmcObjects = await fetchAllSFMCObjects(accessToken, subdomain, restEndpoint);
       
-      // Generate graph data from real SFMC objects
-      const graphData = generateLiveGraphData(sfmcObjects, types, parsedKeys);
+      // Generate graph data from real SFMC objects with selected object filtering
+      const graphData = generateLiveGraphData(sfmcObjects, types, parsedKeys, parsedSelectedObjects);
       
       console.log('✅ [Graph API] Generated live graph data from SFMC objects:', {
         nodeCount: graphData.nodes.length,

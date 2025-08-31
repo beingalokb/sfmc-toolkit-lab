@@ -2,11 +2,14 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
 
 // API functions for backend integration
-const fetchGraphData = async (type = null, keys = null) => {
+const fetchGraphData = async (selectedObjects = {}) => {
   try {
     const params = new URLSearchParams();
-    if (type) params.append('type', type);
-    if (keys) params.append('keys', keys);
+    
+    // Send selected objects as JSON string
+    if (Object.keys(selectedObjects).length > 0) {
+      params.append('selectedObjects', JSON.stringify(selectedObjects));
+    }
     
     const response = await fetch(`/graph?${params.toString()}`);
     if (!response.ok) {
@@ -61,9 +64,38 @@ const SchemaBuilder = () => {
   const [objectsLoading, setObjectsLoading] = useState(false);
   const [objectsError, setObjectsError] = useState(null);
   
+  // Search functionality
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredObjectData, setFilteredObjectData] = useState({});
+  
   const cyRef = useRef(null);
 
-  const objectTypes = Object.keys(objectData);
+  // Filter objects based on search term
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredObjectData(objectData);
+      return;
+    }
+    
+    const filtered = {};
+    const searchLower = searchTerm.toLowerCase();
+    
+    Object.entries(objectData).forEach(([category, objects]) => {
+      const filteredObjects = objects.filter(obj => 
+        obj.name.toLowerCase().includes(searchLower) ||
+        obj.description?.toLowerCase().includes(searchLower) ||
+        obj.externalKey?.toLowerCase().includes(searchLower)
+      );
+      
+      if (filteredObjects.length > 0) {
+        filtered[category] = filteredObjects;
+      }
+    });
+    
+    setFilteredObjectData(filtered);
+  }, [objectData, searchTerm]);
+
+  const objectTypes = Object.keys(filteredObjectData);
 
   // Check if any objects are selected
   const hasSelectedObjects = Object.values(selectedObjects).some(categoryObj => 
@@ -150,7 +182,7 @@ const getTypeFromCategory = (category) => {
     setApiLoading(true);
     setApiError(null);
     try {
-      const data = await fetchGraphData();
+      const data = await fetchGraphData(selectedObjects);
       return data;
     } catch (error) {
       setApiError(error.message);
@@ -158,32 +190,39 @@ const getTypeFromCategory = (category) => {
     } finally {
       setApiLoading(false);
     }
-  }, [selectedObjects]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedObjects]);
 
   // Update graph based on selected objects
   const updateGraph = useCallback(async () => {
     const graphData = await loadGraphData();
     
     // Apply styling to nodes and edges with better directional flow
-    const styledNodes = graphData.nodes.map(node => ({
-      ...node,
-      style: {
-        'background-color': nodeColors[node.data.category] || nodeColors[node.data.type] || '#6B7280',
-        'label': node.data.label,
-        'color': '#ffffff',
-        'text-valign': 'center',
-        'text-halign': 'center',
-        'font-size': '12px',
-        'font-weight': 'bold',
-        'width': '140px',
-        'height': '50px',
-        'shape': 'roundrectangle',
-        'border-width': '2px',
-        'border-color': '#ffffff',
-        'text-wrap': 'wrap',
-        'text-max-width': '120px'
-      }
-    }));
+    const styledNodes = graphData.nodes.map(node => {
+      const isRelated = node.data.metadata?.isRelated === true;
+      const baseColor = nodeColors[node.data.category] || nodeColors[node.data.type] || '#6B7280';
+      
+      return {
+        ...node,
+        style: {
+          'background-color': isRelated ? `${baseColor}80` : baseColor, // 50% opacity for related objects
+          'label': node.data.label,
+          'color': '#ffffff',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '12px',
+          'font-weight': isRelated ? 'normal' : 'bold',
+          'width': '140px',
+          'height': '50px',
+          'shape': 'roundrectangle',
+          'border-width': isRelated ? '1px' : '2px',
+          'border-color': isRelated ? baseColor : '#ffffff',
+          'border-style': isRelated ? 'dashed' : 'solid',
+          'text-wrap': 'wrap',
+          'text-max-width': '120px',
+          'opacity': isRelated ? 0.8 : 1.0
+        }
+      };
+    });
 
     // Enhanced edge styling with directional flow and relationship-specific colors
     const styledEdges = graphData.edges.map(edge => {
@@ -337,13 +376,55 @@ const getTypeFromCategory = (category) => {
           <h2 className="text-lg font-semibold text-gray-900">Schema Objects</h2>
           <p className="text-sm text-gray-600">Select objects to visualize relationships</p>
           
+          {/* Search Bar */}
+          <div className="mt-3 relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              placeholder="Search objects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            />
+            {searchTerm && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* Search Results Summary */}
+          {searchTerm && (
+            <div className="mt-2 text-xs text-gray-500">
+              {Object.keys(filteredObjectData).length === 0 ? (
+                <span>No objects match "{searchTerm}"</span>
+              ) : (
+                <span>
+                  {Object.values(filteredObjectData).reduce((sum, objects) => sum + objects.length, 0)} objects 
+                  in {Object.keys(filteredObjectData).length} categories match "{searchTerm}"
+                </span>
+              )}
+            </div>
+          )}
+          
           {/* API Status */}
           <div className="mt-3">
             {(apiLoading || objectsLoading) && (
               <div className="flex items-center text-xs text-blue-600">
                 <svg className="animate-spin -ml-1 mr-2 h-3 w-3" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 008-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 {objectsLoading ? 'Loading objects...' : 'Loading from API...'}
               </div>
@@ -395,7 +476,7 @@ const getTypeFromCategory = (category) => {
               
               {expandedCategories[category] && (
                 <div className="px-4 pb-4 space-y-2">
-                  {objectData[category].map(object => (
+                  {filteredObjectData[category].map(object => (
                     <label key={object.id} className="flex items-center space-x-3 py-2 hover:bg-gray-50 rounded cursor-pointer">
                       <input
                         type="checkbox"
