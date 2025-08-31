@@ -136,16 +136,16 @@ const SchemaBuilder = () => {
     Object.values(categoryObj || {}).some(selected => selected)
   );
 
-  // Color mapping for different object types
+  // Color mapping for different object types (following your specification)
 const OBJECT_TYPE_COLORS = {
-  'Data Extensions': '#10B981', // Green
-  'SQL Queries': '#3B82F6',    // Blue
-  'Automations': '#8B5CF6',    // Purple
-  'Journeys': '#F59E0B',       // Orange
-  'Triggered Sends': '#EF4444', // Red
-  'Filters': '#06B6D4',        // Cyan
-  'File Transfers': '#84CC16',  // Lime
-  'Data Extracts': '#F97316'   // Orange-red
+  'Data Extensions': '#3B82F6',    // 🟦 Blue
+  'SQL Queries': '#10B981',       // 🟩 Green  
+  'Automations': '#F97316',       // 🟧 Orange
+  'Journeys': '#8B5CF6',          // 🟪 Purple
+  'Triggered Sends': '#EF4444',   // 🟥 Red
+  'File Transfers': '#EAB308',    // 🟨 Yellow
+  'Data Extracts': '#A16207',     // 🟫 Brown
+  'Filters': '#06B6D4'            // 🟦 Cyan (keeping as distinguishable blue)
 };
 
 // Get color for object type
@@ -304,34 +304,68 @@ const getTypeFromCategory = (category) => {
 
     const graphData = await loadGraphData();
     
-    // Apply styling to nodes and edges
+    // Apply styling to nodes and edges with better directional flow
     const styledNodes = graphData.nodes.map(node => ({
       ...node,
       style: {
-        'background-color': nodeColors[node.data.type] || '#6B7280',
+        'background-color': nodeColors[node.data.category] || nodeColors[node.data.type] || '#6B7280',
         'label': node.data.label,
         'color': '#ffffff',
         'text-valign': 'center',
         'text-halign': 'center',
         'font-size': '12px',
-        'width': '120px',
-        'height': '40px',
-        'shape': 'roundrectangle'
+        'font-weight': 'bold',
+        'width': '140px',
+        'height': '50px',
+        'shape': 'roundrectangle',
+        'border-width': '2px',
+        'border-color': '#ffffff',
+        'text-wrap': 'wrap',
+        'text-max-width': '120px'
       }
     }));
 
-    const styledEdges = graphData.edges.map(edge => ({
-      ...edge,
-      style: {
-        'line-color': edge.data.label === 'writes to' ? '#94A3B8' : '#10B981',
-        'target-arrow-color': edge.data.label === 'writes to' ? '#94A3B8' : '#10B981',
-        'target-arrow-shape': 'triangle',
-        'curve-style': 'bezier',
-        'label': edge.data.label,
-        'font-size': '10px',
-        'text-rotation': 'autorotate'
-      }
-    }));
+    // Enhanced edge styling with directional flow and relationship-specific colors
+    const styledEdges = graphData.edges.map(edge => {
+      const relationshipColors = {
+        'writes_to': '#10B981',           // Green for data writes
+        'reads_from': '#3B82F6',         // Blue for data reads
+        'imports_to_de': '#F97316',      // Orange for data imports
+        'journey_entry_source': '#8B5CF6', // Purple for journey entries
+        'contains_query': '#6B7280',     // Gray for containment
+        'uses_in_decision': '#EAB308',   // Yellow for decision logic
+        'subscriber_source': '#EF4444',  // Red for email sources
+        'sends_email': '#EC4899',        // Pink for email sends
+        'provides_data_to': '#06B6D4',   // Cyan for data flow
+        'updates_de': '#84CC16',         // Lime for updates
+        'default': '#94A3B8'             // Default gray
+      };
+      
+      const edgeColor = relationshipColors[edge.data.type] || relationshipColors.default;
+      
+      return {
+        ...edge,
+        style: {
+          'line-color': edgeColor,
+          'target-arrow-color': edgeColor,
+          'target-arrow-shape': 'triangle',
+          'target-arrow-size': '12px',
+          'curve-style': 'bezier',
+          'label': edge.data.label,
+          'font-size': '10px',
+          'font-weight': '600',
+          'text-rotation': 'autorotate',
+          'text-background-color': '#ffffff',
+          'text-background-opacity': 0.9,
+          'text-background-padding': '3px',
+          'text-border-color': edgeColor,
+          'text-border-width': '1px',
+          'text-border-opacity': 0.3,
+          'width': '3px',
+          'opacity': 0.8
+        }
+      };
+    });
 
     setGraphElements([...styledNodes, ...styledEdges]);
   }, [dataSource, selectedObjects, loadGraphData]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -402,17 +436,22 @@ const getTypeFromCategory = (category) => {
   const layout = {
     name: 'cose',
     animate: true,
-    animationDuration: 500,
+    animationDuration: 1000,
+    animationEasing: 'ease-out',
     nodeDimensionsIncludeLabels: true,
     fit: true,
-    padding: 30,
-    componentSpacing: 100,
-    nodeOverlap: 20,
-    idealEdgeLength: 100,
-    edgeElasticity: 100,
-    nestingFactor: 5,
+    padding: 50,
+    componentSpacing: 150,
+    nodeOverlap: 30,
+    idealEdgeLength: 120,
+    edgeElasticity: 200,
+    nestingFactor: 12,
     gravity: 80,
-    numIter: 1000
+    numIter: 1000,
+    initialTemp: 200,
+    coolingFactor: 0.95,
+    minTemp: 1.0,
+    nodeRepulsion: function(node) { return 400000; }
   };
 
   useEffect(() => {
@@ -596,16 +635,20 @@ const getTypeFromCategory = (category) => {
                 </p>
                 <div className="text-sm text-gray-500 space-y-2">
                   <p className="flex items-center justify-center space-x-2">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                    <span>Select objects from the sidebar to begin</span>
+                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    <span>🟦 Data Extensions are the foundation of your data flow</span>
                   </p>
                   <p className="flex items-center justify-center space-x-2">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                    <span>See how Data Extensions connect to Queries, Automations & Journeys</span>
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    <span>🟩 SQL Queries read from and write to Data Extensions</span>
                   </p>
                   <p className="flex items-center justify-center space-x-2">
                     <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-                    <span>Discover hidden dependencies in your data flow</span>
+                    <span>🟪 Journeys use Data Extensions for entry and decisions</span>
+                  </p>
+                  <p className="flex items-center justify-center space-x-2">
+                    <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                    <span>🟧 Automations orchestrate data flows and activities</span>
                   </p>
                 </div>
               </div>

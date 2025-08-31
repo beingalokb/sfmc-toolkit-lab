@@ -6459,18 +6459,147 @@ function generateMockGraphData(types = [], keys = []) {
     });
   }
   
+  // Mock Triggered Sends
+  if (!types.length || types.includes('TriggeredSend')) {
+    const triggeredSends = [
+      { id: 'ts_password_reset', name: 'Password_Reset_Email', type: 'TriggeredSend' },
+      { id: 'ts_order_confirmation', name: 'Order_Confirmation', type: 'TriggeredSend' },
+      { id: 'ts_weekly_newsletter', name: 'Weekly_Newsletter', type: 'TriggeredSend' }
+    ];
+    
+    triggeredSends.forEach(ts => {
+      if (!keys.length || keys.some(key => ts.name.toLowerCase().includes(key.toLowerCase()) || ts.id.includes(key))) {
+        mockNodes.push({
+          data: {
+            id: ts.id,
+            label: ts.name,
+            type: ts.type,
+            category: 'Triggered Sends',
+            name: ts.name,
+            description: `Mock triggered send: ${ts.name}`,
+            status: 'Active'
+          }
+        });
+      }
+    });
+  }
+  
+  // Mock Filters
+  if (!types.length || types.includes('Filter')) {
+    const filters = [
+      { id: 'filter_active_subscribers', name: 'Active_Subscribers_Filter', type: 'Filter' },
+      { id: 'filter_high_value_customers', name: 'High_Value_Customers', type: 'Filter' }
+    ];
+    
+    filters.forEach(filter => {
+      if (!keys.length || keys.some(key => filter.name.toLowerCase().includes(key.toLowerCase()) || filter.id.includes(key))) {
+        mockNodes.push({
+          data: {
+            id: filter.id,
+            label: filter.name,
+            type: filter.type,
+            category: 'Filters',
+            name: filter.name,
+            description: `Mock filter: ${filter.name}`,
+            status: 'Active'
+          }
+        });
+      }
+    });
+  }
+  
+  // Mock File Transfers
+  if (!types.length || types.includes('FileTransfer')) {
+    const fileTransfers = [
+      { id: 'ft_daily_customer_export', name: 'Daily_Customer_Export', type: 'FileTransfer' },
+      { id: 'ft_campaign_data_import', name: 'Campaign_Data_Import', type: 'FileTransfer' }
+    ];
+    
+    fileTransfers.forEach(ft => {
+      if (!keys.length || keys.some(key => ft.name.toLowerCase().includes(key.toLowerCase()) || ft.id.includes(key))) {
+        mockNodes.push({
+          data: {
+            id: ft.id,
+            label: ft.name,
+            type: ft.type,
+            category: 'File Transfers',
+            name: ft.name,
+            description: `Mock file transfer: ${ft.name}`,
+            status: 'Active'
+          }
+        });
+      }
+    });
+  }
+  
+  // Mock Data Extracts
+  if (!types.length || types.includes('DataExtract')) {
+    const dataExtracts = [
+      { id: 'extract_monthly_performance', name: 'Monthly_Performance_Extract', type: 'DataExtract' },
+      { id: 'extract_customer_export', name: 'Customer_Export_Extract', type: 'DataExtract' }
+    ];
+    
+    dataExtracts.forEach(extract => {
+      if (!keys.length || keys.some(key => extract.name.toLowerCase().includes(key.toLowerCase()) || extract.id.includes(key))) {
+        mockNodes.push({
+          data: {
+            id: extract.id,
+            label: extract.name,
+            type: extract.type,
+            category: 'Data Extracts',
+            name: extract.name,
+            description: `Mock data extract: ${extract.name}`,
+            status: 'Active'
+          }
+        });
+      }
+    });
+  }
+  
   // Create filter for which nodes exist after filtering
   const nodeIds = new Set(mockNodes.map(n => n.data.id));
   
-  // Mock Relationship Edges (only include if both nodes exist)
+  // Enhanced Mock Relationship Edges (following your comprehensive logic)
   const mockRelationships = [
-    { source: 'query_customer_segmentation', target: 'de_customer_master', label: 'reads from', type: 'reads_from' },
-    { source: 'query_customer_segmentation', target: 'de_email_preferences', label: 'writes to', type: 'writes_to' },
-    { source: 'auto_daily_import', target: 'de_customer_master', label: 'imports to DE', type: 'imports_to_de' },
-    { source: 'de_customer_master', target: 'journey_welcome_series', label: 'journey entry source', type: 'journey_entry_source' },
-    { source: 'journey_welcome_series', target: 'de_journey_activity', label: 'writes activity', type: 'writes_to' },
-    { source: 'auto_journey_sync', target: 'query_journey_attribution', label: 'contains query', type: 'contains_query' },
-    { source: 'query_email_performance', target: 'de_campaign_results', label: 'writes to', type: 'writes_to' }
+    // Data Extension INPUTS
+    { source: 'query_customer_segmentation', target: 'de_customer_master', label: 'writes to', type: 'writes_to', category: 'query_to_de' },
+    { source: 'auto_daily_import', target: 'de_customer_master', label: 'imports to DE', type: 'imports_to_de', category: 'automation_to_de' },
+    { source: 'ft_campaign_data_import', target: 'de_customer_master', label: 'provides data to', type: 'provides_data_to', category: 'file_transfer_to_de' },
+    
+    // Data Extension OUTPUTS  
+    { source: 'de_customer_master', target: 'query_customer_segmentation', label: 'reads from', type: 'reads_from', category: 'de_to_query' },
+    { source: 'de_customer_master', target: 'journey_welcome_series', label: 'journey entry source', type: 'journey_entry_source', category: 'de_to_journey' },
+    { source: 'de_email_preferences', target: 'journey_abandonment_recovery', label: 'journey entry source', type: 'journey_entry_source', category: 'de_to_journey' },
+    { source: 'de_customer_master', target: 'ts_password_reset', label: 'subscriber source', type: 'subscriber_source', category: 'de_to_triggered_send' },
+    { source: 'de_email_preferences', target: 'filter_active_subscribers', label: 'filter source', type: 'filter_source', category: 'de_to_filter' },
+    
+    // SQL Query relationships
+    { source: 'query_email_performance', target: 'de_campaign_results', label: 'writes to', type: 'writes_to', category: 'query_to_de' },
+    { source: 'de_purchase_history', target: 'query_email_performance', label: 'reads from', type: 'reads_from', category: 'de_to_query' },
+    
+    // Automation relationships
+    { source: 'auto_journey_sync', target: 'query_journey_attribution', label: 'contains query', type: 'contains_query', category: 'automation_to_query' },
+    { source: 'auto_email_cleanup', target: 'de_email_preferences', label: 'updates DE', type: 'updates_de', category: 'automation_to_de' },
+    { source: 'auto_daily_import', target: 'ft_campaign_data_import', label: 'uses file transfer', type: 'uses_file_transfer', category: 'automation_to_file_transfer' },
+    
+    // Journey relationships
+    { source: 'journey_welcome_series', target: 'de_journey_activity', label: 'writes activity', type: 'writes_to', category: 'journey_to_de' },
+    { source: 'journey_birthday_campaign', target: 'de_campaign_results', label: 'updates DE', type: 'updates_de', category: 'journey_to_de' },
+    { source: 'journey_welcome_series', target: 'ts_order_confirmation', label: 'sends email', type: 'sends_email', category: 'journey_to_triggered_send' },
+    
+    // Triggered Send relationships
+    { source: 'ts_weekly_newsletter', target: 'de_email_preferences', label: 'uses subscription data', type: 'uses_subscription_data', category: 'triggered_send_to_de' },
+    
+    // Filter relationships
+    { source: 'filter_high_value_customers', target: 'de_purchase_history', label: 'filters on', type: 'filters_on', category: 'filter_to_de' },
+    { source: 'filter_active_subscribers', target: 'journey_abandonment_recovery', label: 'audience filter', type: 'audience_filter', category: 'filter_to_journey' },
+    
+    // File Transfer and Data Extract relationships
+    { source: 'extract_customer_export', target: 'ft_daily_customer_export', label: 'exported via', type: 'exported_via', category: 'extract_to_file_transfer' },
+    { source: 'de_campaign_results', target: 'extract_monthly_performance', label: 'extracted from', type: 'extracted_from', category: 'de_to_extract' },
+    
+    // Cross-object dependencies
+    { source: 'de_purchase_history', target: 'journey_abandonment_recovery', label: 'decision split data', type: 'uses_in_decision', category: 'de_to_journey' }
   ];
   
   mockRelationships.forEach((rel, index) => {
