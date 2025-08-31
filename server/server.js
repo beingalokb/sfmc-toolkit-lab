@@ -6347,6 +6347,91 @@ async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
 
 // ==================== GRAPH API UTILITY FUNCTIONS ====================
 
+/**
+ * Generate graph data from live SFMC objects
+ * Creates nodes and edges for visualization
+ */
+function generateLiveGraphData(sfmcObjects, types = [], keys = []) {
+  const nodes = [];
+  const edges = [];
+  
+  console.log('🔍 [Graph] Generating graph from SFMC objects:', {
+    dataExtensions: sfmcObjects['Data Extensions']?.length || 0,
+    sqlQueries: sfmcObjects['SQL Queries']?.length || 0,
+    automations: sfmcObjects['Automations']?.length || 0,
+    journeys: sfmcObjects['Journeys']?.length || 0,
+    triggeredSends: sfmcObjects['Triggered Sends']?.length || 0,
+    filters: sfmcObjects['Filters']?.length || 0,
+    fileTransfers: sfmcObjects['File Transfers']?.length || 0,
+    dataExtracts: sfmcObjects['Data Extracts']?.length || 0
+  });
+
+  // Create nodes for each object type
+  Object.entries(sfmcObjects).forEach(([category, objects]) => {
+    if (!objects || objects.length === 0) return;
+    
+    objects.forEach(obj => {
+      nodes.push({
+        data: {
+          id: obj.id,
+          label: obj.name,
+          category: category,
+          type: category,
+          metadata: {
+            ...obj,
+            category: category
+          }
+        }
+      });
+    });
+  });
+
+  // Generate relationships between objects
+  const dataExtensions = sfmcObjects['Data Extensions'] || [];
+  const sqlQueries = sfmcObjects['SQL Queries'] || [];
+  const automations = sfmcObjects['Automations'] || [];
+  const journeys = sfmcObjects['Journeys'] || [];
+  const triggeredSends = sfmcObjects['Triggered Sends'] || [];
+  const filters = sfmcObjects['Filters'] || [];
+  const fileTransfers = sfmcObjects['File Transfers'] || [];
+  const dataExtracts = sfmcObjects['Data Extracts'] || [];
+
+  // Detect and add all relationship types
+  const relationships = [
+    ...detectQueryToDataExtensionRelationships(sqlQueries, dataExtensions),
+    ...detectFilterToDataExtensionRelationships(filters, dataExtensions),
+    ...detectAutomationToDataExtensionRelationships(automations, dataExtensions, sqlQueries, fileTransfers, dataExtracts),
+    ...detectJourneyToDataExtensionRelationships(journeys, dataExtensions),
+    ...detectTriggeredSendToDataExtensionRelationships(triggeredSends, dataExtensions)
+  ];
+
+  // Convert relationships to graph edges
+  relationships.forEach(rel => {
+    edges.push({
+      data: {
+        id: rel.id,
+        source: rel.source,
+        target: rel.target,
+        type: rel.type,
+        label: rel.label,
+        description: rel.description
+      }
+    });
+  });
+
+  console.log('✅ [Graph] Generated graph data:', {
+    totalNodes: nodes.length,
+    totalEdges: edges.length,
+    nodesByType: Object.entries(sfmcObjects).map(([type, objs]) => `${type}: ${objs?.length || 0}`),
+    relationshipTypes: [...new Set(relationships.map(r => r.type))]
+  });
+
+  return {
+    nodes,
+    edges
+  };
+}
+
 // ==================== GRAPH API ENDPOINTS ====================
 
 /**
