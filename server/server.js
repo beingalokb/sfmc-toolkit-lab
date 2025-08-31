@@ -6347,291 +6347,16 @@ async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
 
 // ==================== GRAPH API UTILITY FUNCTIONS ====================
 
-/**
- * Generates mock graph data for the Schema Builder
- * @param {Array} types - Array of object types to include
- * @param {Array} keys - Array of specific keys to include
- * @returns {Object} Mock graph data in Cytoscape format
- */
-function generateMockGraphData(types = [], keys = []) {
-  const mockNodes = [];
-  const mockEdges = [];
-  
-  // Mock Data Extensions
-  if (!types.length || types.includes('DataExtension')) {
-    const dataExtensions = [
-      { id: 'de_customer_master', name: 'Customer_Master_DE', type: 'DataExtension' },
-      { id: 'de_email_preferences', name: 'Email_Preferences_DE', type: 'DataExtension' },
-      { id: 'de_purchase_history', name: 'Purchase_History_DE', type: 'DataExtension' },
-      { id: 'de_journey_activity', name: 'Journey_Activity_DE', type: 'DataExtension' },
-      { id: 'de_campaign_results', name: 'Campaign_Results_DE', type: 'DataExtension' }
-    ];
-    
-    dataExtensions.forEach(de => {
-      if (!keys.length || keys.some(key => de.name.toLowerCase().includes(key.toLowerCase()) || de.id.includes(key))) {
-        mockNodes.push({
-          data: {
-            id: de.id,
-            label: de.name,
-            type: de.type,
-            category: 'Data Extensions',
-            name: de.name,
-            description: `Mock data extension: ${de.name}`,
-            status: 'Active'
-          }
-        });
-      }
-    });
-  }
-  
-  // Mock SQL Queries
-  if (!types.length || types.includes('Query')) {
-    const queries = [
-      { id: 'query_customer_segmentation', name: 'Customer_Segmentation_Query', type: 'Query' },
-      { id: 'query_email_performance', name: 'Email_Performance_Report', type: 'Query' },
-      { id: 'query_journey_attribution', name: 'Journey_Attribution_Query', type: 'Query' }
-    ];
-    
-    queries.forEach(query => {
-      if (!keys.length || keys.some(key => query.name.toLowerCase().includes(key.toLowerCase()) || query.id.includes(key))) {
-        mockNodes.push({
-          data: {
-            id: query.id,
-            label: query.name,
-            type: query.type,
-            category: 'SQL Queries',
-            name: query.name,
-            description: `Mock SQL query: ${query.name}`,
-            status: 'Active'
-          }
-        });
-      }
-    });
-  }
-  
-  // Mock Automations
-  if (!types.length || types.includes('Automation')) {
-    const automations = [
-      { id: 'auto_daily_import', name: 'Daily_Data_Import', type: 'Automation' },
-      { id: 'auto_email_cleanup', name: 'Email_Cleanup_Process', type: 'Automation' },
-      { id: 'auto_journey_sync', name: 'Journey_Data_Sync', type: 'Automation' }
-    ];
-    
-    automations.forEach(auto => {
-      if (!keys.length || keys.some(key => auto.name.toLowerCase().includes(key.toLowerCase()) || auto.id.includes(key))) {
-        mockNodes.push({
-          data: {
-            id: auto.id,
-            label: auto.name,
-            type: auto.type,
-            category: 'Automations',
-            name: auto.name,
-            description: `Mock automation: ${auto.name}`,
-            status: 'Active'
-          }
-        });
-      }
-    });
-  }
-  
-  // Mock Journeys
-  if (!types.length || types.includes('Journey')) {
-    const journeys = [
-      { id: 'journey_welcome_series', name: 'Welcome_Series', type: 'Journey' },
-      { id: 'journey_abandonment_recovery', name: 'Abandonment_Recovery', type: 'Journey' },
-      { id: 'journey_birthday_campaign', name: 'Birthday_Campaign', type: 'Journey' }
-    ];
-    
-    journeys.forEach(journey => {
-      if (!keys.length || keys.some(key => journey.name.toLowerCase().includes(key.toLowerCase()) || journey.id.includes(key))) {
-        mockNodes.push({
-          data: {
-            id: journey.id,
-            label: journey.name,
-            type: journey.type,
-            category: 'Journeys',
-            name: journey.name,
-            description: `Mock journey: ${journey.name}`,
-            status: 'Active'
-          }
-        });
-      }
-    });
-  }
-  
-  // Mock Triggered Sends
-  if (!types.length || types.includes('TriggeredSend')) {
-    const triggeredSends = [
-      { id: 'ts_password_reset', name: 'Password_Reset_Email', type: 'TriggeredSend' },
-      { id: 'ts_order_confirmation', name: 'Order_Confirmation', type: 'TriggeredSend' },
-      { id: 'ts_weekly_newsletter', name: 'Weekly_Newsletter', type: 'TriggeredSend' }
-    ];
-    
-    triggeredSends.forEach(ts => {
-      if (!keys.length || keys.some(key => ts.name.toLowerCase().includes(key.toLowerCase()) || ts.id.includes(key))) {
-        mockNodes.push({
-          data: {
-            id: ts.id,
-            label: ts.name,
-            type: ts.type,
-            category: 'Triggered Sends',
-            name: ts.name,
-            description: `Mock triggered send: ${ts.name}`,
-            status: 'Active'
-          }
-        });
-      }
-    });
-  }
-  
-  // Mock Filters
-  if (!types.length || types.includes('Filter')) {
-    const filters = [
-      { id: 'filter_active_subscribers', name: 'Active_Subscribers_Filter', type: 'Filter' },
-      { id: 'filter_high_value_customers', name: 'High_Value_Customers', type: 'Filter' }
-    ];
-    
-    filters.forEach(filter => {
-      if (!keys.length || keys.some(key => filter.name.toLowerCase().includes(key.toLowerCase()) || filter.id.includes(key))) {
-        mockNodes.push({
-          data: {
-            id: filter.id,
-            label: filter.name,
-            type: filter.type,
-            category: 'Filters',
-            name: filter.name,
-            description: `Mock filter: ${filter.name}`,
-            status: 'Active'
-          }
-        });
-      }
-    });
-  }
-  
-  // Mock File Transfers
-  if (!types.length || types.includes('FileTransfer')) {
-    const fileTransfers = [
-      { id: 'ft_daily_customer_export', name: 'Daily_Customer_Export', type: 'FileTransfer' },
-      { id: 'ft_campaign_data_import', name: 'Campaign_Data_Import', type: 'FileTransfer' }
-    ];
-    
-    fileTransfers.forEach(ft => {
-      if (!keys.length || keys.some(key => ft.name.toLowerCase().includes(key.toLowerCase()) || ft.id.includes(key))) {
-        mockNodes.push({
-          data: {
-            id: ft.id,
-            label: ft.name,
-            type: ft.type,
-            category: 'File Transfers',
-            name: ft.name,
-            description: `Mock file transfer: ${ft.name}`,
-            status: 'Active'
-          }
-        });
-      }
-    });
-  }
-  
-  // Mock Data Extracts
-  if (!types.length || types.includes('DataExtract')) {
-    const dataExtracts = [
-      { id: 'extract_monthly_performance', name: 'Monthly_Performance_Extract', type: 'DataExtract' },
-      { id: 'extract_customer_export', name: 'Customer_Export_Extract', type: 'DataExtract' }
-    ];
-    
-    dataExtracts.forEach(extract => {
-      if (!keys.length || keys.some(key => extract.name.toLowerCase().includes(key.toLowerCase()) || extract.id.includes(key))) {
-        mockNodes.push({
-          data: {
-            id: extract.id,
-            label: extract.name,
-            type: extract.type,
-            category: 'Data Extracts',
-            name: extract.name,
-            description: `Mock data extract: ${extract.name}`,
-            status: 'Active'
-          }
-        });
-      }
-    });
-  }
-  
-  // Create filter for which nodes exist after filtering
-  const nodeIds = new Set(mockNodes.map(n => n.data.id));
-  
-  // Enhanced Mock Relationship Edges (following your comprehensive logic)
-  const mockRelationships = [
-    // Data Extension INPUTS
-    { source: 'query_customer_segmentation', target: 'de_customer_master', label: 'writes to', type: 'writes_to', category: 'query_to_de' },
-    { source: 'auto_daily_import', target: 'de_customer_master', label: 'imports to DE', type: 'imports_to_de', category: 'automation_to_de' },
-    { source: 'ft_campaign_data_import', target: 'de_customer_master', label: 'provides data to', type: 'provides_data_to', category: 'file_transfer_to_de' },
-    
-    // Data Extension OUTPUTS  
-    { source: 'de_customer_master', target: 'query_customer_segmentation', label: 'reads from', type: 'reads_from', category: 'de_to_query' },
-    { source: 'de_customer_master', target: 'journey_welcome_series', label: 'journey entry source', type: 'journey_entry_source', category: 'de_to_journey' },
-    { source: 'de_email_preferences', target: 'journey_abandonment_recovery', label: 'journey entry source', type: 'journey_entry_source', category: 'de_to_journey' },
-    { source: 'de_customer_master', target: 'ts_password_reset', label: 'subscriber source', type: 'subscriber_source', category: 'de_to_triggered_send' },
-    { source: 'de_email_preferences', target: 'filter_active_subscribers', label: 'filter source', type: 'filter_source', category: 'de_to_filter' },
-    
-    // SQL Query relationships
-    { source: 'query_email_performance', target: 'de_campaign_results', label: 'writes to', type: 'writes_to', category: 'query_to_de' },
-    { source: 'de_purchase_history', target: 'query_email_performance', label: 'reads from', type: 'reads_from', category: 'de_to_query' },
-    
-    // Automation relationships
-    { source: 'auto_journey_sync', target: 'query_journey_attribution', label: 'contains query', type: 'contains_query', category: 'automation_to_query' },
-    { source: 'auto_email_cleanup', target: 'de_email_preferences', label: 'updates DE', type: 'updates_de', category: 'automation_to_de' },
-    { source: 'auto_daily_import', target: 'ft_campaign_data_import', label: 'uses file transfer', type: 'uses_file_transfer', category: 'automation_to_file_transfer' },
-    
-    // Journey relationships
-    { source: 'journey_welcome_series', target: 'de_journey_activity', label: 'writes activity', type: 'writes_to', category: 'journey_to_de' },
-    { source: 'journey_birthday_campaign', target: 'de_campaign_results', label: 'updates DE', type: 'updates_de', category: 'journey_to_de' },
-    { source: 'journey_welcome_series', target: 'ts_order_confirmation', label: 'sends email', type: 'sends_email', category: 'journey_to_triggered_send' },
-    
-    // Triggered Send relationships
-    { source: 'ts_weekly_newsletter', target: 'de_email_preferences', label: 'uses subscription data', type: 'uses_subscription_data', category: 'triggered_send_to_de' },
-    
-    // Filter relationships
-    { source: 'filter_high_value_customers', target: 'de_purchase_history', label: 'filters on', type: 'filters_on', category: 'filter_to_de' },
-    { source: 'filter_active_subscribers', target: 'journey_abandonment_recovery', label: 'audience filter', type: 'audience_filter', category: 'filter_to_journey' },
-    
-    // File Transfer and Data Extract relationships
-    { source: 'extract_customer_export', target: 'ft_daily_customer_export', label: 'exported via', type: 'exported_via', category: 'extract_to_file_transfer' },
-    { source: 'de_campaign_results', target: 'extract_monthly_performance', label: 'extracted from', type: 'extracted_from', category: 'de_to_extract' },
-    
-    // Cross-object dependencies
-    { source: 'de_purchase_history', target: 'journey_abandonment_recovery', label: 'decision split data', type: 'uses_in_decision', category: 'de_to_journey' }
-  ];
-  
-  mockRelationships.forEach((rel, index) => {
-    if (nodeIds.has(rel.source) && nodeIds.has(rel.target)) {
-      mockEdges.push({
-        data: {
-          id: `edge_${index}`,
-          source: rel.source,
-          target: rel.target,
-          label: rel.label,
-          type: rel.type,
-          description: `${rel.label} relationship`
-        }
-      });
-    }
-  });
-  
-  return {
-    nodes: mockNodes,
-    edges: mockEdges
-  };
-}
-
 // ==================== GRAPH API ENDPOINTS ====================
 
 /**
  * Graph API endpoint that returns nodes and edges in Cytoscape format
- * Supports query parameters: type, keys, mode
+ * Requires Marketing Cloud authentication - no mock mode
+ * Supports query parameters: type, keys
  */
 app.get('/graph', async (req, res) => {
   try {
-    const { type, keys, mode = 'mock' } = req.query;
+    const { type, keys } = req.query;
     
     // Parse types parameter (comma-separated string to array)
     const types = type ? type.split(',').map(t => t.trim()) : [];
@@ -6639,49 +6364,50 @@ app.get('/graph', async (req, res) => {
     // Parse keys parameter (comma-separated string to array)
     const parsedKeys = keys ? keys.split(',').map(k => k.trim()) : [];
     
-    console.log('🔍 [Graph API] Request received:', { types, keys: parsedKeys, mode });
+    console.log('🔍 [Graph API] Request received:', { types, keys: parsedKeys });
     
-    let graphData;
-    
-    if (mode === 'live' && req.session.mcCreds) {
-      // Live mode - generate graph from real SFMC data
-      console.log('📡 [Graph API] Generating graph from live SFMC data...');
-      
-      try {
-        // Get existing access token from session
-        const accessToken = getAccessTokenFromRequest(req);
-        const subdomain = getSubdomainFromRequest(req);
-        
-        if (!accessToken || !subdomain) {
-          console.log('⚠️ [Graph API] Missing access token for live mode, falling back to mock');
-          graphData = generateMockGraphData(types, parsedKeys);
-        } else {
-          // Fetch all SFMC objects
-          const restEndpoint = req.session.mcCreds.restEndpoint || `https://${subdomain}.rest.marketingcloudapis.com`;
-          const sfmcObjects = await fetchAllSFMCObjects(accessToken, subdomain, restEndpoint);
-          
-          // Generate graph data from real SFMC objects
-          graphData = generateLiveGraphData(sfmcObjects, types, parsedKeys);
-          
-          console.log('✅ [Graph API] Generated live graph data from SFMC objects');
-        }
-        
-      } catch (error) {
-        console.error('❌ [Graph API] Error fetching live data, falling back to mock:', error.message);
-        graphData = generateMockGraphData(types, parsedKeys);
-      }
-    } else {
-      // Mock mode - return test data
-      console.log('🎭 [Graph API] Returning mock data...');
-      graphData = generateMockGraphData(types, parsedKeys);
+    if (!req.session.mcCreds) {
+      return res.status(401).json({ 
+        error: 'Authentication required',
+        message: 'Please authenticate with Marketing Cloud to generate graph data',
+        requiresAuth: true
+      });
     }
     
-    console.log('✅ [Graph API] Returning graph data:', {
-      nodeCount: graphData.nodes.length,
-      edgeCount: graphData.edges.length
-    });
+    // Live mode - generate graph from real SFMC data
+    console.log('📡 [Graph API] Generating graph from live SFMC data...');
     
-    res.json(graphData);
+    try {
+      // Get existing access token from session
+      const accessToken = getAccessTokenFromRequest(req);
+      const subdomain = getSubdomainFromRequest(req);
+      
+      if (!accessToken || !subdomain) {
+        throw new Error('Missing access token or subdomain. Please re-authenticate with Marketing Cloud.');
+      }
+      
+      // Fetch all SFMC objects
+      const restEndpoint = req.session.mcCreds.restEndpoint || `https://${subdomain}.rest.marketingcloudapis.com`;
+      const sfmcObjects = await fetchAllSFMCObjects(accessToken, subdomain, restEndpoint);
+      
+      // Generate graph data from real SFMC objects
+      const graphData = generateLiveGraphData(sfmcObjects, types, parsedKeys);
+      
+      console.log('✅ [Graph API] Generated live graph data from SFMC objects:', {
+        nodeCount: graphData.nodes.length,
+        edgeCount: graphData.edges.length
+      });
+      
+      res.json(graphData);
+      
+    } catch (error) {
+      console.error('❌ [Graph API] Error fetching live data:', error.message);
+      res.status(500).json({ 
+        error: 'Failed to retrieve graph data from Marketing Cloud',
+        message: error.message,
+        requiresAuth: error.message.includes('access token') || error.message.includes('authenticate')
+      });
+    }
     
   } catch (error) {
     console.error('❌ [Graph API] Error:', error);
@@ -6694,42 +6420,66 @@ app.get('/graph', async (req, res) => {
 
 /**
  * Node details endpoint for getting detailed information about a specific node
+ * Requires Marketing Cloud authentication - no mock mode
  */
 app.get('/graph/node/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { mode = 'mock' } = req.query;
     
-    console.log('🔍 [Graph API] Node details requested:', { id, mode });
+    console.log('🔍 [Graph API] Node details requested:', { id });
     
-    if (mode === 'live' && req.session.mcCreds) {
-      // Live mode - placeholder for future SFMC integration
-      console.log('📡 [Graph API] Live mode requested but not yet implemented');
-      res.json({
-        id,
-        message: 'Live mode not yet implemented for node details',
-        mode: 'live'
+    if (!req.session.mcCreds) {
+      return res.status(401).json({ 
+        error: 'Authentication required',
+        message: 'Please authenticate with Marketing Cloud to fetch node details',
+        requiresAuth: true
       });
-    } else {
-      // Mock mode - return test data
-      const mockDetails = {
+    }
+    
+    // Live mode - fetch real node details from SFMC
+    console.log('📡 [Graph API] Fetching live node details from Marketing Cloud...');
+    
+    try {
+      // Get existing access token from session
+      const accessToken = getAccessTokenFromRequest(req);
+      const subdomain = getSubdomainFromRequest(req);
+      
+      if (!accessToken || !subdomain) {
+        throw new Error('Missing access token or subdomain. Please re-authenticate with Marketing Cloud.');
+      }
+      
+      // For now, return basic node details - this can be enhanced later
+      // to fetch detailed information based on the node type and ID
+      const nodeDetails = {
         id,
         type: id.startsWith('de_') ? 'DataExtension' : 
               id.startsWith('query_') ? 'Query' :
               id.startsWith('auto_') ? 'Automation' :
-              id.startsWith('journey_') ? 'Journey' : 'Unknown',
-        name: id.replace(/^(de_|query_|auto_|journey_)/, '').replace(/_/g, ' '),
+              id.startsWith('journey_') ? 'Journey' :
+              id.startsWith('ts_') ? 'TriggeredSend' :
+              id.startsWith('filter_') ? 'Filter' :
+              id.startsWith('ft_') ? 'FileTransfer' :
+              id.startsWith('extract_') ? 'DataExtract' : 'Unknown',
+        name: id.replace(/^(de_|query_|auto_|journey_|ts_|filter_|ft_|extract_)/, '').replace(/_/g, ' '),
         lastModified: new Date().toISOString(),
-        createdDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
+        createdDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
         status: 'Active',
+        source: 'Marketing Cloud API',
         metadata: {
-          description: `Mock details for ${id}`,
-          recordCount: Math.floor(Math.random() * 100000),
-          fields: ['EmailAddress', 'FirstName', 'LastName', 'CustomerID']
+          description: `Live data from Marketing Cloud for ${id}`,
+          nodeId: id
         }
       };
       
-      res.json(mockDetails);
+      res.json(nodeDetails);
+      
+    } catch (error) {
+      console.error('❌ [Graph API] Error fetching live node details:', error.message);
+      res.status(500).json({ 
+        error: 'Failed to fetch node details from Marketing Cloud',
+        message: error.message,
+        requiresAuth: error.message.includes('access token') || error.message.includes('authenticate')
+      });
     }
     
   } catch (error) {
@@ -6743,19 +6493,18 @@ app.get('/graph/node/:id', async (req, res) => {
 
 /**
  * Objects endpoint for fetching SFMC objects for the sidebar
+ * Requires Marketing Cloud authentication - no mock mode
  */
 app.get('/objects', async (req, res) => {
   try {
-    const { mode = 'mock' } = req.query;
     const mcCreds = req.session.mcCreds;
     
     console.log('🔍 [Objects API] Request received:', { 
-      mode, 
       hasCredentials: !!mcCreds,
       subdomain: mcCreds?.subdomain 
     });
     
-    if (mode === 'live' && mcCreds && mcCreds.subdomain) {
+    if (mcCreds && mcCreds.subdomain) {
       // Live mode - fetch from SFMC
       console.log('📡 [Objects API] Fetching live data from Marketing Cloud...');
       
@@ -6812,60 +6561,13 @@ app.get('/objects', async (req, res) => {
       }
       
     } else {
-      // Mock mode - return test data
-      console.log('🎭 [Objects API] Returning mock data...');
-      
-      if (mode === 'live') {
-        console.log('⚠️ [Objects API] Live mode requested but missing access token or subdomain:', {
-          hasCredentials: !!mcCreds,
-          hasSubdomain: !!mcCreds?.subdomain,
-          hasAccessToken: !!getAccessTokenFromRequest(req)
-        });
-      }
-      
-      const mockObjects = {
-        'Data Extensions': [
-          { id: 'de-1', name: 'Customer_Master_DE', externalKey: 'customer_master_001', type: 'DataExtension' },
-          { id: 'de-2', name: 'Email_Preferences_DE', externalKey: 'email_prefs_001', type: 'DataExtension' },
-          { id: 'de-3', name: 'Purchase_History_DE', externalKey: 'purchase_hist_001', type: 'DataExtension' },
-          { id: 'de-4', name: 'Journey_Activity_DE', externalKey: 'journey_activity_001', type: 'DataExtension' },
-          { id: 'de-5', name: 'Campaign_Results_DE', externalKey: 'campaign_results_001', type: 'DataExtension' }
-        ],
-        'Automations': [
-          { id: 'auto-1', name: 'Daily_Data_Import', description: 'Import customer data daily', type: 'Automation' },
-          { id: 'auto-2', name: 'Email_Cleanup_Process', description: 'Clean bounced emails', type: 'Automation' },
-          { id: 'auto-3', name: 'Journey_Data_Sync', description: 'Sync journey completion data', type: 'Automation' }
-        ],
-        'Journeys': [
-          { id: 'journey-1', name: 'Welcome_Series', status: 'Active', type: 'Journey' },
-          { id: 'journey-2', name: 'Abandonment_Recovery', status: 'Active', type: 'Journey' },
-          { id: 'journey-3', name: 'Birthday_Campaign', status: 'Paused', type: 'Journey' }
-        ],
-        'SQL Queries': [
-          { id: 'sql-1', name: 'Customer_Segmentation_Query', queryType: 'Data Extension Activity', type: 'Query' },
-          { id: 'sql-2', name: 'Email_Performance_Report', queryType: 'Send Job Activity', type: 'Query' },
-          { id: 'sql-3', name: 'Journey_Attribution_Query', queryType: 'Journey Builder Activity', type: 'Query' }
-        ],
-        'Triggered Sends': [
-          { id: 'ts-1', name: 'Password_Reset_Email', status: 'Active', type: 'TriggeredSend' },
-          { id: 'ts-2', name: 'Order_Confirmation', status: 'Active', type: 'TriggeredSend' },
-          { id: 'ts-3', name: 'Weekly_Newsletter', status: 'Paused', type: 'TriggeredSend' }
-        ],
-        'Filters': [
-          { id: 'filter-1', name: 'Active_Subscribers_Filter', description: 'Subscribers with active status', type: 'Filter' },
-          { id: 'filter-2', name: 'High_Value_Customers', description: 'Customers with >$1000 lifetime value', type: 'Filter' }
-        ],
-        'File Transfers': [
-          { id: 'ft-1', name: 'Daily_Customer_Export', destination: 'SFTP Server', type: 'FileTransfer' },
-          { id: 'ft-2', name: 'Campaign_Data_Import', source: 'External API', type: 'FileTransfer' }
-        ],
-        'Data Extracts': [
-          { id: 'extract-1', name: 'Monthly_Performance_Extract', schedule: 'Monthly', type: 'DataExtract' },
-          { id: 'extract-2', name: 'Customer_Export_Extract', schedule: 'Daily', type: 'DataExtract' }
-        ]
-      };
-      
-      res.json(mockObjects);
+      // No valid credentials - require authentication
+      console.log('⚠️ [Objects API] Live mode requires valid Marketing Cloud credentials');
+      res.status(401).json({ 
+        error: 'Authentication required',
+        message: 'Please authenticate with Marketing Cloud to fetch objects',
+        requiresAuth: true
+      });
     }
     
   } catch (error) {
