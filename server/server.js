@@ -6080,15 +6080,17 @@ function detectFilterToDataExtensionRelationships(filters, dataExtensions) {
 }
 
 /**
- * Detect Data Extension relationships in Automations
- * Enhanced to handle various automation activity types and structures
+ * Detect activity-aware relationships in Automations
+ * Creates Activity nodes and shows Automation → Activity → Asset relationships
+ * Enhanced to support execution order and activity types
  */
 function detectAutomationToDataExtensionRelationships(automations, dataExtensions, queries, fileTransfers, dataExtracts) {
   const relationships = [];
+  const activityNodes = new Map(); // Store activity nodes for later inclusion
   const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
   const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
   
-  console.log('🔍 [Relationship] Analyzing Automation relationships...');
+  console.log('🔍 [Relationship] Analyzing Activity-Aware Automation relationships...');
   console.log(`📊 [Relationship] Processing ${automations.length} automations`);
   
   automations.forEach(automation => {
@@ -6111,141 +6113,334 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
     
     console.log(`📋 [Relationship] Found ${activities.length} activities in "${automation.name}"`);
     
-    activities.forEach((activity, index) => {
-      console.log(`🔍 [Relationship] Activity ${index + 1}:`, {
-        type: activity.type || activity.activityType || 'Unknown',
-        name: activity.name || activity.displayName || 'Unnamed',
-        objectType: activity.objectType,
-        definitionId: activity.queryDefinitionId || activity.queryId || activity.definitionId,
-        keys: Object.keys(activity).slice(0, 10) // First 10 keys for debugging
+    // Process each activity/step with execution order
+    activities.forEach((activity, stepIndex) => {
+      const stepNumber = stepIndex + 1;
+      const activityType = getActivityType(activity);
+      const activityId = `${automation.id}_activity_${stepNumber}_${activityType}`;
+      
+      console.log(`🔧 [Relationship] Processing Step ${stepNumber}: ${activityType} (${activity.name || activity.displayName || 'Unnamed'})`);
+      
+      // Create activity node
+      const activityNode = {
+        id: activityId,
+        name: activity.name || activity.displayName || `${activityType} Step ${stepNumber}`,
+        type: 'Activity',
+        activityType: activityType,
+        stepNumber: stepNumber,
+        automationId: automation.id,
+        automationName: automation.name,
+        description: activity.description || `${activityType} activity in ${automation.name}`,
+        metadata: {
+          ...activity,
+          stepNumber: stepNumber,
+          executionOrder: stepNumber,
+          parentAutomation: automation.name
+        }
+      };
+      
+      activityNodes.set(activityId, activityNode);
+      
+      // Create Automation → Activity relationship
+      relationships.push({
+        id: `${automation.id}-${activityId}`,
+        source: automation.id,
+        target: activityId,
+        type: 'executes_activity',
+        label: `Step ${stepNumber}`,
+        description: `Automation "${automation.name}" executes ${activityType} at step ${stepNumber}`,
+        stepNumber: stepNumber,
+        executionOrder: stepNumber
       });
       
-      // Enhanced Query Activity relationships
-      const queryActivityTypes = ['query', 'sql', 'sqlquery', 'dataextensionactivity', 'sqlqueryactivity'];
-      const activityType = (activity.type || activity.activityType || '').toLowerCase();
+      // Detect Activity → Asset relationships based on activity type
+      detectActivityToAssetRelationships(activityId, activity, activityType, dataExtensions, queries, fileTransfers, dataExtracts, relationships, deMap, deKeyMap);
       
-      if (queryActivityTypes.includes(activityType)) {
-        // Try multiple possible query reference fields
-        const queryId = activity.queryDefinitionId || activity.queryId || activity.definitionId || activity.objectId;
-        const queryName = activity.queryName || activity.name || activity.displayName;
-        
-        console.log(`🔍 [Relationship] Query activity detected:`, { queryId, queryName, activityType });
-        
-        let query = null;
-        if (queryId) {
-          query = queries.find(q => q.id === queryId || q.objectId === queryId || q.id === `query_${queryId}`);
-        }
-        if (!query && queryName) {
-          query = queries.find(q => q.name === queryName);
-        }
-        
-        if (query) {
-          relationships.push({
-            id: `${automation.id}-${query.id}`,
-            source: automation.id,
-            target: query.id,
-            type: 'contains_query',
-            label: 'contains query',
-            description: `Automation "${automation.name}" contains Query "${query.name}"`
-          });
-          console.log(`✅ [Relationship] Found QUERY: ${automation.name} → ${query.name}`);
-        } else {
-          console.log(`⚠️  [Relationship] Query not found for activity:`, { queryId, queryName });
-        }
+      // If this is not the last activity, create next step relationship
+      if (stepIndex < activities.length - 1) {
+        const nextActivityId = `${automation.id}_activity_${stepIndex + 2}_${getActivityType(activities[stepIndex + 1])}`;
+        relationships.push({
+          id: `${activityId}-${nextActivityId}`,
+          source: activityId,
+          target: nextActivityId,
+          type: 'next_step',
+          label: 'next',
+          description: `Step ${stepNumber} leads to Step ${stepIndex + 2}`,
+          stepNumber: stepNumber,
+          executionOrder: stepNumber
+        });
       }
-      
-      // Enhanced File Transfer relationships
-      const fileTransferTypes = ['filetransfer', 'fileimport', 'import', 'transfer', 'filetransferactivity'];
-      if (fileTransferTypes.includes(activityType)) {
-        const fileTransferId = activity.fileTransferId || activity.transferId || activity.id || activity.objectId;
-        console.log(`🔍 [Relationship] File transfer activity detected:`, { fileTransferId, activityType });
-        
-        const fileTransfer = fileTransfers.find(ft => ft.id === fileTransferId || ft.id === `ft_${fileTransferId}`);
-        if (fileTransfer) {
-          relationships.push({
-            id: `${automation.id}-${fileTransfer.id}`,
-            source: automation.id,
-            target: fileTransfer.id,
-            type: 'contains_file_transfer',
-            label: 'contains file transfer',
-            description: `Automation "${automation.name}" contains File Transfer "${fileTransfer.name}"`
-          });
-          console.log(`✅ [Relationship] Found FILE TRANSFER: ${automation.name} → ${fileTransfer.name}`);
-        }
-      }
-      
-      // Enhanced Data Extract relationships
-      const dataExtractTypes = ['dataextract', 'extract', 'export', 'dataextractactivity'];
-      if (dataExtractTypes.includes(activityType)) {
-        const dataExtractId = activity.dataExtractId || activity.extractId || activity.id || activity.objectId;
-        console.log(`🔍 [Relationship] Data extract activity detected:`, { dataExtractId, activityType });
-        
-        const dataExtract = dataExtracts.find(de => de.id === dataExtractId || de.id === `de_${dataExtractId}`);
-        if (dataExtract) {
-          relationships.push({
-            id: `${automation.id}-${dataExtract.id}`,
-            source: automation.id,
-            target: dataExtract.id,
-            type: 'contains_data_extract',
-            label: 'contains data extract',
-            description: `Automation "${automation.name}" contains Data Extract "${dataExtract.name}"`
-          });
-          console.log(`✅ [Relationship] Found DATA EXTRACT: ${automation.name} → ${dataExtract.name}`);
-        }
-      }
-      
-      // Enhanced Direct DE relationships (import/export activities)
-      const targetDeFields = [
-        'targetDataExtension', 'targetDataExtensionName', 'dataExtensionName',
-        'targetDE', 'destinationDataExtension', 'outputDataExtension',
-        'dataExtension', 'targetDataExtensionKey'
-      ];
-      
-      targetDeFields.forEach(field => {
-        if (activity[field]) {
-          const targetDeName = activity[field].toLowerCase();
-          const targetDe = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
-          if (targetDe) {
-            relationships.push({
-              id: `${automation.id}-${targetDe.id}`,
-              source: automation.id,
-              target: targetDe.id,
-              type: 'imports_to_de',
-              label: 'imports to DE',
-              description: `Automation "${automation.name}" imports data to DE "${targetDe.name}"`
-            });
-            console.log(`✅ [Relationship] Found DE IMPORT: ${automation.name} → ${targetDe.name}`);
-          }
-        }
-      });
-      
-      // Source DE relationships (for data extracts/exports)
-      const sourceDeFields = [
-        'sourceDataExtension', 'sourceDataExtensionName', 'sourceDE', 'inputDataExtension'
-      ];
-      
-      sourceDeFields.forEach(field => {
-        if (activity[field]) {
-          const sourceDeName = activity[field].toLowerCase();
-          const sourceDe = deMap.get(sourceDeName) || deKeyMap.get(sourceDeName);
-          if (sourceDe) {
-            relationships.push({
-              id: `${sourceDe.id}-${automation.id}`,
-              source: sourceDe.id,
-              target: automation.id,
-              type: 'exports_from_de',
-              label: 'exports from DE',
-              description: `Automation "${automation.name}" exports data from DE "${sourceDe.name}"`
-            });
-            console.log(`✅ [Relationship] Found DE EXPORT: ${sourceDe.name} → ${automation.name}`);
-          }
-        }
-      });
     });
   });
   
-  console.log(`📈 [Relationship] Automation analysis complete: ${relationships.length} relationships found`);
+  // Add activity nodes to the global activity nodes collection
+  // This will be used later in generateLiveGraphData to include activity nodes
+  global.activityNodes = activityNodes;
+  
+  console.log(`� [Relationship] Activity-Aware Automation analysis complete: ${relationships.length} relationships found, ${activityNodes.size} activity nodes created`);
   return relationships;
+}
+
+/**
+ * Get standardized activity type from activity object
+ */
+function getActivityType(activity) {
+  const type = activity.type || activity.activityType || activity.objectType || '';
+  const name = (activity.name || activity.displayName || '').toLowerCase();
+  
+  // Map various activity types to standardized names
+  const typeMapping = {
+    // SQL Query activities
+    'query': 'QueryActivity',
+    'sql': 'QueryActivity', 
+    'sqlquery': 'QueryActivity',
+    'queryactivity': 'QueryActivity',
+    'dataextensionactivity': 'QueryActivity',
+    'sqlqueryactivity': 'QueryActivity',
+    
+    // Data Filter activities
+    'filter': 'FilterActivity',
+    'datafilter': 'FilterActivity',
+    'filteractivity': 'FilterActivity',
+    
+    // Email activities
+    'email': 'EmailActivity',
+    'send': 'EmailActivity',
+    'emailsend': 'EmailActivity',
+    'triggeredsend': 'EmailActivity',
+    
+    // File Transfer activities  
+    'filetransfer': 'FileTransferActivity',
+    'ftp': 'FileTransferActivity',
+    'sftp': 'FileTransferActivity',
+    'import': 'ImportActivity',
+    'export': 'ExportActivity',
+    'fileimport': 'ImportActivity',
+    'transfer': 'FileTransferActivity',
+    'filetransferactivity': 'FileTransferActivity',
+    
+    // Data Extract activities
+    'dataextract': 'DataExtractActivity',
+    'extract': 'DataExtractActivity',
+    'dataextractactivity': 'DataExtractActivity',
+    
+    // Wait/Delay activities
+    'wait': 'WaitActivity',
+    'delay': 'WaitActivity',
+    'waitactivity': 'WaitActivity',
+    
+    // Script activities
+    'script': 'ScriptActivity',
+    'ssjs': 'ScriptActivity',
+    'amp': 'ScriptActivity'
+  };
+  
+  // Check direct type mapping first
+  const normalizedType = type.toLowerCase().replace(/[-_\s]/g, '');
+  if (typeMapping[normalizedType]) {
+    return typeMapping[normalizedType];
+  }
+  
+  // Check activity name for type hints
+  for (const [key, mappedType] of Object.entries(typeMapping)) {
+    if (name.includes(key)) {
+      return mappedType;
+    }
+  }
+  
+  // Default fallback
+  return 'GenericActivity';
+}
+
+/**
+ * Detect relationships between activities and assets (DEs, Emails, Files)
+ */
+function detectActivityToAssetRelationships(activityId, activity, activityType, dataExtensions, queries, fileTransfers, dataExtracts, relationships, deMap, deKeyMap) {
+  
+  // Query Activity → Data Extension relationships
+  if (activityType === 'QueryActivity') {
+    // Find the associated query first
+    const queryId = activity.queryDefinitionId || activity.queryId || activity.definitionId || activity.objectId;
+    const queryName = activity.queryName || activity.name || activity.displayName;
+    
+    let query = null;
+    if (queryId) {
+      query = queries.find(q => q.id === queryId || q.objectId === queryId || q.id === `query_${queryId}`);
+    }
+    if (!query && queryName) {
+      query = queries.find(q => q.name === queryName);
+    }
+    
+    if (query) {
+      // Activity → Query relationship
+      relationships.push({
+        id: `${activityId}-${query.id}`,
+        source: activityId,
+        target: query.id,
+        type: 'executes_query',
+        label: 'executes query',
+        description: `Activity executes query "${query.name}"`
+      });
+    }
+    
+    // Target DE relationships (Query writes to DE)
+    const targetDeFields = [
+      'targetDataExtension', 'targetDataExtensionName', 'dataExtensionName',
+      'targetDE', 'destinationDataExtension', 'outputDataExtension',
+      'dataExtension', 'targetDataExtensionKey'
+    ];
+    
+    targetDeFields.forEach(field => {
+      if (activity[field]) {
+        const targetDeName = activity[field].toLowerCase();
+        const targetDe = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
+        if (targetDe) {
+          relationships.push({
+            id: `${activityId}-${targetDe.id}`,
+            source: activityId,
+            target: targetDe.id,
+            type: 'writes_to',
+            label: 'writes to',
+            description: `Query activity writes to DE "${targetDe.name}"`
+          });
+        }
+      }
+    });
+  }
+  
+  // Filter Activity → Data Extension relationships  
+  if (activityType === 'FilterActivity') {
+    if (activity.sourceDataExtension) {
+      const sourceDeName = activity.sourceDataExtension.toLowerCase();
+      const sourceDe = deMap.get(sourceDeName) || deKeyMap.get(sourceDeName);
+      if (sourceDe) {
+        relationships.push({
+          id: `${sourceDe.id}-${activityId}`,
+          source: sourceDe.id,
+          target: activityId,
+          type: 'filters_from',
+          label: 'filters from',
+          description: `Filter activity processes DE "${sourceDe.name}"`
+        });
+      }
+    }
+    
+    if (activity.targetDataExtension) {
+      const targetDeName = activity.targetDataExtension.toLowerCase();
+      const targetDe = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
+      if (targetDe) {
+        relationships.push({
+          id: `${activityId}-${targetDe.id}`,
+          source: activityId,
+          target: targetDe.id,
+          type: 'creates_filtered_de',
+          label: 'creates filtered DE',
+          description: `Filter activity creates filtered DE "${targetDe.name}"`
+        });
+      }
+    }
+  }
+  
+  // Import/Export Activity → Data Extension relationships
+  if (activityType === 'ImportActivity' || activityType === 'ExportActivity' || activityType === 'FileTransferActivity') {
+    // Target DE relationships
+    const targetDeFields = [
+      'targetDataExtension', 'targetDataExtensionName', 'dataExtensionName',
+      'targetDE', 'destinationDataExtension', 'outputDataExtension'
+    ];
+    
+    targetDeFields.forEach(field => {
+      if (activity[field]) {
+        const targetDeName = activity[field].toLowerCase();
+        const targetDe = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
+        if (targetDe) {
+          relationships.push({
+            id: `${activityId}-${targetDe.id}`,
+            source: activityId,
+            target: targetDe.id,
+            type: 'imports_to_de',
+            label: 'imports to',
+            description: `Import activity loads data into DE "${targetDe.name}"`
+          });
+        }
+      }
+    });
+    
+    // Source DE relationships  
+    const sourceDeFields = [
+      'sourceDataExtension', 'sourceDataExtensionName', 'sourceDE', 'inputDataExtension'
+    ];
+    
+    sourceDeFields.forEach(field => {
+      if (activity[field]) {
+        const sourceDeName = activity[field].toLowerCase();
+        const sourceDe = deMap.get(sourceDeName) || deKeyMap.get(sourceDeName);
+        if (sourceDe) {
+          relationships.push({
+            id: `${sourceDe.id}-${activityId}`,
+            source: sourceDe.id,
+            target: activityId,
+            type: 'exports_from_de',
+            label: 'exports from',
+            description: `Export activity extracts data from DE "${sourceDe.name}"`
+          });
+        }
+      }
+    });
+    
+    // File Transfer relationships
+    const fileTransferId = activity.fileTransferId || activity.transferId || activity.id || activity.objectId;
+    if (fileTransferId) {
+      const fileTransfer = fileTransfers.find(ft => ft.id === fileTransferId || ft.id === `ft_${fileTransferId}`);
+      if (fileTransfer) {
+        relationships.push({
+          id: `${activityId}-${fileTransfer.id}`,
+          source: activityId,
+          target: fileTransfer.id,
+          type: 'executes_file_transfer',
+          label: 'executes file transfer',
+          description: `Activity executes file transfer "${fileTransfer.name}"`
+        });
+      }
+    }
+  }
+  
+  // Data Extract Activity relationships
+  if (activityType === 'DataExtractActivity') {
+    const dataExtractId = activity.dataExtractId || activity.extractId || activity.id || activity.objectId;
+    if (dataExtractId) {
+      const dataExtract = dataExtracts.find(de => de.id === dataExtractId || de.id === `extract_${dataExtractId}`);
+      if (dataExtract) {
+        relationships.push({
+          id: `${activityId}-${dataExtract.id}`,
+          source: activityId,
+          target: dataExtract.id,
+          type: 'executes_data_extract',
+          label: 'executes data extract',
+          description: `Activity executes data extract "${dataExtract.name}"`
+        });
+      }
+    }
+    
+    // Source DE for extraction
+    const sourceDeFields = ['sourceDataExtension', 'sourceDataExtensionName', 'sourceDE'];
+    sourceDeFields.forEach(field => {
+      if (activity[field]) {
+        const sourceDeName = activity[field].toLowerCase();
+        const sourceDe = deMap.get(sourceDeName) || deKeyMap.get(sourceDeName);
+        if (sourceDe) {
+          relationships.push({
+            id: `${sourceDe.id}-${activityId}`,
+            source: sourceDe.id,
+            target: activityId,
+            type: 'extracts_from_de',
+            label: 'extracts from',
+            description: `Data extract activity processes DE "${sourceDe.name}"`
+          });
+        }
+      }
+    });
+  }
 }
 
 /**
@@ -6836,10 +7031,12 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
     console.log(`🌐 [Graph] Connected objects: ${finalObjectIds.size}, Orphaned: ${debugStats.nodes.orphaned}`);
   }
   
-  // Step 4: Create final nodes
-  console.log('📦 [Graph] === STEP 4: CREATING FINAL NODES ===');
+  // Step 4: Create final nodes (including activity nodes)
+  console.log('📦 [Graph] === STEP 4: CREATING FINAL NODES (INCLUDING ACTIVITIES) ===');
   
   const nodes = [];
+  
+  // Add regular SFMC object nodes
   finalObjectIds.forEach(objectId => {
     const nodeData = relationshipMap.get(objectId);
     if (nodeData) {
@@ -6867,10 +7064,43 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
     }
   });
   
-  console.log(`📦 [Graph] Created ${nodes.length} final nodes`);
+  // Add activity nodes if they exist
+  if (global.activityNodes && global.activityNodes.size > 0) {
+    console.log(`📦 [Graph] Adding ${global.activityNodes.size} activity nodes to graph`);
+    
+    global.activityNodes.forEach((activityNode, activityId) => {
+      // Only include activity nodes if their parent automation is in finalObjectIds
+      if (finalObjectIds.has(activityNode.automationId)) {
+        finalObjectIds.add(activityId); // Add activity to final object IDs for edge filtering
+        
+        nodes.push({
+          data: {
+            id: activityId,
+            label: activityNode.name,
+            category: 'Activity',
+            type: 'Activity',
+            activityType: activityNode.activityType,
+            stepNumber: activityNode.stepNumber,
+            metadata: {
+              ...activityNode,
+              category: 'Activity',
+              isActivity: true,
+              executionOrder: activityNode.stepNumber,
+              parentAutomation: activityNode.automationName
+            }
+          }
+        });
+        
+        debugStats.nodes.final++;
+        console.log(`  ✅ Added activity: ${activityNode.name} (Step ${activityNode.stepNumber})`);
+      }
+    });
+  }
   
-  // Step 5: Create final edges (only between final nodes)
-  console.log('🔗 [Graph] === STEP 5: CREATING FINAL EDGES ===');
+  console.log(`📦 [Graph] Created ${nodes.length} final nodes (including activities)`);
+  
+  // Step 5: Create final edges (only between final nodes, including activities)
+  console.log('🔗 [Graph] === STEP 5: CREATING FINAL EDGES (INCLUDING ACTIVITY EDGES) ===');
   
   const edges = [];
   const filteredRelationships = allRelationships.filter(rel => 
@@ -6888,14 +7118,17 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
         target: rel.target,
         type: rel.type,
         label: rel.label,
-        description: rel.description
+        description: rel.description,
+        stepNumber: rel.stepNumber || null,
+        executionOrder: rel.executionOrder || null
       }
     });
   });
   
   console.log(`🔗 [Graph] Created ${edges.length} final edges (filtered out ${debugStats.relationships.filtered})`);
   
-  // Step 6: Final statistics and validation
+  // Clear global activity nodes after use
+  global.activityNodes = new Map();
   console.log('📊 [Graph] === FINAL STATISTICS ===');
   console.log('Input Objects:', debugStats.inputObjects);
   console.log('Selected Objects:', debugStats.selectedObjects);

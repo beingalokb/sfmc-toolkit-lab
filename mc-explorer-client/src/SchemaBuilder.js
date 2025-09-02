@@ -76,6 +76,9 @@ const SchemaBuilder = () => {
   const [relationshipStats, setRelationshipStats] = useState({});
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [highlightedElements, setHighlightedElements] = useState(new Set());
+  const [hoveredNodeId, setHoveredNodeId] = useState(null);
+  const [automationSteps, setAutomationSteps] = useState([]);
+  const [hoveredStepIndex, setHoveredStepIndex] = useState(null);
   
   const cyRef = useRef(null);
 
@@ -194,8 +197,8 @@ const getEdgeStyle = (relationshipType, isDirect = true, isHighlighted = false, 
   };
 };
 
-// Enhanced node styling with grouping and highlighting
-const getNodeStyle = (nodeType, isSelected = false, isRelated = false, isOrphan = false, isHighlighted = false, isFaded = false) => {
+// Enhanced node styling with activity-aware design and hierarchical grouping
+const getNodeStyle = (nodeType, nodeSubType = null, isSelected = false, isRelated = false, isOrphan = false, isHighlighted = false, isFaded = false, isActivity = false) => {
   const baseColor = getNodeColor(nodeType);
   
   let backgroundColor = baseColor;
@@ -203,6 +206,20 @@ const getNodeStyle = (nodeType, isSelected = false, isRelated = false, isOrphan 
   let borderWidth = '2px';
   let opacity = 1.0;
   let borderColor = '#ffffff';
+  let width = '140px';
+  let height = '50px';
+  let shape = 'roundrectangle';
+  let fontSize = '12px';
+  
+  // Activity nodes styling - smaller and circular
+  if (isActivity) {
+    width = '80px';
+    height = '30px';
+    shape = 'ellipse';
+    fontSize = '10px';
+    backgroundColor = getActivityColor(nodeSubType);
+    borderWidth = '1px';
+  }
   
   if (isOrphan) {
     backgroundColor = '#f5f5f5';
@@ -211,7 +228,7 @@ const getNodeStyle = (nodeType, isSelected = false, isRelated = false, isOrphan 
     borderColor = '#cccccc';
     opacity = 0.6;
   } else if (isRelated) {
-    backgroundColor = `${baseColor}80`; // 50% opacity
+    backgroundColor = `${backgroundColor}80`; // 50% opacity
     borderStyle = 'dashed';
     borderWidth = '1px';
     borderColor = baseColor;
@@ -223,7 +240,7 @@ const getNodeStyle = (nodeType, isSelected = false, isRelated = false, isOrphan 
   
   if (isHighlighted) {
     borderColor = '#FFD700'; // Gold for highlighting
-    borderWidth = '4px';
+    borderWidth = isActivity ? '3px' : '4px';
     opacity = 1.0;
   } else if (isFaded) {
     opacity = 0.3;
@@ -234,19 +251,34 @@ const getNodeStyle = (nodeType, isSelected = false, isRelated = false, isOrphan 
     'color': isOrphan ? '#666666' : '#ffffff',
     'text-valign': 'center',
     'text-halign': 'center',
-    'font-size': isHighlighted ? '14px' : '12px',
+    'font-size': fontSize,
     'font-weight': isSelected || isHighlighted ? 'bold' : (isRelated || isOrphan ? 'normal' : 'bold'),
-    'width': '140px',
-    'height': '50px',
-    'shape': 'roundrectangle',
+    'width': width,
+    'height': height,
+    'shape': shape,
     'border-width': borderWidth,
     'border-color': borderColor,
     'border-style': borderStyle,
     'text-wrap': 'wrap',
-    'text-max-width': '120px',
+    'text-max-width': isActivity ? '70px' : '120px',
     'opacity': opacity,
-    'z-index': isHighlighted ? 100 : (isSelected ? 50 : 10)
+    'z-index': isHighlighted ? 100 : (isSelected ? 50 : (isActivity ? 30 : 10))
   };
+};
+
+// Get activity-specific colors
+const getActivityColor = (activityType) => {
+  const activityColors = {
+    'FilterActivity': '#06B6D4',      // Cyan for filters
+    'QueryActivity': '#10B981',       // Green for SQL queries
+    'EmailActivity': '#EF4444',       // Red for emails
+    'FileTransferActivity': '#EAB308', // Yellow for file transfers
+    'DataExtractActivity': '#A16207',  // Brown for data extracts
+    'WaitActivity': '#6B7280',        // Gray for wait steps
+    'DecisionActivity': '#8B5CF6',    // Purple for decisions
+    'default': '#94A3B8'              // Default gray
+  };
+  return activityColors[activityType] || activityColors.default;
 };
 
 // Node colors mapping for graph styling (consistent with OBJECT_TYPE_COLORS)
@@ -549,60 +581,110 @@ const getTypeFromCategory = (category) => {
       }
     }
     
-    // Apply enhanced styling to nodes with vertical grouping by type
+    // Apply enhanced styling to nodes with vertical grouping by type (including activities)
     const styledNodes = finalNodes.map((node, index) => {
       const isSelected = node.data.metadata?.isRelated !== true;
       const isRelated = node.data.metadata?.isRelated === true;
       const isOrphan = node.data.metadata?.isOrphan === true;
       const isHighlighted = highlightedNodes.has(node.data.id);
       const isFaded = selectedNodeId && !highlightedNodes.has(node.data.id);
+      const isActivity = node.data.category === 'Activity' || node.data.metadata?.isActivity === true;
+      const activityType = node.data.activityType;
+      const stepNumber = node.data.stepNumber;
       const nodeType = node.data.type || node.data.category || 'default';
       
-      // Calculate vertical position based on node type for grouping
+      // Calculate vertical position based on node type for hierarchical grouping
       const typeOrder = {
-        'Data Extensions': 0,
-        'SQL Queries': 1,
-        'Automations': 2,
-        'Journeys': 3,
-        'Triggered Sends': 4,
-        'Filters': 5,
-        'File Transfers': 6,
-        'Data Extracts': 7
+        'Automations': 0,      // Top level - orchestrators
+        'Activity': 1,         // Middle level - activities within automations
+        'SQL Queries': 2,      // Asset level
+        'Data Extensions': 3,  // Asset level
+        'Filters': 4,          // Asset level
+        'Journeys': 5,         // Asset level
+        'Triggered Sends': 6,  // Asset level
+        'File Transfers': 7,   // Asset level
+        'Data Extracts': 8     // Asset level
       };
       
-      const typeIndex = typeOrder[nodeType] || 8;
-      const baseY = typeIndex * 200; // Vertical spacing between types
+      const typeIndex = typeOrder[nodeType] || 9;
+      let baseY = typeIndex * 180; // Vertical spacing between types
+      
+      // For activities, further sub-group by parent automation and step number
+      if (isActivity && stepNumber) {
+        // Simple hash function for automation grouping
+        const hashCode = (str) => {
+          let hash = 0;
+          for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+          }
+          return Math.abs(hash);
+        };
+        
+        const automationIndex = node.data.metadata?.automationId ? 
+          hashCode(node.data.metadata.automationId) % 5 : 0; // Simple hash for automation grouping
+        baseY += (automationIndex * 40) + (stepNumber * 15); // Sub-grouping within activity layer
+      }
+      
+      // Create activity-aware label
+      let displayLabel = node.data.label;
+      if (isActivity && stepNumber) {
+        displayLabel = `${stepNumber}. ${activityType.replace('Activity', '')}`;
+        if (node.data.label && !node.data.label.startsWith(stepNumber)) {
+          displayLabel += `\n${node.data.label}`;
+        }
+      }
       
       return {
         ...node,
-        position: {
-          x: (index % 5) * 200 + Math.random() * 50, // Horizontal spread with some randomness
-          y: baseY + Math.random() * 100 // Vertical grouping with some randomness
+        data: {
+          ...node.data,
+          label: displayLabel
         },
-        style: getNodeStyle(nodeType, isSelected, isRelated, isOrphan, isHighlighted, isFaded)
+        position: {
+          x: (index % 6) * 180 + Math.random() * 40, // Horizontal spread with some randomness
+          y: baseY + Math.random() * 60 // Vertical grouping with some randomness
+        },
+        style: getNodeStyle(nodeType, activityType, isSelected, isRelated, isOrphan, isHighlighted, isFaded, isActivity)
       };
     });
 
-    // Apply enhanced styling to edges
+    // Apply enhanced styling to edges (including activity flow edges)
     const styledEdges = validEdges.map(edgeInfo => {
       const edge = edgeInfo.edge;
       const isHighlighted = highlightedEdges.has(edge.data.id);
       const isFaded = selectedNodeId && !highlightedEdges.has(edge.data.id);
+      const isActivityFlow = edge.data.type === 'executes_activity' || edge.data.type === 'next_step';
+      const stepNumber = edge.data.stepNumber;
+      
+      // Create enhanced label for activity flows
+      let edgeLabel = edge.data.label;
+      if (isActivityFlow && stepNumber) {
+        edgeLabel = edge.data.type === 'next_step' ? `${stepNumber} →` : `Step ${stepNumber}`;
+      }
       
       return {
         ...edge,
+        data: {
+          ...edge.data,
+          label: edgeLabel
+        },
         style: {
           ...getEdgeStyle(edge.data.type, edgeInfo.isDirect, isHighlighted, isFaded),
-          'label': edge.data.label,
-          'font-size': isHighlighted ? '11px' : '10px',
-          'font-weight': '600',
-          'text-rotation': 'autorotate',
-          'text-background-color': '#ffffff',
+          'label': edgeLabel,
+          'font-size': isHighlighted ? '11px' : (isActivityFlow ? '9px' : '10px'),
+          'font-weight': isActivityFlow ? '700' : '600',
+          'text-rotation': isActivityFlow ? '0deg' : 'autorotate', // Keep step labels horizontal
+          'text-background-color': isActivityFlow ? '#FEF3C7' : '#ffffff',
           'text-background-opacity': isHighlighted ? 0.95 : 0.9,
-          'text-background-padding': '3px',
+          'text-background-padding': isActivityFlow ? '4px' : '3px',
           'text-border-color': getEdgeStyle(edge.data.type, edgeInfo.isDirect)['line-color'],
           'text-border-width': '1px',
-          'text-border-opacity': 0.3
+          'text-border-opacity': 0.3,
+          'width': isActivityFlow ? 3 : 2, // Thicker lines for activity flows
+          'target-arrow-shape': isActivityFlow ? 'triangle' : 'triangle',
+          'target-arrow-size': isActivityFlow ? '8px' : '6px'
         }
       };
     });
@@ -642,7 +724,7 @@ const getTypeFromCategory = (category) => {
     setHighlightedElements(new Set([...highlightedNodes, ...highlightedEdges]));
   }, [selectedObjects, loadGraphData, showOrphans, showIndirect, selectedNodeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Enhanced node click handler with highlighting
+  // Enhanced node click handler with automation steps tracking
   const handleNodeClick = useCallback(async (event) => {
     const node = event.target;
     const nodeData = node.data();
@@ -652,8 +734,34 @@ const getTypeFromCategory = (category) => {
       setSelectedNodeId(null);
       setSelectedNode(null);
       setDrawerOpen(false);
+      setAutomationSteps([]); // Clear automation steps
     } else {
       setSelectedNodeId(nodeData.id);
+      
+      // Extract automation steps if this is an automation node
+      if (nodeData.category === 'Automations' || nodeData.type === 'Automation') {
+        const activityNodes = graphElements.filter(el => 
+          el.data && 
+          el.data.category === 'Activity' && 
+          el.data.metadata?.automationId === nodeData.id
+        );
+        
+        const steps = activityNodes
+          .map(activityNode => ({
+            stepNumber: activityNode.data.stepNumber || 0,
+            activityType: activityNode.data.activityType || 'Unknown',
+            activityId: activityNode.data.id,
+            name: activityNode.data.label,
+            targetAsset: extractTargetAsset(activityNode.data),
+            automationId: nodeData.id
+          }))
+          .sort((a, b) => a.stepNumber - b.stepNumber);
+        
+        setAutomationSteps(steps);
+        console.log(`📋 [Steps] Extracted ${steps.length} steps for automation "${nodeData.label}":`, steps);
+      } else {
+        setAutomationSteps([]);
+      }
       
       // Fetch detailed node information from API
       try {
@@ -670,7 +778,35 @@ const getTypeFromCategory = (category) => {
       
       setDrawerOpen(true);
     }
-  }, [selectedNodeId]);
+  }, [selectedNodeId, graphElements]);
+
+  // Helper function to extract target asset from activity data
+  const extractTargetAsset = useCallback((activityData) => {
+    if (!activityData.metadata) return null;
+    
+    // Look for common target fields
+    const targetFields = [
+      'targetDataExtension', 'targetDataExtensionName', 'dataExtensionName',
+      'targetDE', 'destinationDataExtension', 'outputDataExtension',
+      'emailName', 'fileName', 'extractName'
+    ];
+    
+    for (const field of targetFields) {
+      if (activityData.metadata[field]) {
+        return activityData.metadata[field];
+      }
+    }
+    
+    return null;
+  }, []);
+
+  // Function to highlight automation step
+  const highlightAutomationStep = useCallback((step) => {
+    if (step.activityId) {
+      setSelectedNodeId(step.activityId);
+      console.log(`🎯 [Highlight] Highlighting activity step: ${step.stepNumber} - ${step.activityType}`);
+    }
+  }, []);
 
   // Cytoscape layout and style
   const cytoscapeStylesheet = [
@@ -752,14 +888,51 @@ const getTypeFromCategory = (category) => {
 
   useEffect(() => {
     if (cyRef.current) {
+      // Add all event listeners
       cyRef.current.on('tap', 'node', handleNodeClick);
+      
+      // Add hover events for tooltips
+      cyRef.current.on('mouseover', 'node', (event) => {
+        const node = event.target;
+        const nodeData = node.data();
+        
+        // Create tooltip content based on node type
+        let tooltipContent = '';
+        if (nodeData.category === 'Activity') {
+          const stepNum = nodeData.stepNumber ? `Step ${nodeData.stepNumber}: ` : '';
+          const activityType = nodeData.activityType || 'Activity';
+          const targetAsset = extractTargetAsset(nodeData);
+          tooltipContent = `${stepNum}${activityType}${targetAsset ? ` → ${targetAsset}` : ''}`;
+        } else {
+          tooltipContent = `${nodeData.type || nodeData.category}: ${nodeData.label}`;
+          if (nodeData.metadata?.connectionCount > 0) {
+            tooltipContent += ` (${nodeData.metadata.connectionCount} connections)`;
+          }
+        }
+        
+        // Set title attribute for browser tooltip
+        node.style('label', tooltipContent);
+        setHoveredNodeId(nodeData.id);
+      });
+      
+      cyRef.current.on('mouseout', 'node', (event) => {
+        const node = event.target;
+        const nodeData = node.data();
+        
+        // Restore original label
+        node.style('label', nodeData.label);
+        setHoveredNodeId(null);
+      });
+      
       return () => {
         if (cyRef.current) {
           cyRef.current.removeListener('tap', 'node', handleNodeClick);
+          cyRef.current.removeListener('mouseover', 'node');
+          cyRef.current.removeListener('mouseout', 'node');
         }
       };
     }
-  }, [handleNodeClick]);
+  }, [handleNodeClick, extractTargetAsset]);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -1149,31 +1322,84 @@ const getTypeFromCategory = (category) => {
                   </div>
                 </div>
               )}
+              
+              {/* Automation Steps (Activity-Aware) */}
+              {automationSteps.length > 0 && (
+                <div className="p-2 bg-orange-50 rounded">
+                  <div className="font-semibold text-orange-900">
+                    Automation Steps ({automationSteps.length})
+                    {selectedNodeId && <span className="text-orange-700 ml-1">[Click step to highlight]</span>}
+                  </div>
+                  <div className="text-orange-700 mt-1 max-h-32 overflow-y-auto space-y-1">
+                    {automationSteps.map((step, idx) => (
+                      <div 
+                        key={idx} 
+                        className={`cursor-pointer p-1 rounded text-xs ${
+                          hoveredStepIndex === idx 
+                            ? 'bg-orange-200 text-orange-900' 
+                            : 'hover:bg-orange-100'
+                        }`}
+                        onMouseEnter={() => setHoveredStepIndex(idx)}
+                        onMouseLeave={() => setHoveredStepIndex(null)}
+                        onClick={() => highlightAutomationStep(step)}
+                      >
+                        <div className="font-medium">
+                          Step {step.stepNumber}: {step.activityType}
+                        </div>
+                        <div className="text-orange-600 truncate">
+                          {step.targetAsset && `→ ${step.targetAsset}`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
         
-        {/* Relationship Legend */}
+        {/* Enhanced Activity-Aware Relationship Legend */}
         {hasSelectedObjects && (
-          <div className="absolute bottom-4 left-4 bg-white border border-gray-300 rounded-lg shadow-lg p-3 z-10">
-            <h5 className="text-xs font-semibold text-gray-700 mb-2">Relationship Types</h5>
+          <div className="absolute bottom-4 left-4 bg-white border border-gray-300 rounded-lg shadow-lg p-3 z-10 max-w-xs">
+            <h5 className="text-xs font-semibold text-gray-700 mb-2">Activity-Aware Relationships</h5>
             <div className="space-y-1 text-xs">
               <div className="flex items-center space-x-2">
+                <div className="w-6 h-0.5 bg-orange-500" style={{borderBottom: '2px solid #F59E0B'}}></div>
+                <span>Automation → Activity (execution)</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-0.5 bg-orange-400" style={{borderBottom: '1px solid #FB923C'}}></div>
+                <span>Activity → Activity (next step)</span>
+              </div>
+              <div className="flex items-center space-x-2">
                 <div className="w-6 h-0.5 bg-green-500"></div>
-                <span>Direct Data Flow (writes/reads)</span>
+                <span>Activity → Asset (writes/creates)</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-6 h-0.5 bg-blue-500"></div>
-                <span>Direct Data Flow (reads/imports)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-6 h-0.5 bg-gray-500 border-dashed border-t"></div>
-                <span>Workflow/Contains (indirect)</span>
+                <span>Asset → Activity (reads/filters)</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-6 h-0.5 bg-cyan-500" style={{borderTop: '0.5px dotted #06B6D4'}}></div>
-                <span>Metadata/Filters</span>
+                <span>Metadata/Configuration</span>
               </div>
+              
+              <div className="pt-1 mt-2 border-t border-gray-200">
+                <div className="font-medium text-gray-600 mb-1">Node Types:</div>
+                <div className="flex items-center space-x-1 mb-1">
+                  <div className="w-3 h-3 bg-orange-500 rounded-sm"></div>
+                  <span>Automations</span>
+                </div>
+                <div className="flex items-center space-x-1 mb-1">
+                  <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
+                  <span>Activities (steps)</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
+                  <span>Assets (DEs, Emails, etc.)</span>
+                </div>
+              </div>
+              
               {selectedNodeId && (
                 <div className="pt-1 border-t text-yellow-700">
                   <div>🟡 Highlighting connections for selected node</div>
