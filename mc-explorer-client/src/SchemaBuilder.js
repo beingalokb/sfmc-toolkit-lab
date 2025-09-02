@@ -68,6 +68,12 @@ const SchemaBuilder = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredObjectData, setFilteredObjectData] = useState({});
   
+  // Debug and filtering controls
+  const [showOrphans, setShowOrphans] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugInfo, setDebugInfo] = useState({});
+  const [relationshipStats, setRelationshipStats] = useState({});
+  
   const cyRef = useRef(null);
 
   // Filter objects based on search term
@@ -117,6 +123,49 @@ const OBJECT_TYPE_COLORS = {
 // Get color for object type
 const getObjectTypeColor = (category) => {
   return OBJECT_TYPE_COLORS[category] || '#6B7280'; // Default gray
+};
+
+// Get node color based on type/category
+const getNodeColor = (type) => {
+  const typeMapping = {
+    'Data Extensions': '#3B82F6',    // Blue
+    'SQL Queries': '#10B981',       // Green  
+    'Automations': '#F97316',       // Orange
+    'Journeys': '#8B5CF6',          // Purple
+    'Triggered Sends': '#EF4444',   // Red
+    'File Transfers': '#EAB308',    // Yellow
+    'Data Extracts': '#A16207',     // Brown
+    'Filters': '#06B6D4',           // Cyan
+    'DataExtension': '#3B82F6',
+    'Query': '#10B981',
+    'Automation': '#F97316',
+    'Journey': '#8B5CF6',
+    'TriggeredSend': '#EF4444',
+    'FileTransfer': '#EAB308',
+    'DataExtract': '#A16207',
+    'Filter': '#06B6D4'
+  };
+  return typeMapping[type] || '#6B7280'; // Default gray
+};
+
+// Get edge color based on relationship type
+const getEdgeColor = (relationshipType) => {
+  const edgeColors = {
+    'writes_to': '#10B981',           // Green for data writes
+    'reads_from': '#3B82F6',         // Blue for data reads
+    'imports_to_de': '#F97316',      // Orange for data imports
+    'journey_entry_source': '#8B5CF6', // Purple for journey entries
+    'contains_query': '#6B7280',     // Gray for containment
+    'contains_filter': '#06B6D4',    // Cyan for filter containment
+    'uses_in_decision': '#EAB308',   // Yellow for decision logic
+    'subscriber_source': '#EF4444',  // Red for email sources
+    'sends_email': '#EC4899',        // Pink for email sends
+    'provides_data_to': '#06B6D4',   // Cyan for data flow
+    'updates_de': '#84CC16',         // Lime for updates
+    'filters_de': '#06B6D4',         // Cyan for filtering
+    'default': '#94A3B8'             // Default gray
+  };
+  return edgeColors[relationshipType] || edgeColors.default;
 };
 
 // Node colors mapping for graph styling (consistent with OBJECT_TYPE_COLORS)
@@ -192,55 +241,191 @@ const getTypeFromCategory = (category) => {
     }
   }, [selectedObjects]);
 
-  // Update graph based on selected objects
+  // Update graph based on selected objects with enhanced debugging
   const updateGraph = useCallback(async () => {
+    console.log('🔧 [Graph Update] Starting graph update with selections:', selectedObjects);
+    
     const graphData = await loadGraphData();
     
-    // Apply styling to nodes and edges with better directional flow
-    const styledNodes = graphData.nodes.map(node => {
+    // Initialize debugging information
+    const debugData = {
+      totalNodes: graphData.nodes.length,
+      totalEdges: graphData.edges.length,
+      nodeTypes: {},
+      edgeTypes: {},
+      orphanNodes: [],
+      connectedNodes: [],
+      relationships: []
+    };
+    
+    // Track node connections
+    const nodeConnections = new Map();
+    
+    // Initialize connection tracking for all nodes
+    graphData.nodes.forEach(node => {
+      nodeConnections.set(node.data.id, {
+        node: node,
+        inbound: [],
+        outbound: [],
+        hasConnections: false
+      });
+    });
+    
+    // Process edges and track connections
+    graphData.edges.forEach(edge => {
+      const sourceConn = nodeConnections.get(edge.data.source);
+      const targetConn = nodeConnections.get(edge.data.target);
+      
+      if (sourceConn) {
+        sourceConn.outbound.push({
+          edgeId: edge.data.id,
+          targetId: edge.data.target,
+          type: edge.data.type,
+          label: edge.data.label
+        });
+        sourceConn.hasConnections = true;
+      }
+      
+      if (targetConn) {
+        targetConn.inbound.push({
+          edgeId: edge.data.id,
+          sourceId: edge.data.source,
+          type: edge.data.type,
+          label: edge.data.label
+        });
+        targetConn.hasConnections = true;
+      }
+      
+      // Track edge types for debugging
+      debugData.edgeTypes[edge.data.type] = (debugData.edgeTypes[edge.data.type] || 0) + 1;
+      
+      debugData.relationships.push({
+        id: edge.data.id,
+        source: edge.data.source,
+        target: edge.data.target,
+        type: edge.data.type,
+        label: edge.data.label
+      });
+    });
+    
+    // Separate connected and orphan nodes
+    const connectedNodes = [];
+    const orphanNodes = [];
+    
+    nodeConnections.forEach((connection, nodeId) => {
+      const node = connection.node;
+      
+      // Track node types for debugging
+      const nodeType = node.data.type || node.data.category || 'unknown';
+      debugData.nodeTypes[nodeType] = (debugData.nodeTypes[nodeType] || 0) + 1;
+      
+      // Debug log for each node
+      console.log(`🔍 [Node Debug] ${nodeType}: ${node.data.label}`);
+      console.log(`  - ID: ${nodeId}`);
+      console.log(`  - Selected: ${node.data.metadata?.isRelated !== true ? 'YES' : 'NO'}`);
+      console.log(`  - Related: ${node.data.metadata?.isRelated === true ? 'YES' : 'NO'}`);
+      console.log(`  - Inbound: ${connection.inbound.length} [${connection.inbound.map(i => i.label).join(', ')}]`);
+      console.log(`  - Outbound: ${connection.outbound.length} [${connection.outbound.map(o => o.label).join(', ')}]`);
+      
+      if (connection.hasConnections) {
+        console.log(`  ✅ Including in graph (has relationships)`);
+        connectedNodes.push(node);
+        debugData.connectedNodes.push({
+          id: nodeId,
+          label: node.data.label,
+          type: nodeType,
+          inboundCount: connection.inbound.length,
+          outboundCount: connection.outbound.length,
+          isSelected: node.data.metadata?.isRelated !== true,
+          relationships: [...connection.inbound, ...connection.outbound]
+        });
+      } else {
+        console.log(`  ❌ Node has no relationships`);
+        orphanNodes.push(node);
+        debugData.orphanNodes.push({
+          id: nodeId,
+          label: node.data.label,
+          type: nodeType,
+          reason: 'No inbound or outbound relationships found'
+        });
+      }
+    });
+    
+    // Filter nodes based on showOrphans setting
+    let finalNodes = connectedNodes;
+    
+    if (showOrphans) {
+      // Include orphan nodes with special styling
+      const styledOrphanNodes = orphanNodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          metadata: {
+            ...node.data.metadata,
+            isOrphan: true
+          }
+        }
+      }));
+      finalNodes = [...connectedNodes, ...styledOrphanNodes];
+      console.log(`🔘 [Graph Filter] Including ${orphanNodes.length} orphan nodes`);
+    } else {
+      console.log(`❌ [Graph Filter] Excluding ${orphanNodes.length} orphan nodes`);
+    }
+
+    // Apply enhanced styling to nodes
+    const styledNodes = finalNodes.map(node => {
       const isRelated = node.data.metadata?.isRelated === true;
-      const baseColor = nodeColors[node.data.category] || nodeColors[node.data.type] || '#6B7280';
+      const isOrphan = node.data.metadata?.isOrphan === true;
+      const nodeType = node.data.type || node.data.category || 'default';
+      const baseColor = getNodeColor(nodeType);
+      
+      let backgroundColor = baseColor;
+      let borderStyle = 'solid';
+      let borderWidth = '2px';
+      let opacity = 1.0;
+      
+      if (isOrphan) {
+        backgroundColor = '#f5f5f5';
+        borderStyle = 'dashed';
+        borderWidth = '1px';
+        opacity = 0.6;
+      } else if (isRelated) {
+        backgroundColor = `${baseColor}80`; // 50% opacity
+        borderStyle = 'dashed';
+        borderWidth = '1px';
+        opacity = 0.8;
+      }
       
       return {
         ...node,
         style: {
-          'background-color': isRelated ? `${baseColor}80` : baseColor, // 50% opacity for related objects
+          'background-color': backgroundColor,
           'label': node.data.label,
-          'color': '#ffffff',
+          'color': isOrphan ? '#666666' : '#ffffff',
           'text-valign': 'center',
           'text-halign': 'center',
           'font-size': '12px',
-          'font-weight': isRelated ? 'normal' : 'bold',
+          'font-weight': isRelated || isOrphan ? 'normal' : 'bold',
           'width': '140px',
           'height': '50px',
           'shape': 'roundrectangle',
-          'border-width': isRelated ? '1px' : '2px',
-          'border-color': isRelated ? baseColor : '#ffffff',
-          'border-style': isRelated ? 'dashed' : 'solid',
+          'border-width': borderWidth,
+          'border-color': isOrphan ? '#cccccc' : (isRelated ? baseColor : '#ffffff'),
+          'border-style': borderStyle,
           'text-wrap': 'wrap',
           'text-max-width': '120px',
-          'opacity': isRelated ? 0.8 : 1.0
+          'opacity': opacity
         }
       };
     });
 
-    // Enhanced edge styling with directional flow and relationship-specific colors
-    const styledEdges = graphData.edges.map(edge => {
-      const relationshipColors = {
-        'writes_to': '#10B981',           // Green for data writes
-        'reads_from': '#3B82F6',         // Blue for data reads
-        'imports_to_de': '#F97316',      // Orange for data imports
-        'journey_entry_source': '#8B5CF6', // Purple for journey entries
-        'contains_query': '#6B7280',     // Gray for containment
-        'uses_in_decision': '#EAB308',   // Yellow for decision logic
-        'subscriber_source': '#EF4444',  // Red for email sources
-        'sends_email': '#EC4899',        // Pink for email sends
-        'provides_data_to': '#06B6D4',   // Cyan for data flow
-        'updates_de': '#84CC16',         // Lime for updates
-        'default': '#94A3B8'             // Default gray
-      };
-      
-      const edgeColor = relationshipColors[edge.data.type] || relationshipColors.default;
+    // Apply enhanced styling to edges
+    const styledEdges = graphData.edges.filter(edge => {
+      // Only include edges between nodes that are in the final node set
+      const nodeIds = new Set(finalNodes.map(n => n.data.id));
+      return nodeIds.has(edge.data.source) && nodeIds.has(edge.data.target);
+    }).map(edge => {
+      const edgeColor = getEdgeColor(edge.data.type);
       
       return {
         ...edge,
@@ -266,8 +451,29 @@ const getTypeFromCategory = (category) => {
       };
     });
 
+    // Update debug information
+    setDebugInfo(debugData);
+    setRelationshipStats({
+      totalObjects: graphData.nodes.length,
+      connectedObjects: connectedNodes.length,
+      orphanObjects: orphanNodes.length,
+      totalRelationships: graphData.edges.length,
+      displayedRelationships: styledEdges.length,
+      showingOrphans: showOrphans
+    });
+
+    console.log('📊 [Graph Final] Final graph stats:', {
+      originalNodes: graphData.nodes.length,
+      connectedNodes: connectedNodes.length,
+      orphanNodes: orphanNodes.length,
+      finalNodes: finalNodes.length,
+      originalEdges: graphData.edges.length,
+      filteredEdges: styledEdges.length,
+      showOrphans
+    });
+
     setGraphElements([...styledNodes, ...styledEdges]);
-  }, [selectedObjects, loadGraphData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedObjects, loadGraphData, showOrphans]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle node click
   const handleNodeClick = useCallback(async (event) => {
@@ -446,6 +652,47 @@ const getTypeFromCategory = (category) => {
               </div>
             )}
           </div>
+          
+          {/* Debug and Filter Controls */}
+          <div className="mt-4 space-y-2 p-3 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-semibold text-gray-700">Graph Controls</h3>
+            
+            <label className="flex items-center space-x-2 text-sm">
+              <input
+                type="checkbox"
+                checked={showOrphans}
+                onChange={(e) => setShowOrphans(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-gray-700">Show orphan nodes (no relationships)</span>
+            </label>
+            
+            <label className="flex items-center space-x-2 text-sm">
+              <input
+                type="checkbox"
+                checked={debugMode}
+                onChange={(e) => setDebugMode(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-gray-700">Show debug information</span>
+            </label>
+            
+            {/* Relationship Stats */}
+            {Object.keys(relationshipStats).length > 0 && (
+              <div className="mt-3 p-2 bg-white rounded border text-xs">
+                <div className="font-semibold text-gray-700 mb-1">Graph Statistics</div>
+                <div className="space-y-1 text-gray-600">
+                  <div>Total Objects: {relationshipStats.totalObjects}</div>
+                  <div>Connected: {relationshipStats.connectedObjects}</div>
+                  <div>Orphans: {relationshipStats.orphanObjects}</div>
+                  <div>Relationships: {relationshipStats.displayedRelationships}</div>
+                  {relationshipStats.showingOrphans && (
+                    <div className="text-orange-600">Including orphan nodes</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         
         <div className="p-4 space-y-2">
@@ -557,6 +804,105 @@ const getTypeFromCategory = (category) => {
             </div>
           )}
         </div>
+        
+        {/* Debug Panel */}
+        {debugMode && Object.keys(debugInfo).length > 0 && (
+          <div className="absolute top-4 right-4 w-80 bg-white border border-gray-300 rounded-lg shadow-lg p-4 max-h-96 overflow-y-auto z-10">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-gray-900">Debug Information</h4>
+              <button
+                onClick={() => setDebugMode(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-3 text-xs">
+              {/* Overall Stats */}
+              <div className="p-2 bg-blue-50 rounded">
+                <div className="font-semibold text-blue-900">Graph Overview</div>
+                <div className="text-blue-700 mt-1">
+                  <div>Total Nodes: {debugInfo.totalNodes}</div>
+                  <div>Total Edges: {debugInfo.totalEdges}</div>
+                  <div>Connected: {debugInfo.connectedNodes?.length || 0}</div>
+                  <div>Orphans: {debugInfo.orphanNodes?.length || 0}</div>
+                </div>
+              </div>
+              
+              {/* Node Types */}
+              {Object.keys(debugInfo.nodeTypes || {}).length > 0 && (
+                <div className="p-2 bg-green-50 rounded">
+                  <div className="font-semibold text-green-900">Node Types</div>
+                  <div className="text-green-700 mt-1">
+                    {Object.entries(debugInfo.nodeTypes).map(([type, count]) => (
+                      <div key={type}>{type}: {count}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Edge Types */}
+              {Object.keys(debugInfo.edgeTypes || {}).length > 0 && (
+                <div className="p-2 bg-purple-50 rounded">
+                  <div className="font-semibold text-purple-900">Relationship Types</div>
+                  <div className="text-purple-700 mt-1">
+                    {Object.entries(debugInfo.edgeTypes).map(([type, count]) => (
+                      <div key={type}>{type}: {count}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Connected Nodes */}
+              {debugInfo.connectedNodes && debugInfo.connectedNodes.length > 0 && (
+                <div className="p-2 bg-green-50 rounded">
+                  <div className="font-semibold text-green-900">Connected Objects ({debugInfo.connectedNodes.length})</div>
+                  <div className="text-green-700 mt-1 max-h-20 overflow-y-auto">
+                    {debugInfo.connectedNodes.map((node, idx) => (
+                      <div key={idx} className="truncate">
+                        {node.type}: {node.label} ({node.inboundCount}↓ {node.outboundCount}↑)
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Orphan Nodes */}
+              {debugInfo.orphanNodes && debugInfo.orphanNodes.length > 0 && (
+                <div className="p-2 bg-orange-50 rounded">
+                  <div className="font-semibold text-orange-900">Orphan Objects ({debugInfo.orphanNodes.length})</div>
+                  <div className="text-orange-700 mt-1 max-h-20 overflow-y-auto">
+                    {debugInfo.orphanNodes.map((node, idx) => (
+                      <div key={idx} className="truncate">
+                        {node.type}: {node.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Recent Relationships */}
+              {debugInfo.relationships && debugInfo.relationships.length > 0 && (
+                <div className="p-2 bg-indigo-50 rounded">
+                  <div className="font-semibold text-indigo-900">Relationships ({debugInfo.relationships.length})</div>
+                  <div className="text-indigo-700 mt-1 max-h-24 overflow-y-auto">
+                    {debugInfo.relationships.slice(0, 10).map((rel, idx) => (
+                      <div key={idx} className="truncate">
+                        {rel.type}: {rel.label}
+                      </div>
+                    ))}
+                    {debugInfo.relationships.length > 10 && (
+                      <div className="text-indigo-500">...and {debugInfo.relationships.length - 10} more</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Right Detail Drawer */}

@@ -5609,17 +5609,66 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
     
     console.log(`✅ [SFMC API] Found ${automations.length} Automations`);
     
-    return automations.map(automation => ({
-      id: `auto_${automation.id}`,
-      name: automation.name || 'Unnamed Automation',
-      description: automation.description || '',
-      status: automation.status,
-      createdDate: automation.createdDate,
-      modifiedDate: automation.modifiedDate,
-      steps: automation.steps || [],
-      activities: automation.activities || [],
-      type: 'Automation'
-    }));
+    // Enhanced automation processing with detailed activity fetching
+    const processedAutomations = [];
+    
+    for (const automation of automations) {
+      console.log(`🔍 [SFMC API] Processing automation: ${automation.name} (ID: ${automation.id})`);
+      
+      // Fetch detailed automation info including activities
+      let detailedActivities = [];
+      try {
+        const detailResponse = await axios.get(`${restEndpoint}/automation/v1/automations/${automation.id}`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 15000
+        });
+        
+        const detailedAutomation = detailResponse.data;
+        console.log(`📋 [SFMC API] Automation "${automation.name}" raw structure:`, JSON.stringify({
+          id: detailedAutomation.id,
+          name: detailedAutomation.name,
+          steps: detailedAutomation.steps?.length || 0,
+          activities: detailedAutomation.activities?.length || 0,
+          program: detailedAutomation.program ? 'exists' : 'none',
+          programActivities: detailedAutomation.program?.activities?.length || 0
+        }, null, 2));
+        
+        // Extract activities from various possible locations
+        detailedActivities = detailedAutomation.steps || 
+                           detailedAutomation.activities || 
+                           detailedAutomation.program?.activities || 
+                           [];
+        
+        console.log(`📋 [SFMC API] Found ${detailedActivities.length} activities for automation "${automation.name}"`);
+        
+        // Log sample activity structure if available
+        if (detailedActivities.length > 0) {
+          console.log(`🔍 [SFMC API] Sample activity structure:`, JSON.stringify(detailedActivities[0], null, 2));
+        }
+        
+      } catch (detailError) {
+        console.warn(`⚠️ [SFMC API] Could not fetch detailed info for automation ${automation.id}:`, detailError.message);
+        // Fallback to basic automation data
+        detailedActivities = automation.steps || automation.activities || [];
+      }
+      
+      processedAutomations.push({
+        id: `auto_${automation.id}`,
+        name: automation.name || 'Unnamed Automation',
+        description: automation.description || '',
+        status: automation.status,
+        createdDate: automation.createdDate,
+        modifiedDate: automation.modifiedDate,
+        steps: detailedActivities,
+        activities: detailedActivities,
+        type: 'Automation'
+      });
+    }
+    
+    return processedAutomations;
     
   } catch (error) {
     console.error('❌ [SFMC API] Error fetching Automations:', error.message);
@@ -6032,7 +6081,7 @@ function detectFilterToDataExtensionRelationships(filters, dataExtensions) {
 
 /**
  * Detect Data Extension relationships in Automations
- * Enhanced to handle various automation activity types
+ * Enhanced to handle various automation activity types and structures
  */
 function detectAutomationToDataExtensionRelationships(automations, dataExtensions, queries, fileTransfers, dataExtracts) {
   const relationships = [];
@@ -6043,10 +6092,17 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
   console.log(`📊 [Relationship] Processing ${automations.length} automations`);
   
   automations.forEach(automation => {
-    console.log(`🔍 [Relationship] Analyzing automation "${automation.name}"`);
+    console.log(`🔍 [Relationship] Analyzing automation "${automation.name}" (ID: ${automation.id})`);
     
-    // Check various possible activity containers
+    // Check multiple possible activity containers
     const activities = automation.steps || automation.activities || automation.program?.activities || [];
+    
+    console.log(`📋 [Relationship] Automation structure:`, {
+      steps: automation.steps?.length || 0,
+      activities: automation.activities?.length || 0,
+      programActivities: automation.program?.activities?.length || 0,
+      totalActivities: activities.length
+    });
     
     if (activities.length === 0) {
       console.log(`⚠️  [Relationship] No activities found for automation: ${automation.name}`);
@@ -6056,18 +6112,28 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
     console.log(`📋 [Relationship] Found ${activities.length} activities in "${automation.name}"`);
     
     activities.forEach((activity, index) => {
-      console.log(`🔍 [Relationship] Activity ${index + 1}: ${activity.type || activity.activityType || 'Unknown'}`);
+      console.log(`🔍 [Relationship] Activity ${index + 1}:`, {
+        type: activity.type || activity.activityType || 'Unknown',
+        name: activity.name || activity.displayName || 'Unnamed',
+        objectType: activity.objectType,
+        definitionId: activity.queryDefinitionId || activity.queryId || activity.definitionId,
+        keys: Object.keys(activity).slice(0, 10) // First 10 keys for debugging
+      });
       
       // Enhanced Query Activity relationships
-      const queryActivityTypes = ['query', 'sql', 'sqlquery', 'dataextensionactivity'];
-      if (queryActivityTypes.includes((activity.type || activity.activityType || '').toLowerCase())) {
+      const queryActivityTypes = ['query', 'sql', 'sqlquery', 'dataextensionactivity', 'sqlqueryactivity'];
+      const activityType = (activity.type || activity.activityType || '').toLowerCase();
+      
+      if (queryActivityTypes.includes(activityType)) {
         // Try multiple possible query reference fields
-        const queryId = activity.queryDefinitionId || activity.queryId || activity.definitionId;
-        const queryName = activity.queryName || activity.name;
+        const queryId = activity.queryDefinitionId || activity.queryId || activity.definitionId || activity.objectId;
+        const queryName = activity.queryName || activity.name || activity.displayName;
+        
+        console.log(`🔍 [Relationship] Query activity detected:`, { queryId, queryName, activityType });
         
         let query = null;
         if (queryId) {
-          query = queries.find(q => q.id === queryId || q.objectId === queryId);
+          query = queries.find(q => q.id === queryId || q.objectId === queryId || q.id === `query_${queryId}`);
         }
         if (!query && queryName) {
           query = queries.find(q => q.name === queryName);
@@ -6083,14 +6149,18 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
             description: `Automation "${automation.name}" contains Query "${query.name}"`
           });
           console.log(`✅ [Relationship] Found QUERY: ${automation.name} → ${query.name}`);
+        } else {
+          console.log(`⚠️  [Relationship] Query not found for activity:`, { queryId, queryName });
         }
       }
       
       // Enhanced File Transfer relationships
-      const fileTransferTypes = ['filetransfer', 'fileimport', 'import', 'transfer'];
-      if (fileTransferTypes.includes((activity.type || activity.activityType || '').toLowerCase())) {
-        const fileTransferId = activity.fileTransferId || activity.transferId || activity.id;
-        const fileTransfer = fileTransfers.find(ft => ft.id === fileTransferId);
+      const fileTransferTypes = ['filetransfer', 'fileimport', 'import', 'transfer', 'filetransferactivity'];
+      if (fileTransferTypes.includes(activityType)) {
+        const fileTransferId = activity.fileTransferId || activity.transferId || activity.id || activity.objectId;
+        console.log(`🔍 [Relationship] File transfer activity detected:`, { fileTransferId, activityType });
+        
+        const fileTransfer = fileTransfers.find(ft => ft.id === fileTransferId || ft.id === `ft_${fileTransferId}`);
         if (fileTransfer) {
           relationships.push({
             id: `${automation.id}-${fileTransfer.id}`,
@@ -6105,10 +6175,12 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
       }
       
       // Enhanced Data Extract relationships
-      const dataExtractTypes = ['dataextract', 'extract', 'export'];
-      if (dataExtractTypes.includes((activity.type || activity.activityType || '').toLowerCase())) {
-        const dataExtractId = activity.dataExtractId || activity.extractId || activity.id;
-        const dataExtract = dataExtracts.find(de => de.id === dataExtractId);
+      const dataExtractTypes = ['dataextract', 'extract', 'export', 'dataextractactivity'];
+      if (dataExtractTypes.includes(activityType)) {
+        const dataExtractId = activity.dataExtractId || activity.extractId || activity.id || activity.objectId;
+        console.log(`🔍 [Relationship] Data extract activity detected:`, { dataExtractId, activityType });
+        
+        const dataExtract = dataExtracts.find(de => de.id === dataExtractId || de.id === `de_${dataExtractId}`);
         if (dataExtract) {
           relationships.push({
             id: `${automation.id}-${dataExtract.id}`,
@@ -6125,7 +6197,8 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
       // Enhanced Direct DE relationships (import/export activities)
       const targetDeFields = [
         'targetDataExtension', 'targetDataExtensionName', 'dataExtensionName',
-        'targetDE', 'destinationDataExtension', 'outputDataExtension'
+        'targetDE', 'destinationDataExtension', 'outputDataExtension',
+        'dataExtension', 'targetDataExtensionKey'
       ];
       
       targetDeFields.forEach(field => {
@@ -6575,8 +6648,8 @@ async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
 // ==================== GRAPH API UTILITY FUNCTIONS ====================
 
 /**
- * Generate graph data from live SFMC objects with filtering support
- * Creates nodes and edges for visualization
+ * Generate graph data from live SFMC objects with enhanced filtering and debugging
+ * Creates nodes and edges for visualization, showing only meaningful relationships
  * @param {Object} sfmcObjects - The SFMC objects organized by category
  * @param {Array} types - Optional filter by object types
  * @param {Array} keys - Optional filter by object keys
@@ -6584,345 +6657,229 @@ async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
  * @returns {Object} Graph data with nodes and edges
  */
 function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjects = {}) {
-  const nodes = [];
-  const edges = [];
+  console.log('🔍 [Graph] === STARTING ENHANCED GRAPH GENERATION ===');
   
-  console.log('🔍 [Graph] Generating graph from SFMC objects:', {
-    dataExtensions: sfmcObjects['Data Extensions']?.length || 0,
-    sqlQueries: sfmcObjects['SQL Queries']?.length || 0,
-    automations: sfmcObjects['Automations']?.length || 0,
-    journeys: sfmcObjects['Journeys']?.length || 0,
-    triggeredSends: sfmcObjects['Triggered Sends']?.length || 0,
-    filters: sfmcObjects['Filters']?.length || 0,
-    fileTransfers: sfmcObjects['File Transfers']?.length || 0,
-    dataExtracts: sfmcObjects['Data Extracts']?.length || 0,
-    hasSelectedObjects: Object.keys(selectedObjects).length > 0
+  const debugStats = {
+    inputObjects: {},
+    selectedObjects: {},
+    relationships: {
+      detected: 0,
+      filtered: 0,
+      included: 0
+    },
+    nodes: {
+      created: 0,
+      selected: 0,
+      related: 0,
+      orphaned: 0,
+      final: 0
+    }
+  };
+  
+  // Log input statistics
+  Object.entries(sfmcObjects).forEach(([category, objects]) => {
+    debugStats.inputObjects[category] = objects?.length || 0;
+    console.log(`📊 [Graph] Input ${category}: ${objects?.length || 0} objects`);
   });
-
-  // Helper function to check if any objects are selected
+  
+  // Check if any objects are selected
   const hasAnySelection = Object.keys(selectedObjects).length > 0 && 
     Object.values(selectedObjects).some(categoryObj => 
       Object.values(categoryObj || {}).some(selected => selected)
     );
-
-  // Create filtered objects based on selection
-  let filteredSfmcObjects = { ...sfmcObjects };
+  
+  console.log(`🎯 [Graph] Selection mode: ${hasAnySelection ? 'FILTERED' : 'ALL_OBJECTS'}`);
   
   if (hasAnySelection) {
-    console.log('🎯 [Graph] Filtering objects based on selection...');
-    
-    // First pass: Include all selected objects
-    const selectedObjectIds = new Set();
-    Object.entries(selectedObjects).forEach(([category, categorySelections]) => {
-      if (filteredSfmcObjects[category]) {
-        filteredSfmcObjects[category] = filteredSfmcObjects[category].filter(obj => {
-          const isSelected = categorySelections[obj.id] === true;
-          if (isSelected) {
-            selectedObjectIds.add(obj.id);
-          }
-          return isSelected;
+    Object.entries(selectedObjects).forEach(([category, selections]) => {
+      const selectedCount = Object.values(selections || {}).filter(Boolean).length;
+      debugStats.selectedObjects[category] = selectedCount;
+      console.log(`🎯 [Graph] Selected ${category}: ${selectedCount} objects`);
+    });
+  }
+  
+  // Step 1: Identify all relationships first (regardless of selection)
+  console.log('🔗 [Graph] === STEP 1: DETECTING ALL RELATIONSHIPS ===');
+  
+  const allDataExtensions = sfmcObjects['Data Extensions'] || [];
+  const allSqlQueries = sfmcObjects['SQL Queries'] || [];
+  const allAutomations = sfmcObjects['Automations'] || [];
+  const allJourneys = sfmcObjects['Journeys'] || [];
+  const allTriggeredSends = sfmcObjects['Triggered Sends'] || [];
+  const allFilters = sfmcObjects['Filters'] || [];
+  const allFileTransfers = sfmcObjects['File Transfers'] || [];
+  const allDataExtracts = sfmcObjects['Data Extracts'] || [];
+  
+  // Detect ALL relationships using enhanced detection functions
+  const allRelationships = [
+    ...detectQueryToDataExtensionRelationships(allSqlQueries, allDataExtensions),
+    ...detectFilterToDataExtensionRelationships(allFilters, allDataExtensions),
+    ...detectAutomationToDataExtensionRelationships(allAutomations, allDataExtensions, allSqlQueries, allFileTransfers, allDataExtracts),
+    ...detectJourneyToDataExtensionRelationships(allJourneys, allDataExtensions),
+    ...detectTriggeredSendToDataExtensionRelationships(allTriggeredSends, allDataExtensions)
+  ];
+  
+  debugStats.relationships.detected = allRelationships.length;
+  console.log(`🔗 [Graph] Total relationships detected: ${allRelationships.length}`);
+  
+  // Log relationship type breakdown
+  const relationshipTypes = {};
+  allRelationships.forEach(rel => {
+    relationshipTypes[rel.type] = (relationshipTypes[rel.type] || 0) + 1;
+  });
+  console.log('🔗 [Graph] Relationship types:', relationshipTypes);
+  
+  // Step 2: Create relationship map for efficient lookups
+  const relationshipMap = new Map();
+  
+  // Initialize relationship tracking for ALL objects
+  const initializeObjectTracking = (category, objects) => {
+    objects.forEach(obj => {
+      if (!relationshipMap.has(obj.id)) {
+        relationshipMap.set(obj.id, {
+          object: obj,
+          category: category,
+          inbound: [],
+          outbound: [],
+          hasConnections: false
         });
       }
     });
-
-    console.log('🎯 [Graph] Selected objects count:', selectedObjectIds.size);
-  }
-
-  // Create nodes for filtered objects
-  Object.entries(filteredSfmcObjects).forEach(([category, objects]) => {
-    if (!objects || objects.length === 0) return;
+  };
+  
+  Object.entries(sfmcObjects).forEach(([category, objects]) => {
+    if (objects) initializeObjectTracking(category, objects);
+  });
+  
+  // Populate relationship map
+  allRelationships.forEach(rel => {
+    const sourceNode = relationshipMap.get(rel.source);
+    const targetNode = relationshipMap.get(rel.target);
     
-    objects.forEach(obj => {
+    if (sourceNode) {
+      sourceNode.outbound.push(rel);
+      sourceNode.hasConnections = true;
+    }
+    
+    if (targetNode) {
+      targetNode.inbound.push(rel);
+      targetNode.hasConnections = true;
+    }
+  });
+  
+  // Step 3: Apply selection filtering if needed
+  let finalObjectIds = new Set();
+  
+  if (hasAnySelection) {
+    console.log('🎯 [Graph] === STEP 3: APPLYING SELECTION FILTER ===');
+    
+    // Add all selected objects
+    Object.entries(selectedObjects).forEach(([category, selections]) => {
+      if (sfmcObjects[category]) {
+        sfmcObjects[category].forEach(obj => {
+          if (selections[obj.id] === true) {
+            finalObjectIds.add(obj.id);
+            debugStats.nodes.selected++;
+            console.log(`✅ [Graph] Selected: ${category} - ${obj.name} (${obj.id})`);
+          }
+        });
+      }
+    });
+    
+    console.log(`🎯 [Graph] Total selected objects: ${finalObjectIds.size}`);
+    
+    // Add directly related objects (only 1-hop relationships)
+    const selectedIds = Array.from(finalObjectIds);
+    selectedIds.forEach(selectedId => {
+      const nodeData = relationshipMap.get(selectedId);
+      if (nodeData) {
+        console.log(`🔍 [Graph] Finding relationships for: ${nodeData.category} - ${nodeData.object.name}`);
+        
+        // Add targets of outbound relationships
+        nodeData.outbound.forEach(rel => {
+          if (!finalObjectIds.has(rel.target)) {
+            finalObjectIds.add(rel.target);
+            debugStats.nodes.related++;
+            const targetNode = relationshipMap.get(rel.target);
+            console.log(`  ➡️  Related (outbound): ${targetNode?.category} - ${targetNode?.object.name} (${rel.type})`);
+          }
+        });
+        
+        // Add sources of inbound relationships  
+        nodeData.inbound.forEach(rel => {
+          if (!finalObjectIds.has(rel.source)) {
+            finalObjectIds.add(rel.source);
+            debugStats.nodes.related++;
+            const sourceNode = relationshipMap.get(rel.source);
+            console.log(`  ⬅️  Related (inbound): ${sourceNode?.category} - ${sourceNode?.object.name} (${rel.type})`);
+          }
+        });
+      }
+    });
+    
+    console.log(`🔗 [Graph] Total objects after adding related: ${finalObjectIds.size}`);
+    
+  } else {
+    // No selection - include only connected objects (filter out orphans by default)
+    console.log('🌐 [Graph] === STEP 3: INCLUDING ALL CONNECTED OBJECTS ===');
+    
+    relationshipMap.forEach((nodeData, objectId) => {
+      if (nodeData.hasConnections) {
+        finalObjectIds.add(objectId);
+        debugStats.nodes.selected++; // In this case, "selected" means "connected"
+      } else {
+        debugStats.nodes.orphaned++;
+        console.log(`🔘 [Graph] Orphan: ${nodeData.category} - ${nodeData.object.name} (no relationships)`);
+      }
+    });
+    
+    console.log(`🌐 [Graph] Connected objects: ${finalObjectIds.size}, Orphaned: ${debugStats.nodes.orphaned}`);
+  }
+  
+  // Step 4: Create final nodes
+  console.log('📦 [Graph] === STEP 4: CREATING FINAL NODES ===');
+  
+  const nodes = [];
+  finalObjectIds.forEach(objectId => {
+    const nodeData = relationshipMap.get(objectId);
+    if (nodeData) {
+      const isSelected = hasAnySelection ? 
+        (selectedObjects[nodeData.category] && selectedObjects[nodeData.category][objectId] === true) : 
+        false;
+      
       nodes.push({
         data: {
-          id: obj.id,
-          label: obj.name,
-          category: category,
-          type: category,
+          id: objectId,
+          label: nodeData.object.name,
+          category: nodeData.category,
+          type: nodeData.category,
           metadata: {
-            ...obj,
-            category: category
+            ...nodeData.object,
+            category: nodeData.category,
+            isRelated: hasAnySelection && !isSelected, // Mark as related if not directly selected
+            isSelected: isSelected,
+            connectionCount: nodeData.inbound.length + nodeData.outbound.length
           }
         }
       });
-    });
+      
+      debugStats.nodes.final++;
+    }
   });
-
-  // Generate relationships between filtered objects
-  const dataExtensions = filteredSfmcObjects['Data Extensions'] || [];
-  const sqlQueries = filteredSfmcObjects['SQL Queries'] || [];
-  const automations = filteredSfmcObjects['Automations'] || [];
-  const journeys = filteredSfmcObjects['Journeys'] || [];
-  const triggeredSends = filteredSfmcObjects['Triggered Sends'] || [];
-  const filters = filteredSfmcObjects['Filters'] || [];
-  const fileTransfers = filteredSfmcObjects['File Transfers'] || [];
-  const dataExtracts = filteredSfmcObjects['Data Extracts'] || [];
-
-  // If we have selected objects, we need to include related objects that aren't selected
-  // but have relationships with selected objects
-  let additionalNodes = [];
-  if (hasAnySelection) {
-    console.log('🔗 [Graph] Finding related objects for selected items...');
-    
-    // Get all object IDs that are currently in the filtered set (selected objects)
-    const selectedNodeIds = new Set(nodes.map(n => n.data.id));
-    
-    // For each selected object, find its direct relationships only
-    const relatedObjectIds = new Set();
-    
-    // Function to find direct relationships for a specific object
-    const findDirectRelationships = (objectId, objectCategory, objectData) => {
-      console.log(`🔍 [Graph] Finding relationships for ${objectCategory}: ${objectData.name} (${objectId})`);
-      
-      // Get all objects for relationship detection
-      const allDataExtensions = sfmcObjects['Data Extensions'] || [];
-      const allSqlQueries = sfmcObjects['SQL Queries'] || [];
-      const allAutomations = sfmcObjects['Automations'] || [];
-      const allJourneys = sfmcObjects['Journeys'] || [];
-      const allTriggeredSends = sfmcObjects['Triggered Sends'] || [];
-      const allFilters = sfmcObjects['Filters'] || [];
-      const allFileTransfers = sfmcObjects['File Transfers'] || [];
-      const allDataExtracts = sfmcObjects['Data Extracts'] || [];
-      
-      let foundRelationships = [];
-      
-      if (objectCategory === 'Automations') {
-        // For automations, find ONLY direct activities - limit to immediate children
-        console.log(`🎯 [Graph] Finding direct activities for automation: ${objectData.name}`);
-        const activities = objectData.steps || objectData.activities || objectData.program?.activities || [];
-        
-        activities.forEach(activity => {
-          const activityType = (activity.type || activity.activityType || '').toLowerCase();
-          
-          // Only include direct query activities
-          if (['query', 'sql', 'sqlquery'].includes(activityType)) {
-            const queryId = activity.queryDefinitionId || activity.queryId || activity.definitionId;
-            const queryName = activity.queryName || activity.name;
-            
-            let query = allSqlQueries.find(q => 
-              (queryId && (q.id === queryId || q.objectId === queryId)) ||
-              (queryName && q.name === queryName)
-            );
-            
-            if (query) {
-              foundRelationships.push({
-                id: `${objectId}-${query.id}`,
-                source: objectId,
-                target: query.id,
-                type: 'contains_query',
-                label: 'contains',
-                description: `Automation contains SQL Query`
-              });
-            }
-          }
-          
-          // Only include direct filter activities
-          if (['filter', 'datafilter'].includes(activityType)) {
-            const filterId = activity.filterId || activity.definitionId;
-            const filterName = activity.filterName || activity.name;
-            
-            let filter = allFilters.find(f => 
-              (filterId && (f.id === filterId || f.objectId === filterId)) ||
-              (filterName && f.name === filterName)
-            );
-            
-            if (filter) {
-              foundRelationships.push({
-                id: `${objectId}-${filter.id}`,
-                source: objectId,
-                target: filter.id,
-                type: 'contains_filter',
-                label: 'contains',
-                description: `Automation contains Filter`
-              });
-            }
-          }
-        });
-        
-      } else if (objectCategory === 'Data Extensions') {
-        // For DEs, find ONLY direct references - be very conservative
-        console.log(`🎯 [Graph] Finding direct references for DE: ${objectData.name}`);
-        const deName = objectData.name.toLowerCase();
-        const deKey = objectData.externalKey?.toLowerCase();
-        
-        // Find queries that DIRECTLY reference this DE (by name or key)
-        allSqlQueries.forEach(query => {
-          const queryText = (query.queryText || query.sql || '').toLowerCase();
-          if (queryText.includes(deName) || (deKey && queryText.includes(deKey))) {
-            // Check if it's a direct reference (not just substring match)
-            const hasDirectReference = 
-              queryText.includes(`[${deName}]`) || 
-              queryText.includes(`"${deName}"`) ||
-              queryText.includes(`'${deName}'`) ||
-              queryText.includes(` ${deName} `) ||
-              queryText.includes(`from ${deName}`) ||
-              queryText.includes(`into ${deName}`);
-              
-            if (hasDirectReference) {
-              const isWrite = queryText.includes('insert') || queryText.includes('update') || queryText.includes('into');
-              foundRelationships.push({
-                id: `${query.id}-${objectId}`,
-                source: query.id,
-                target: objectId,
-                type: isWrite ? 'writes_to' : 'reads_from',
-                label: isWrite ? 'writes to' : 'reads from',
-                description: `Query ${isWrite ? 'writes to' : 'reads from'} Data Extension`
-              });
-            }
-          }
-        });
-        
-      } else if (objectCategory === 'SQL Queries') {
-        // For queries, find ONLY DEs they directly reference
-        console.log(`🎯 [Graph] Finding DE references for query: ${objectData.name}`);
-        const queryText = (objectData.queryText || objectData.sql || '').toLowerCase();
-        
-        allDataExtensions.forEach(de => {
-          const deName = de.name.toLowerCase();
-          const deKey = de.externalKey?.toLowerCase();
-          
-          const hasDirectReference = 
-            queryText.includes(`[${deName}]`) || 
-            queryText.includes(`"${deName}"`) ||
-            queryText.includes(`'${deName}'`) ||
-            queryText.includes(` ${deName} `) ||
-            queryText.includes(`from ${deName}`) ||
-            queryText.includes(`into ${deName}`) ||
-            (deKey && (
-              queryText.includes(`[${deKey}]`) || 
-              queryText.includes(`"${deKey}"`) ||
-              queryText.includes(`'${deKey}'`)
-            ));
-            
-          if (hasDirectReference) {
-            const isWrite = queryText.includes('insert') || queryText.includes('update') || queryText.includes('into');
-            foundRelationships.push({
-              id: `${objectId}-${de.id}`,
-              source: objectId,
-              target: de.id,
-              type: isWrite ? 'writes_to' : 'reads_from',
-              label: isWrite ? 'writes to' : 'reads from',
-              description: `Query ${isWrite ? 'writes to' : 'reads from'} Data Extension`
-            });
-          }
-        });
-        
-      } else if (objectCategory === 'Filters') {
-        // For filters, find ONLY the DE they directly filter
-        console.log(`🎯 [Graph] Finding DE for filter: ${objectData.name}`);
-        const dataSource = objectData.dataSource || objectData.dataExtension || objectData.source;
-        if (dataSource) {
-          let de = allDataExtensions.find(d => 
-            d.id === dataSource || 
-            d.externalKey === dataSource || 
-            d.name === dataSource
-          );
-          
-          if (de) {
-            foundRelationships.push({
-              id: `${objectId}-${de.id}`,
-              source: objectId,
-              target: de.id,
-              type: 'filters_de',
-              label: 'filters',
-              description: `Filter applies to Data Extension`
-            });
-          }
-        }
-      }
-      
-      console.log(`✅ [Graph] Found ${foundRelationships.length} direct relationships for ${objectData.name}`);
-      return foundRelationships;
-    };
-    
-    // Find relationships for each selected object
-    Object.entries(filteredSfmcObjects).forEach(([category, objects]) => {
-      if (!objects) return;
-      objects.forEach(obj => {
-        if (selectedNodeIds.has(obj.id)) {
-          const relationships = findDirectRelationships(obj.id, category, obj);
-          
-          // Add related object IDs from the found relationships
-          relationships.forEach(rel => {
-            if (rel.source === obj.id && !selectedNodeIds.has(rel.target)) {
-              relatedObjectIds.add(rel.target);
-            }
-            if (rel.target === obj.id && !selectedNodeIds.has(rel.source)) {
-              relatedObjectIds.add(rel.source);
-            }
-          });
-        }
-      });
-    });
-    
-    console.log(`🔍 [Graph] Found ${relatedObjectIds.size} related objects for ${selectedNodeIds.size} selected objects`);
-    
-    // Add related objects as additional nodes
-    Object.entries(sfmcObjects).forEach(([category, objects]) => {
-      if (!objects) return;
-      objects.forEach(obj => {
-        if (relatedObjectIds.has(obj.id)) {
-          additionalNodes.push({
-            data: {
-              id: obj.id,
-              label: obj.name,
-              category: category,
-              type: category,
-              metadata: {
-                ...obj,
-                category: category,
-                isRelated: true // Mark as related object
-              }
-            }
-          });
-          
-          // Update filtered objects to include this related object for relationship detection
-          if (!filteredSfmcObjects[category]) {
-            filteredSfmcObjects[category] = [];
-          }
-          if (!filteredSfmcObjects[category].find(o => o.id === obj.id)) {
-            filteredSfmcObjects[category].push(obj);
-          }
-        }
-      });
-    });
-    
-    console.log('🔗 [Graph] Added related objects:', additionalNodes.length);
-  }
-
-  // Add additional nodes to the main nodes array
-  nodes.push(...additionalNodes);
-
-  // Generate relationships between all objects (selected + related)
-  const finalDataExtensions = filteredSfmcObjects['Data Extensions'] || [];
-  const finalSqlQueries = filteredSfmcObjects['SQL Queries'] || [];
-  const finalAutomations = filteredSfmcObjects['Automations'] || [];
-  const finalJourneys = filteredSfmcObjects['Journeys'] || [];
-  const finalTriggeredSends = filteredSfmcObjects['Triggered Sends'] || [];
-  const finalFilters = filteredSfmcObjects['Filters'] || [];
-  const finalFileTransfers = filteredSfmcObjects['File Transfers'] || [];
-  const finalDataExtracts = filteredSfmcObjects['Data Extracts'] || [];
-
-  // Detect and add all relationship types using final filtered objects
-  const relationships = [
-    ...detectQueryToDataExtensionRelationships(finalSqlQueries, finalDataExtensions),
-    ...detectFilterToDataExtensionRelationships(finalFilters, finalDataExtensions),
-    ...detectAutomationToDataExtensionRelationships(finalAutomations, finalDataExtensions, finalSqlQueries, finalFileTransfers, finalDataExtracts),
-    ...detectJourneyToDataExtensionRelationships(finalJourneys, finalDataExtensions),
-    ...detectTriggeredSendToDataExtensionRelationships(finalTriggeredSends, finalDataExtensions)
-  ];
-
-  // Get the final set of node IDs that will be in the graph
-  const finalNodeIds = new Set(nodes.map(n => n.data.id));
   
-  // Filter relationships to only include those between objects that are actually in the graph
-  const filteredRelationships = relationships.filter(rel => 
-    finalNodeIds.has(rel.source) && finalNodeIds.has(rel.target)
+  console.log(`📦 [Graph] Created ${nodes.length} final nodes`);
+  
+  // Step 5: Create final edges (only between final nodes)
+  console.log('🔗 [Graph] === STEP 5: CREATING FINAL EDGES ===');
+  
+  const edges = [];
+  const filteredRelationships = allRelationships.filter(rel => 
+    finalObjectIds.has(rel.source) && finalObjectIds.has(rel.target)
   );
-
-  console.log(`🔗 [Graph] Filtered relationships: ${relationships.length} -> ${filteredRelationships.length} (only between graph nodes)`);
-
-  // Convert filtered relationships to graph edges
+  
+  debugStats.relationships.filtered = allRelationships.length - filteredRelationships.length;
+  debugStats.relationships.included = filteredRelationships.length;
+  
   filteredRelationships.forEach(rel => {
     edges.push({
       data: {
@@ -6935,18 +6892,37 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
       }
     });
   });
-
-  console.log('✅ [Graph] Generated graph data:', {
-    totalNodes: nodes.length,
-    totalEdges: edges.length,
-    nodesByType: Object.entries(filteredSfmcObjects).map(([type, objs]) => `${type}: ${objs?.length || 0}`),
-    relationshipTypes: [...new Set(filteredRelationships.map(r => r.type))],
-    wasFiltered: hasAnySelection
-  });
-
+  
+  console.log(`🔗 [Graph] Created ${edges.length} final edges (filtered out ${debugStats.relationships.filtered})`);
+  
+  // Step 6: Final statistics and validation
+  console.log('📊 [Graph] === FINAL STATISTICS ===');
+  console.log('Input Objects:', debugStats.inputObjects);
+  console.log('Selected Objects:', debugStats.selectedObjects);
+  console.log('Relationships:', debugStats.relationships);
+  console.log('Nodes:', debugStats.nodes);
+  
+  // Validate graph integrity
+  const nodeIds = new Set(nodes.map(n => n.data.id));
+  const invalidEdges = edges.filter(e => 
+    !nodeIds.has(e.data.source) || !nodeIds.has(e.data.target)
+  );
+  
+  if (invalidEdges.length > 0) {
+    console.error('❌ [Graph] Invalid edges detected:', invalidEdges.length);
+    invalidEdges.forEach(edge => {
+      console.error(`  Invalid edge: ${edge.data.source} -> ${edge.data.target}`);
+    });
+  } else {
+    console.log('✅ [Graph] Graph integrity validated');
+  }
+  
+  console.log('🔍 [Graph] === GRAPH GENERATION COMPLETE ===');
+  
   return {
     nodes,
-    edges
+    edges,
+    debug: debugStats
   };
 }
 
