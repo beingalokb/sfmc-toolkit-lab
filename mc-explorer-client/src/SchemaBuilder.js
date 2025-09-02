@@ -70,9 +70,12 @@ const SchemaBuilder = () => {
   
   // Debug and filtering controls
   const [showOrphans, setShowOrphans] = useState(false);
+  const [showIndirect, setShowIndirect] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [debugInfo, setDebugInfo] = useState({});
   const [relationshipStats, setRelationshipStats] = useState({});
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [highlightedElements, setHighlightedElements] = useState(new Set());
   
   const cyRef = useRef(null);
 
@@ -148,24 +151,102 @@ const getNodeColor = (type) => {
   return typeMapping[type] || '#6B7280'; // Default gray
 };
 
-// Get edge color based on relationship type
-const getEdgeColor = (relationshipType) => {
+// Enhanced edge styling based on relationship type and connection level
+const getEdgeStyle = (relationshipType, isDirect = true, isHighlighted = false, isFaded = false) => {
   const edgeColors = {
+    // Direct data flow relationships
     'writes_to': '#10B981',           // Green for data writes
     'reads_from': '#3B82F6',         // Blue for data reads
     'imports_to_de': '#F97316',      // Orange for data imports
-    'journey_entry_source': '#8B5CF6', // Purple for journey entries
+    'updates_de': '#84CC16',         // Lime for updates
+    
+    // Automation and workflow relationships
     'contains_query': '#6B7280',     // Gray for containment
     'contains_filter': '#06B6D4',    // Cyan for filter containment
+    'executes_query': '#8B5CF6',     // Purple for execution
+    'triggers_automation': '#EC4899', // Pink for triggers
+    
+    // Journey and campaign relationships
+    'journey_entry_source': '#8B5CF6', // Purple for journey entries
     'uses_in_decision': '#EAB308',   // Yellow for decision logic
     'subscriber_source': '#EF4444',  // Red for email sources
     'sends_email': '#EC4899',        // Pink for email sends
-    'provides_data_to': '#06B6D4',   // Cyan for data flow
-    'updates_de': '#84CC16',         // Lime for updates
+    
+    // Filter and metadata relationships
     'filters_de': '#06B6D4',         // Cyan for filtering
+    'provides_data_to': '#06B6D4',   // Cyan for data flow
+    
     'default': '#94A3B8'             // Default gray
   };
-  return edgeColors[relationshipType] || edgeColors.default;
+  
+  const baseColor = edgeColors[relationshipType] || edgeColors.default;
+  
+  return {
+    'line-color': isFaded ? `${baseColor}40` : baseColor,
+    'target-arrow-color': isFaded ? `${baseColor}40` : baseColor,
+    'target-arrow-shape': 'triangle',
+    'target-arrow-size': isHighlighted ? '15px' : '12px',
+    'curve-style': 'bezier',
+    'line-style': isDirect ? 'solid' : (relationshipType.includes('filter') || relationshipType.includes('metadata') ? 'dotted' : 'dashed'),
+    'width': isHighlighted ? '4px' : (isDirect ? '3px' : '2px'),
+    'opacity': isFaded ? 0.3 : (isHighlighted ? 1.0 : 0.8),
+    'z-index': isHighlighted ? 100 : 10
+  };
+};
+
+// Enhanced node styling with grouping and highlighting
+const getNodeStyle = (nodeType, isSelected = false, isRelated = false, isOrphan = false, isHighlighted = false, isFaded = false) => {
+  const baseColor = getNodeColor(nodeType);
+  
+  let backgroundColor = baseColor;
+  let borderStyle = 'solid';
+  let borderWidth = '2px';
+  let opacity = 1.0;
+  let borderColor = '#ffffff';
+  
+  if (isOrphan) {
+    backgroundColor = '#f5f5f5';
+    borderStyle = 'dashed';
+    borderWidth = '1px';
+    borderColor = '#cccccc';
+    opacity = 0.6;
+  } else if (isRelated) {
+    backgroundColor = `${baseColor}80`; // 50% opacity
+    borderStyle = 'dashed';
+    borderWidth = '1px';
+    borderColor = baseColor;
+    opacity = 0.8;
+  } else if (isSelected) {
+    borderColor = '#ffffff';
+    borderWidth = '3px';
+  }
+  
+  if (isHighlighted) {
+    borderColor = '#FFD700'; // Gold for highlighting
+    borderWidth = '4px';
+    opacity = 1.0;
+  } else if (isFaded) {
+    opacity = 0.3;
+  }
+  
+  return {
+    'background-color': backgroundColor,
+    'color': isOrphan ? '#666666' : '#ffffff',
+    'text-valign': 'center',
+    'text-halign': 'center',
+    'font-size': isHighlighted ? '14px' : '12px',
+    'font-weight': isSelected || isHighlighted ? 'bold' : (isRelated || isOrphan ? 'normal' : 'bold'),
+    'width': '140px',
+    'height': '50px',
+    'shape': 'roundrectangle',
+    'border-width': borderWidth,
+    'border-color': borderColor,
+    'border-style': borderStyle,
+    'text-wrap': 'wrap',
+    'text-max-width': '120px',
+    'opacity': opacity,
+    'z-index': isHighlighted ? 100 : (isSelected ? 50 : 10)
+  };
 };
 
 // Node colors mapping for graph styling (consistent with OBJECT_TYPE_COLORS)
@@ -241,9 +322,21 @@ const getTypeFromCategory = (category) => {
     }
   }, [selectedObjects]);
 
-  // Update graph based on selected objects with enhanced debugging
+  // Enhanced relationship classification
+  const classifyRelationship = (relationshipType) => {
+    const directTypes = ['writes_to', 'reads_from', 'imports_to_de', 'updates_de', 'journey_entry_source'];
+    const indirectTypes = ['contains_query', 'executes_query', 'triggers_automation'];
+    const metadataTypes = ['filters_de', 'uses_in_decision', 'provides_data_to'];
+    
+    if (directTypes.includes(relationshipType)) return 'direct';
+    if (indirectTypes.includes(relationshipType)) return 'indirect';
+    if (metadataTypes.includes(relationshipType)) return 'metadata';
+    return 'unknown';
+  };
+
+  // Enhanced graph update with comprehensive filtering and highlighting
   const updateGraph = useCallback(async () => {
-    console.log('🔧 [Graph Update] Starting graph update with selections:', selectedObjects);
+    console.log('🔧 [Graph Update] Starting enhanced graph update with selections:', selectedObjects);
     
     const graphData = await loadGraphData();
     
@@ -253,13 +346,17 @@ const getTypeFromCategory = (category) => {
       totalEdges: graphData.edges.length,
       nodeTypes: {},
       edgeTypes: {},
+      relationshipLevels: { direct: 0, indirect: 0, metadata: 0, unknown: 0 },
       orphanNodes: [],
       connectedNodes: [],
-      relationships: []
+      relationships: [],
+      filteredEdges: 0,
+      finalStats: {}
     };
     
-    // Track node connections
+    // Build comprehensive relationship map
     const nodeConnections = new Map();
+    const edgeMap = new Map();
     
     // Initialize connection tracking for all nodes
     graphData.nodes.forEach(node => {
@@ -267,33 +364,84 @@ const getTypeFromCategory = (category) => {
         node: node,
         inbound: [],
         outbound: [],
-        hasConnections: false
+        hasDirectConnections: false,
+        hasIndirectConnections: false,
+        hasMetadataConnections: false,
+        totalConnections: 0
       });
+      
+      const nodeType = node.data.type || node.data.category || 'unknown';
+      debugData.nodeTypes[nodeType] = (debugData.nodeTypes[nodeType] || 0) + 1;
     });
     
-    // Process edges and track connections
+    // Process edges and classify relationships
+    const validEdges = [];
     graphData.edges.forEach(edge => {
       const sourceConn = nodeConnections.get(edge.data.source);
       const targetConn = nodeConnections.get(edge.data.target);
       
-      if (sourceConn) {
+      if (!sourceConn || !targetConn) {
+        console.warn(`⚠️ [Graph] Invalid edge: ${edge.data.source} -> ${edge.data.target} (missing nodes)`);
+        return;
+      }
+      
+      // Classify relationship level
+      const relationshipLevel = classifyRelationship(edge.data.type);
+      debugData.relationshipLevels[relationshipLevel]++;
+      
+      // Create edge info object
+      const edgeInfo = {
+        edge: edge,
+        level: relationshipLevel,
+        isDirect: relationshipLevel === 'direct',
+        isIndirect: relationshipLevel === 'indirect',
+        isMetadata: relationshipLevel === 'metadata'
+      };
+      
+      // Apply filtering based on user preferences
+      let includeEdge = true;
+      
+      if (!showIndirect && relationshipLevel === 'indirect') {
+        includeEdge = false;
+        debugData.filteredEdges++;
+        console.log(`🚫 [Graph] Filtered indirect edge: ${edge.data.type} (${edge.data.source} -> ${edge.data.target})`);
+      }
+      
+      if (includeEdge) {
+        validEdges.push(edgeInfo);
+        edgeMap.set(edge.data.id, edgeInfo);
+        
+        // Update connection tracking
         sourceConn.outbound.push({
           edgeId: edge.data.id,
           targetId: edge.data.target,
           type: edge.data.type,
-          label: edge.data.label
+          label: edge.data.label,
+          level: relationshipLevel
         });
-        sourceConn.hasConnections = true;
-      }
-      
-      if (targetConn) {
+        
         targetConn.inbound.push({
           edgeId: edge.data.id,
           sourceId: edge.data.source,
           type: edge.data.type,
-          label: edge.data.label
+          label: edge.data.label,
+          level: relationshipLevel
         });
-        targetConn.hasConnections = true;
+        
+        // Mark connection types
+        if (relationshipLevel === 'direct') {
+          sourceConn.hasDirectConnections = true;
+          targetConn.hasDirectConnections = true;
+        } else if (relationshipLevel === 'indirect') {
+          sourceConn.hasIndirectConnections = true;
+          targetConn.hasIndirectConnections = true;
+        } else if (relationshipLevel === 'metadata') {
+          sourceConn.hasMetadataConnections = true;
+          targetConn.hasMetadataConnections = true;
+        }
+        
+        sourceConn.totalConnections++;
+        targetConn.totalConnections++;
       }
       
       // Track edge types for debugging
@@ -304,7 +452,9 @@ const getTypeFromCategory = (category) => {
         source: edge.data.source,
         target: edge.data.target,
         type: edge.data.type,
-        label: edge.data.label
+        label: edge.data.label,
+        level: relationshipLevel,
+        included: includeEdge
       });
     });
     
@@ -314,21 +464,24 @@ const getTypeFromCategory = (category) => {
     
     nodeConnections.forEach((connection, nodeId) => {
       const node = connection.node;
-      
-      // Track node types for debugging
       const nodeType = node.data.type || node.data.category || 'unknown';
-      debugData.nodeTypes[nodeType] = (debugData.nodeTypes[nodeType] || 0) + 1;
       
       // Debug log for each node
       console.log(`🔍 [Node Debug] ${nodeType}: ${node.data.label}`);
       console.log(`  - ID: ${nodeId}`);
       console.log(`  - Selected: ${node.data.metadata?.isRelated !== true ? 'YES' : 'NO'}`);
       console.log(`  - Related: ${node.data.metadata?.isRelated === true ? 'YES' : 'NO'}`);
+      console.log(`  - Direct connections: ${connection.hasDirectConnections ? 'YES' : 'NO'}`);
+      console.log(`  - Indirect connections: ${connection.hasIndirectConnections ? 'YES' : 'NO'}`);
+      console.log(`  - Metadata connections: ${connection.hasMetadataConnections ? 'YES' : 'NO'}`);
+      console.log(`  - Total connections: ${connection.totalConnections}`);
       console.log(`  - Inbound: ${connection.inbound.length} [${connection.inbound.map(i => i.label).join(', ')}]`);
       console.log(`  - Outbound: ${connection.outbound.length} [${connection.outbound.map(o => o.label).join(', ')}]`);
       
-      if (connection.hasConnections) {
-        console.log(`  ✅ Including in graph (has relationships)`);
+      const hasAnyConnections = connection.totalConnections > 0;
+      
+      if (hasAnyConnections) {
+        console.log(`  ✅ Including in graph (has ${connection.totalConnections} relationships)`);
         connectedNodes.push(node);
         debugData.connectedNodes.push({
           id: nodeId,
@@ -336,6 +489,9 @@ const getTypeFromCategory = (category) => {
           type: nodeType,
           inboundCount: connection.inbound.length,
           outboundCount: connection.outbound.length,
+          directConnections: connection.hasDirectConnections,
+          indirectConnections: connection.hasIndirectConnections,
+          metadataConnections: connection.hasMetadataConnections,
           isSelected: node.data.metadata?.isRelated !== true,
           relationships: [...connection.inbound, ...connection.outbound]
         });
@@ -351,7 +507,7 @@ const getTypeFromCategory = (category) => {
       }
     });
     
-    // Filter nodes based on showOrphans setting
+    // Filter nodes based on user preferences
     let finalNodes = connectedNodes;
     
     if (showOrphans) {
@@ -372,129 +528,149 @@ const getTypeFromCategory = (category) => {
       console.log(`❌ [Graph Filter] Excluding ${orphanNodes.length} orphan nodes`);
     }
 
-    // Apply enhanced styling to nodes
-    const styledNodes = finalNodes.map(node => {
+    // Apply node highlighting based on selection
+    const highlightedNodes = new Set();
+    const highlightedEdges = new Set();
+    
+    if (selectedNodeId) {
+      highlightedNodes.add(selectedNodeId);
+      
+      // Find all connected nodes and edges
+      const selectedConnection = nodeConnections.get(selectedNodeId);
+      if (selectedConnection) {
+        selectedConnection.inbound.forEach(conn => {
+          highlightedNodes.add(conn.sourceId);
+          highlightedEdges.add(conn.edgeId);
+        });
+        selectedConnection.outbound.forEach(conn => {
+          highlightedNodes.add(conn.targetId);
+          highlightedEdges.add(conn.edgeId);
+        });
+      }
+    }
+    
+    // Apply enhanced styling to nodes with vertical grouping by type
+    const styledNodes = finalNodes.map((node, index) => {
+      const isSelected = node.data.metadata?.isRelated !== true;
       const isRelated = node.data.metadata?.isRelated === true;
       const isOrphan = node.data.metadata?.isOrphan === true;
+      const isHighlighted = highlightedNodes.has(node.data.id);
+      const isFaded = selectedNodeId && !highlightedNodes.has(node.data.id);
       const nodeType = node.data.type || node.data.category || 'default';
-      const baseColor = getNodeColor(nodeType);
       
-      let backgroundColor = baseColor;
-      let borderStyle = 'solid';
-      let borderWidth = '2px';
-      let opacity = 1.0;
+      // Calculate vertical position based on node type for grouping
+      const typeOrder = {
+        'Data Extensions': 0,
+        'SQL Queries': 1,
+        'Automations': 2,
+        'Journeys': 3,
+        'Triggered Sends': 4,
+        'Filters': 5,
+        'File Transfers': 6,
+        'Data Extracts': 7
+      };
       
-      if (isOrphan) {
-        backgroundColor = '#f5f5f5';
-        borderStyle = 'dashed';
-        borderWidth = '1px';
-        opacity = 0.6;
-      } else if (isRelated) {
-        backgroundColor = `${baseColor}80`; // 50% opacity
-        borderStyle = 'dashed';
-        borderWidth = '1px';
-        opacity = 0.8;
-      }
+      const typeIndex = typeOrder[nodeType] || 8;
+      const baseY = typeIndex * 200; // Vertical spacing between types
       
       return {
         ...node,
-        style: {
-          'background-color': backgroundColor,
-          'label': node.data.label,
-          'color': isOrphan ? '#666666' : '#ffffff',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'font-size': '12px',
-          'font-weight': isRelated || isOrphan ? 'normal' : 'bold',
-          'width': '140px',
-          'height': '50px',
-          'shape': 'roundrectangle',
-          'border-width': borderWidth,
-          'border-color': isOrphan ? '#cccccc' : (isRelated ? baseColor : '#ffffff'),
-          'border-style': borderStyle,
-          'text-wrap': 'wrap',
-          'text-max-width': '120px',
-          'opacity': opacity
-        }
+        position: {
+          x: (index % 5) * 200 + Math.random() * 50, // Horizontal spread with some randomness
+          y: baseY + Math.random() * 100 // Vertical grouping with some randomness
+        },
+        style: getNodeStyle(nodeType, isSelected, isRelated, isOrphan, isHighlighted, isFaded)
       };
     });
 
     // Apply enhanced styling to edges
-    const styledEdges = graphData.edges.filter(edge => {
-      // Only include edges between nodes that are in the final node set
-      const nodeIds = new Set(finalNodes.map(n => n.data.id));
-      return nodeIds.has(edge.data.source) && nodeIds.has(edge.data.target);
-    }).map(edge => {
-      const edgeColor = getEdgeColor(edge.data.type);
+    const styledEdges = validEdges.map(edgeInfo => {
+      const edge = edgeInfo.edge;
+      const isHighlighted = highlightedEdges.has(edge.data.id);
+      const isFaded = selectedNodeId && !highlightedEdges.has(edge.data.id);
       
       return {
         ...edge,
         style: {
-          'line-color': edgeColor,
-          'target-arrow-color': edgeColor,
-          'target-arrow-shape': 'triangle',
-          'target-arrow-size': '12px',
-          'curve-style': 'bezier',
+          ...getEdgeStyle(edge.data.type, edgeInfo.isDirect, isHighlighted, isFaded),
           'label': edge.data.label,
-          'font-size': '10px',
+          'font-size': isHighlighted ? '11px' : '10px',
           'font-weight': '600',
           'text-rotation': 'autorotate',
           'text-background-color': '#ffffff',
-          'text-background-opacity': 0.9,
+          'text-background-opacity': isHighlighted ? 0.95 : 0.9,
           'text-background-padding': '3px',
-          'text-border-color': edgeColor,
+          'text-border-color': getEdgeStyle(edge.data.type, edgeInfo.isDirect)['line-color'],
           'text-border-width': '1px',
-          'text-border-opacity': 0.3,
-          'width': '3px',
-          'opacity': 0.8
+          'text-border-opacity': 0.3
         }
       };
     });
 
     // Update debug information
+    debugData.finalStats = {
+      finalNodes: finalNodes.length,
+      connectedNodes: connectedNodes.length,
+      orphanNodes: orphanNodes.length,
+      validEdges: validEdges.length,
+      filteredEdges: debugData.filteredEdges,
+      highlightedNodes: highlightedNodes.size,
+      highlightedEdges: highlightedEdges.size,
+      showOrphans,
+      showIndirect,
+      selectedNodeId
+    };
+    
     setDebugInfo(debugData);
     setRelationshipStats({
       totalObjects: graphData.nodes.length,
       connectedObjects: connectedNodes.length,
       orphanObjects: orphanNodes.length,
       totalRelationships: graphData.edges.length,
-      displayedRelationships: styledEdges.length,
-      showingOrphans: showOrphans
+      displayedRelationships: validEdges.length,
+      filteredRelationships: debugData.filteredEdges,
+      directRelationships: debugData.relationshipLevels.direct,
+      indirectRelationships: debugData.relationshipLevels.indirect,
+      metadataRelationships: debugData.relationshipLevels.metadata,
+      showingOrphans: showOrphans,
+      showingIndirect: showIndirect
     });
 
-    console.log('📊 [Graph Final] Final graph stats:', {
-      originalNodes: graphData.nodes.length,
-      connectedNodes: connectedNodes.length,
-      orphanNodes: orphanNodes.length,
-      finalNodes: finalNodes.length,
-      originalEdges: graphData.edges.length,
-      filteredEdges: styledEdges.length,
-      showOrphans
-    });
+    console.log('📊 [Graph Final] Final graph stats:', debugData.finalStats);
 
     setGraphElements([...styledNodes, ...styledEdges]);
-  }, [selectedObjects, loadGraphData, showOrphans]); // eslint-disable-line react-hooks/exhaustive-deps
+    setHighlightedElements(new Set([...highlightedNodes, ...highlightedEdges]));
+  }, [selectedObjects, loadGraphData, showOrphans, showIndirect, selectedNodeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Handle node click
+  // Enhanced node click handler with highlighting
   const handleNodeClick = useCallback(async (event) => {
     const node = event.target;
     const nodeData = node.data();
     
-    // Fetch detailed node information from API
-    try {
-      const nodeDetails = await fetchNodeDetails(nodeData.id);
-      setSelectedNode({
-        ...nodeData,
-        apiDetails: nodeDetails
-      });
-    } catch (error) {
-      console.error('Error fetching node details:', error);
-      // Fall back to basic node data
-      setSelectedNode(nodeData);
+    // Toggle highlighting
+    if (selectedNodeId === nodeData.id) {
+      setSelectedNodeId(null);
+      setSelectedNode(null);
+      setDrawerOpen(false);
+    } else {
+      setSelectedNodeId(nodeData.id);
+      
+      // Fetch detailed node information from API
+      try {
+        const nodeDetails = await fetchNodeDetails(nodeData.id);
+        setSelectedNode({
+          ...nodeData,
+          apiDetails: nodeDetails
+        });
+      } catch (error) {
+        console.error('Error fetching node details:', error);
+        // Fall back to basic node data
+        setSelectedNode(nodeData);
+      }
+      
+      setDrawerOpen(true);
     }
-    
-    setDrawerOpen(true);
-  }, []);
+  }, [selectedNodeId]);
 
   // Cytoscape layout and style
   const cytoscapeStylesheet = [
@@ -533,7 +709,18 @@ const getTypeFromCategory = (category) => {
     }
   ];
 
+  // Enhanced Cytoscape layout with vertical grouping
   const layout = {
+    name: 'preset', // Use preset positions for vertical grouping
+    animate: true,
+    animationDuration: 1000,
+    animationEasing: 'ease-out',
+    fit: true,
+    padding: 50
+  };
+
+  // Fallback layout for when preset positions are not available
+  const fallbackLayout = {
     name: 'cose',
     animate: true,
     animationDuration: 1000,
@@ -670,6 +857,16 @@ const getTypeFromCategory = (category) => {
             <label className="flex items-center space-x-2 text-sm">
               <input
                 type="checkbox"
+                checked={showIndirect}
+                onChange={(e) => setShowIndirect(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-gray-700">Show indirect relationships</span>
+            </label>
+            
+            <label className="flex items-center space-x-2 text-sm">
+              <input
+                type="checkbox"
                 checked={debugMode}
                 onChange={(e) => setDebugMode(e.target.checked)}
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
@@ -677,7 +874,7 @@ const getTypeFromCategory = (category) => {
               <span className="text-gray-700">Show debug information</span>
             </label>
             
-            {/* Relationship Stats */}
+            {/* Enhanced Relationship Stats */}
             {Object.keys(relationshipStats).length > 0 && (
               <div className="mt-3 p-2 bg-white rounded border text-xs">
                 <div className="font-semibold text-gray-700 mb-1">Graph Statistics</div>
@@ -685,13 +882,37 @@ const getTypeFromCategory = (category) => {
                   <div>Total Objects: {relationshipStats.totalObjects}</div>
                   <div>Connected: {relationshipStats.connectedObjects}</div>
                   <div>Orphans: {relationshipStats.orphanObjects}</div>
-                  <div>Relationships: {relationshipStats.displayedRelationships}</div>
+                  <div>Total Relationships: {relationshipStats.totalRelationships}</div>
+                  <div>Displayed: {relationshipStats.displayedRelationships}</div>
+                  {relationshipStats.filteredRelationships > 0 && (
+                    <div className="text-orange-600">Filtered: {relationshipStats.filteredRelationships}</div>
+                  )}
+                  <div className="pt-1 border-t">
+                    <div>Direct: {relationshipStats.directRelationships || 0}</div>
+                    <div>Indirect: {relationshipStats.indirectRelationships || 0}</div>
+                    <div>Metadata: {relationshipStats.metadataRelationships || 0}</div>
+                  </div>
                   {relationshipStats.showingOrphans && (
                     <div className="text-orange-600">Including orphan nodes</div>
+                  )}
+                  {relationshipStats.showingIndirect && (
+                    <div className="text-blue-600">Including indirect links</div>
                   )}
                 </div>
               </div>
             )}
+            
+            {/* Node Interaction Help */}
+            <div className="mt-3 p-2 bg-blue-50 rounded text-xs">
+              <div className="font-semibold text-blue-900 mb-1">Interaction Guide</div>
+              <div className="text-blue-700 space-y-1">
+                <div>• Click node to highlight connections</div>
+                <div>• Click again to deselect</div>
+                <div>• Solid lines = direct data flow</div>
+                <div>• Dashed lines = indirect/workflow</div>
+                <div>• Dotted lines = metadata/filters</div>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -810,14 +1031,25 @@ const getTypeFromCategory = (category) => {
           <div className="absolute top-4 right-4 w-80 bg-white border border-gray-300 rounded-lg shadow-lg p-4 max-h-96 overflow-y-auto z-10">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-semibold text-gray-900">Debug Information</h4>
-              <button
-                onClick={() => setDebugMode(false)}
-                className="p-1 hover:bg-gray-100 rounded"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex space-x-1">
+                {selectedNodeId && (
+                  <button
+                    onClick={() => setSelectedNodeId(null)}
+                    className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200"
+                    title="Clear highlighting"
+                  >
+                    Clear
+                  </button>
+                )}
+                <button
+                  onClick={() => setDebugMode(false)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
             
             <div className="space-y-3 text-xs">
@@ -829,8 +1061,25 @@ const getTypeFromCategory = (category) => {
                   <div>Total Edges: {debugInfo.totalEdges}</div>
                   <div>Connected: {debugInfo.connectedNodes?.length || 0}</div>
                   <div>Orphans: {debugInfo.orphanNodes?.length || 0}</div>
+                  <div>Filtered: {debugInfo.filteredEdges || 0}</div>
+                  {debugInfo.finalStats?.selectedNodeId && (
+                    <div className="text-yellow-700">Highlighting: {debugInfo.finalStats.highlightedNodes} nodes, {debugInfo.finalStats.highlightedEdges} edges</div>
+                  )}
                 </div>
               </div>
+              
+              {/* Relationship Levels */}
+              {debugInfo.relationshipLevels && (
+                <div className="p-2 bg-indigo-50 rounded">
+                  <div className="font-semibold text-indigo-900">Relationship Levels</div>
+                  <div className="text-indigo-700 mt-1">
+                    <div>Direct: {debugInfo.relationshipLevels.direct} (solid lines)</div>
+                    <div>Indirect: {debugInfo.relationshipLevels.indirect} (dashed lines)</div>
+                    <div>Metadata: {debugInfo.relationshipLevels.metadata} (dotted lines)</div>
+                    <div>Unknown: {debugInfo.relationshipLevels.unknown}</div>
+                  </div>
+                </div>
+              )}
               
               {/* Node Types */}
               {Object.keys(debugInfo.nodeTypes || {}).length > 0 && (
@@ -898,6 +1147,36 @@ const getTypeFromCategory = (category) => {
                       <div className="text-indigo-500">...and {debugInfo.relationships.length - 10} more</div>
                     )}
                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Relationship Legend */}
+        {hasSelectedObjects && (
+          <div className="absolute bottom-4 left-4 bg-white border border-gray-300 rounded-lg shadow-lg p-3 z-10">
+            <h5 className="text-xs font-semibold text-gray-700 mb-2">Relationship Types</h5>
+            <div className="space-y-1 text-xs">
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-0.5 bg-green-500"></div>
+                <span>Direct Data Flow (writes/reads)</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-0.5 bg-blue-500"></div>
+                <span>Direct Data Flow (reads/imports)</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-0.5 bg-gray-500 border-dashed border-t"></div>
+                <span>Workflow/Contains (indirect)</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-0.5 bg-cyan-500" style={{borderTop: '0.5px dotted #06B6D4'}}></div>
+                <span>Metadata/Filters</span>
+              </div>
+              {selectedNodeId && (
+                <div className="pt-1 border-t text-yellow-700">
+                  <div>🟡 Highlighting connections for selected node</div>
                 </div>
               )}
             </div>

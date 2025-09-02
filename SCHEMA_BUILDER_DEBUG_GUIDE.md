@@ -1,168 +1,207 @@
-# MC Explorer - Enhanced Schema Builder Debug Guide
+# MC Explorer - Refined Schema Builder Guide
 
 ## Overview
-The Schema Builder has been enhanced with comprehensive debugging and relationship filtering capabilities to help you understand and troubleshoot the graph visualization of your Salesforce Marketing Cloud assets.
+The Schema Builder has been comprehensively refined with advanced filtering, visual enhancements, and interactive debugging capabilities to provide clear visualization of your Salesforce Marketing Cloud asset relationships.
 
-## Key Enhancements
+## 🎯 Key Refinements
 
-### 1. Relationship Filtering Logic
-- **Connected Objects Only**: By default, only objects with actual relationships are shown
-- **Orphan Detection**: Objects with no inbound or outbound relationships are identified and can optionally be displayed
-- **Direct Relationships**: When objects are selected, the graph shows only direct (1-hop) relationships to avoid clutter
+### 1. Enhanced Relationship Filtering
+- **Valid Relationships Only**: Edges are drawn only when valid backend relationships exist
+- **Direct vs Indirect Classification**:
+  - **Direct**: SQL → Target DE, Journey → Entry Source DE (solid lines)
+  - **Indirect**: Automation → Activity → DE (dashed lines)  
+  - **Metadata**: Filters, decisions (dotted lines)
+- **Orphan Node Handling**: By default, nodes with no connections are hidden
 
-### 2. Debug Controls (Left Sidebar)
-Located in the "Graph Controls" section:
-
-#### Show Orphan Nodes Checkbox
-- When enabled, displays objects that have no relationships in gray with dashed borders
-- Helps identify isolated assets that might need attention
-- Orphan nodes are marked with "(orphan)" in their labels
-
-#### Show Debug Information Checkbox
-- Enables a comprehensive debug panel overlay on the graph
-- Provides real-time statistics and relationship analysis
-
-### 3. Debug Panel Features
-When debug mode is enabled, a detailed panel appears in the top-right corner showing:
-
-#### Graph Overview
-- Total Nodes: All objects processed
-- Total Edges: All relationships detected
-- Connected: Objects with at least one relationship
-- Orphans: Objects with no relationships
-
-#### Node Types Breakdown
-- Count of each object type (Data Extensions, SQL Queries, etc.)
-- Helps understand the composition of your SFMC environment
-
-#### Relationship Types Analysis
-- Count of each relationship type detected
-- Examples: writes_to, reads_from, contains_query, etc.
-
-#### Connected Objects List
-- Detailed list of objects with relationships
-- Shows inbound (↓) and outbound (↑) relationship counts
-- Truncated list with scroll for large datasets
-
-#### Orphan Objects List
-- Objects with no detected relationships
-- Helps identify unused or isolated assets
-
-#### Relationships Summary
-- List of detected relationships with types and labels
-- Shows the actual data flow connections found
-
-### 4. Enhanced Graph Statistics
-The bottom of the Graph Controls shows:
-- **Total Objects**: Objects from the API
-- **Connected**: Objects with relationships
-- **Orphans**: Objects without relationships  
-- **Relationships**: Active relationships displayed
-
-### 5. Visual Enhancements
+### 2. Advanced Visual System
 
 #### Node Styling
-- **Selected Objects**: Bold border, full opacity, bright colors
-- **Related Objects**: Dashed border, reduced opacity, same color family
-- **Orphan Objects**: Gray background, dashed border, reduced opacity
+- **Selected Objects**: Bold gold borders, full opacity, bright colors
+- **Related Objects**: Dashed borders, reduced opacity, same color family
+- **Orphan Objects**: Gray background, dashed borders, reduced opacity
+- **Highlighted Objects**: Gold border when clicked, connected nodes/edges highlighted
 
-#### Edge Styling
-- **Color-coded by relationship type**:
-  - Green: Data writes (writes_to)
-  - Blue: Data reads (reads_from)
-  - Orange: Data imports
-  - Purple: Journey entries
-  - Gray: Containment relationships
-  - Cyan: Filtering relationships
+#### Edge Styling by Relationship Type
+- **Solid Lines** (Direct Data Flow):
+  - Green: Data writes (writes_to, updates_de)
+  - Blue: Data reads (reads_from, imports_to_de)
+  - Purple: Journey entries (journey_entry_source)
+- **Dashed Lines** (Indirect/Workflow):
+  - Gray: Contains relationships (contains_query, executes_query)
+  - Purple: Automation execution (triggers_automation)
+- **Dotted Lines** (Metadata):
+  - Cyan: Filters and decisions (filters_de, uses_in_decision)
 
-## Backend Debugging (Console Logs)
+#### Vertical Node Grouping
+Nodes are automatically arranged by type:
+1. Data Extensions (top)
+2. SQL Queries  
+3. Automations
+4. Journeys
+5. Triggered Sends
+6. Filters
+7. File Transfers
+8. Data Extracts (bottom)
 
-### Enhanced Server Logging
-The backend now provides detailed console output:
+### 3. Interactive Controls (Left Sidebar)
 
-```
-🔍 [Graph] === STARTING ENHANCED GRAPH GENERATION ===
-📊 [Graph] Input Data Extensions: 45 objects
-📊 [Graph] Input SQL Queries: 23 objects
-🎯 [Graph] Selection mode: FILTERED
-🔗 [Graph] === STEP 1: DETECTING ALL RELATIONSHIPS ===
-🔗 [Graph] Total relationships detected: 67
-✅ [Graph] Selected: Data Extensions - Customer_Data (de_12345)
-➡️  Related (outbound): SQL Queries - Update_Customer_Query (query_456)
-📦 [Graph] Created 12 final nodes
-🔗 [Graph] Created 8 final edges (filtered out 59)
-✅ [Graph] Graph integrity validated
-```
+#### Graph Controls Section
+- **Show orphan nodes**: Toggle to display isolated objects in gray
+- **Show indirect relationships**: Toggle to include workflow/container relationships
+- **Show debug information**: Enable comprehensive debug overlay
 
-### Relationship Detection Logging
-For each object type, detailed logs show:
-- What relationships were searched for
-- Which relationships were found
-- Why objects were included or excluded
+#### Enhanced Statistics Panel
+- Total Objects, Connected, Orphans
+- Total vs Displayed Relationships
+- Relationship breakdown by type (Direct/Indirect/Metadata)
+- Real-time filtering status
 
-## Troubleshooting Common Issues
+#### Interaction Guide
+- Visual legend explaining line types and interaction patterns
+- Instructions for node highlighting and selection
 
-### "No relationships found for automation"
-**Debug Steps:**
-1. Enable debug mode
-2. Check the "Connected Objects" list for the automation
-3. Look at console logs for activity detection details
-4. Verify automation activities have proper IDs/names
+### 4. Advanced Debug Panel (Top-right overlay)
 
-### "Graph shows unrelated objects"
-**Debug Steps:**
-1. Check if multiple objects are selected
-2. Verify that only direct relationships are being shown
-3. Use debug panel to see relationship types
-4. Look for unexpected relationship detection in logs
+#### Graph Overview
+- Total nodes, edges, connected, orphaned counts
+- Real-time filtering statistics
+- Current highlighting status
 
-### "Expected relationships missing"
-**Debug Steps:**
-1. Check SQL query text for proper DE references
-2. Verify automation activity structure in debug logs
-3. Look for case sensitivity issues in names/keys
-4. Check if objects exist in both source and target
+#### Relationship Levels Analysis
+- **Direct**: Count with visual indicator (solid lines)
+- **Indirect**: Count with visual indicator (dashed lines)  
+- **Metadata**: Count with visual indicator (dotted lines)
+- **Unknown**: Unclassified relationships
 
-## Console Commands for Advanced Debugging
+#### Node Types Breakdown
+- Count by object type with color coding
 
-Open browser developer tools and use these commands:
+#### Connection Details
+- Connected objects with inbound/outbound counts
+- Connection type indicators (direct, indirect, metadata)
+- Orphan objects with isolation reasons
 
-```javascript
-// Check current graph state
-console.log('Graph elements:', window.cyRef?.current?.elements());
+### 5. Interactive Highlighting System
 
-// Check selected objects
-console.log('Selected objects:', selectedObjects);
+#### Node Selection
+- **Click any node** to highlight its connections
+- **Connected nodes and edges** become prominently displayed
+- **Unrelated elements** fade to background
+- **Click again** to deselect and return to normal view
 
-// Check debug info
-console.log('Debug info:', debugInfo);
-```
+#### Visual Feedback
+- **Gold borders** on selected nodes
+- **Thicker, brighter edges** for connections
+- **Clear button** in debug panel to reset highlighting
+- **Status indicator** showing what's being highlighted
 
-## Best Practices
+### 6. Relationship Legend (Bottom-left)
+Real-time legend showing:
+- Color-coded line types with explanations
+- Current highlighting status
+- Visual guide for understanding connections
 
-1. **Start Small**: Select 1-2 related objects first to understand the graph
-2. **Use Debug Mode**: Always enable debug when troubleshooting
-3. **Check Orphans**: Review orphan objects to identify unused assets
-4. **Monitor Console**: Backend logs provide detailed relationship detection info
-5. **Verify API Data**: Ensure your SFMC objects have proper relationships in the source system
+## 🔧 How to Use the Refined System
 
-## API Response Requirements
+### Basic Workflow
+1. **Select objects** from the sidebar to focus on specific assets
+2. **Use toggles** to control orphan and indirect relationship display
+3. **Click nodes** to explore their connections interactively
+4. **Enable debug mode** for detailed analysis and troubleshooting
 
-For optimal relationship detection, ensure your SFMC API responses include:
+### Advanced Debugging
+1. **Enable "Show debug information"** for the overlay panel
+2. **Review relationship levels** to understand connection types
+3. **Check statistics** to see filtering effectiveness
+4. **Use node highlighting** to trace data flow paths
+5. **Monitor console logs** for detailed backend relationship detection
 
-### SQL Queries
-- `queryText` or `sqlStatement`: The actual SQL code
-- `name`: Query name for matching
+### Performance Optimization
+- **Smart filtering** reduces visual clutter for large datasets
+- **Relationship classification** enables selective display
+- **Vertical grouping** improves spatial organization
+- **Interactive highlighting** focuses attention without redrawing
 
-### Automations  
-- `steps` or `activities`: Activity list
-- Activity objects with `type`, `queryDefinitionId`, etc.
+## 🎨 Visual Design System
 
-### Data Extensions
-- `name`: DE name for SQL matching
-- `externalKey`: Alternative identifier
+### Color Coding
+- **Blue Family**: Data Extensions (foundation assets)
+- **Green Family**: SQL Queries (data transformation)
+- **Orange Family**: Automations (workflow orchestration)
+- **Purple Family**: Journeys (customer engagement)
+- **Red Family**: Triggered Sends (email delivery)
+- **Cyan Family**: Filters (data filtering/decisions)
+- **Yellow Family**: File Transfers (data import/export)
+- **Brown Family**: Data Extracts (data export)
 
-### Journeys
-- `entrySource`: Entry Data Extension reference
+### Line Types
+- **Solid**: Direct data movement (high importance)
+- **Dashed**: Workflow containers (medium importance)  
+- **Dotted**: Metadata relationships (low visual priority)
 
-This enhanced debugging system helps you understand exactly how your SFMC assets are connected and why certain relationships appear or don't appear in the graph.
+### Highlighting System
+- **Gold**: Currently selected/highlighted elements
+- **Bright colors**: Connected elements when highlighting
+- **Faded**: Background elements when highlighting active
+
+## 🔍 Troubleshooting Guide
+
+### "No relationships showing"
+1. Check if objects are actually connected in SFMC
+2. Enable "Show indirect relationships" 
+3. Review debug panel for relationship detection details
+4. Verify SQL queries have proper DE references
+
+### "Too many/few relationships"
+1. Use "Show indirect relationships" toggle to control detail level
+2. Enable orphan display to see all objects
+3. Check relationship level breakdown in debug panel
+4. Use node highlighting to focus on specific connections
+
+### "Graph looks cluttered"
+1. Disable "Show indirect relationships" for cleaner view
+2. Hide orphan nodes to focus on connected assets
+3. Use node highlighting to isolate specific data flows
+4. Select fewer objects to reduce visual complexity
+
+### "Expected connections missing"
+1. Enable debug mode and check console logs
+2. Verify relationship detection in backend
+3. Check for case sensitivity in names/keys
+4. Ensure objects exist in both source and target datasets
+
+## 📊 Performance Features
+
+### Efficient Rendering
+- **Relationship classification** reduces unnecessary edge rendering
+- **Connection mapping** enables fast relationship lookups
+- **Smart filtering** processes only relevant relationships
+- **Lazy evaluation** for complex relationship detection
+
+### Interactive Responsiveness
+- **Local highlighting** doesn't require server requests
+- **Cached relationship data** for instant node selection
+- **Optimized styling** for smooth animations
+- **Efficient hit detection** for node interactions
+
+## 🎯 Best Practices
+
+### For Analysis
+1. **Start with key objects** (critical Data Extensions or Automations)
+2. **Use direct relationships first** to understand core data flow
+3. **Add indirect relationships** to see workflow context
+4. **Leverage highlighting** to trace specific data paths
+
+### For Debugging
+1. **Enable debug mode** for detailed analysis
+2. **Check relationship levels** to understand connection types
+3. **Use console logs** for backend relationship detection details
+4. **Test node highlighting** to verify expected connections
+
+### For Performance
+1. **Select specific objects** rather than viewing all assets
+2. **Use relationship toggles** to control visual complexity
+3. **Hide orphans** unless specifically analyzing unused assets
+4. **Clear highlighting** when switching between analysis areas
+
+This refined Schema Builder provides a comprehensive, interactive visualization system that adapts to your analysis needs while maintaining clarity and performance for large SFMC environments.
