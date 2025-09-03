@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
+import SchemaCardBoard from './components/SchemaCardBoard';
 
 // API functions for backend integration
 const fetchGraphData = async (selectedObjects = {}) => {
@@ -68,6 +69,9 @@ const SchemaBuilder = () => {
   const [graphElements, setGraphElements] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  
+  // New: view mode toggle (cards vs graph)
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'graph'
   
   // API state
   const [apiLoading, setApiLoading] = useState(false);
@@ -326,6 +330,32 @@ const dedupeById = (arr) => {
     if (!map.has(id)) map.set(id, el);
   }
   return Array.from(map.values());
+};
+
+// New helper: attempt to extract a target asset name for activity/tooltips/steps
+const extractTargetAsset = (nodeData = {}) => {
+  const md = nodeData.metadata || {};
+  const candidates = [
+    md.targetName,
+    md.targetDE,
+    md.targetDe,
+    md.deName,
+    md.dataExtensionName,
+    md.destinationName,
+    nodeData.targetName,
+    nodeData.toName,
+    nodeData.deName,
+    nodeData.destinationName
+  ].filter(Boolean);
+  if (candidates.length > 0) return candidates[0];
+  if (typeof nodeData.label === 'string' && nodeData.label.includes('→')) {
+    try {
+      return nodeData.label.split('→').pop().trim();
+    } catch (_) {
+      return null;
+    }
+  }
+  return null;
 };
 
 // Toggle category expansion
@@ -692,6 +722,11 @@ const dedupeById = (arr) => {
       const isFaded = selectedNodeId && !highlightedEdges.has(edge.data.id);
       const isActivityFlow = edge.data.type === 'executes_activity' || edge.data.type === 'next_step';
       const stepNumber = edge.data.stepNumber;
+
+      // Determine relation style from backend when available
+      const relationStyle = edge.data.relationStyle || (edgeInfo.isDirect ? 'direct' : (edgeInfo.isIndirect ? 'workflow' : (edgeInfo.isMetadata ? 'metadata' : 'unknown')));
+      const isDirectForStyle = relationStyle === 'direct';
+      const relationshipTypeForStyle = relationStyle === 'metadata' ? 'metadata' : edge.data.type;
       
       // Create enhanced label for activity flows
       let edgeLabel = edge.data.label;
@@ -706,7 +741,7 @@ const dedupeById = (arr) => {
           label: edgeLabel
         },
         style: {
-          ...getEdgeStyle(edge.data.type, edgeInfo.isDirect, isHighlighted, isFaded),
+          ...getEdgeStyle(relationshipTypeForStyle, isDirectForStyle, isHighlighted, isFaded),
           'label': edgeLabel,
           'font-size': isHighlighted ? '11px' : (isActivityFlow ? '9px' : '10px'),
           'font-weight': isActivityFlow ? '700' : '600',
@@ -714,7 +749,7 @@ const dedupeById = (arr) => {
           'text-background-color': isActivityFlow ? '#FEF3C7' : '#ffffff',
           'text-background-opacity': isHighlighted ? 0.95 : 0.9,
           'text-background-padding': isActivityFlow ? '4px' : '3px',
-          'text-border-color': getEdgeStyle(edge.data.type, edgeInfo.isDirect)['line-color'],
+          'text-border-color': getEdgeStyle(relationshipTypeForStyle, isDirectForStyle)['line-color'],
           'text-border-width': '1px',
           'text-border-opacity': 0.3,
           'width': isActivityFlow ? 3 : 2, // Thicker lines for activity flows
@@ -815,25 +850,51 @@ const dedupeById = (arr) => {
     }
   }, [selectedNodeId, graphElements]);
 
-  // Helper function to extract target asset from activity data
-  const extractTargetAsset = useCallback((activityData) => {
-    if (!activityData.metadata) return null;
-    
-    // Look for common target fields
-    const targetFields = [
-      'targetDataExtension', 'targetDataExtensionName', 'dataExtensionName',
-      'targetDE', 'destinationDataExtension', 'outputDataExtension',
-      'emailName', 'fileName', 'extractName'
-    ];
-    
-    for (const field of targetFields) {
-      if (activityData.metadata[field]) {
-        return activityData.metadata[field];
-      }
+  // Card selection handler (for SchemaCardBoard)
+  const handleCardSelect = useCallback(async (nodeData) => {
+    // Toggle highlighting
+    if (selectedNodeId === nodeData.id) {
+      setSelectedNodeId(null);
+      setSelectedNode(null);
+      setDrawerOpen(false);
+      setAutomationSteps([]);
+      return;
     }
-    
-    return null;
-  }, []);
+    setSelectedNodeId(nodeData.id);
+
+    // Extract automation steps if this is an automation node (derive from available elements)
+    if (nodeData.category === 'Automations' || nodeData.type === 'Automation') {
+      const activityNodes = graphElements.filter(el => 
+        el.data && 
+        el.data.category === 'Activity' && 
+        el.data.metadata?.automationId === nodeData.id
+      );
+      const steps = activityNodes
+        .map(activityNode => ({
+          stepNumber: activityNode.data.stepNumber || 0,
+          activityType: activityNode.data.activityType || 'Unknown',
+          activityId: activityNode.data.id,
+          name: activityNode.data.label,
+          targetAsset: extractTargetAsset(activityNode.data),
+          automationId: nodeData.id
+        }))
+        .sort((a, b) => a.stepNumber - b.stepNumber);
+      setAutomationSteps(steps);
+    } else {
+      setAutomationSteps([]);
+    }
+
+    try {
+      const nodeDetails = await fetchNodeDetails(nodeData.id);
+      setSelectedNode({
+        ...nodeData,
+        apiDetails: nodeDetails
+      });
+    } catch (e) {
+      setSelectedNode(nodeData);
+    }
+    setDrawerOpen(true);
+  }, [selectedNodeId, graphElements, extractTargetAsset]);
 
   // New: expand a selected node's dependencies (1-hop)
   const expandSelectedNode = useCallback(async () => {
@@ -1044,6 +1105,10 @@ const dedupeById = (arr) => {
     }
   }, [handleNodeClick, extractTargetAsset]);
 
+  // Separate nodes and edges for card board rendering
+  const boardNodes = graphElements.filter(el => el?.data && !(el.data.source && el.data.target));
+  const boardEdges = graphElements.filter(el => el?.data && (el.data.source && el.data.target));
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Left Sidebar */}
@@ -1051,6 +1116,24 @@ const dedupeById = (arr) => {
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Schema Objects</h2>
           <p className="text-sm text-gray-600">Select objects to visualize relationships</p>
+          
+          {/* View Mode Toggle */}
+          <div className="mt-3 inline-flex rounded-md shadow-sm" role="group">
+            <button
+              type="button"
+              className={`px-3 py-1.5 text-xs font-medium border ${viewMode === 'cards' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+              onClick={() => setViewMode('cards')}
+            >
+              Cards
+            </button>
+            <button
+              type="button"
+              className={`px-3 py-1.5 text-xs font-medium border -ml-px ${viewMode === 'graph' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+              onClick={() => setViewMode('graph')}
+            >
+              Graph
+            </button>
+          </div>
           
           {/* Search Bar */}
           <div className="mt-3 relative">
@@ -1242,7 +1325,7 @@ const dedupeById = (arr) => {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-900 truncate">
                           {object.name}
-                        </div>
+                                               </div>
                         {object.externalKey && (
                           <div className="text-xs text-gray-500 truncate">
                             {object.externalKey}
@@ -1263,19 +1346,31 @@ const dedupeById = (arr) => {
         </div>
       </div>
 
-      {/* Center Graph Canvas */}
+      {/* Center Canvas / Board */}
       <div className="flex-1 relative">
         <div className="absolute inset-0">
           {hasSelectedObjects ? (
-            <CytoscapeComponent
-              elements={graphElements}
-              style={{ width: '100%', height: '100%' }}
-              stylesheet={cytoscapeStylesheet}
-              layout={layout}
-              cy={(cy) => { cyRef.current = cy; }}
-              boxSelectionEnabled={false}
-              autounselectify={false}
-            />
+            viewMode === 'graph' ? (
+              <CytoscapeComponent
+                elements={graphElements}
+                style={{ width: '100%', height: '100%' }}
+                stylesheet={cytoscapeStylesheet}
+                layout={layout}
+                cy={(cy) => { cyRef.current = cy; }}
+                boxSelectionEnabled={false}
+                autounselectify={false}
+              />
+            ) : (
+              <SchemaCardBoard
+                nodes={boardNodes}
+                edges={boardEdges}
+                selectedNodeId={selectedNodeId}
+                onSelectNode={handleCardSelect}
+                onExpandNode={() => expandSelectedNode()}
+                getTypeColor={getNodeColor}
+                fetchDetails={fetchNodeDetails}
+              />
+            )
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-center max-w-md mx-auto">
@@ -1469,7 +1564,7 @@ const dedupeById = (arr) => {
         )}
         
         {/* Enhanced Activity-Aware Relationship Legend */}
-        {hasSelectedObjects && (
+        {hasSelectedObjects && viewMode === 'graph' && (
           <div className="absolute bottom-4 left-4 bg-white border border-gray-300 rounded-lg shadow-lg p-3 z-10 max-w-xs">
             <h5 className="text-xs font-semibold text-gray-700 mb-2">Activity-Aware Relationships</h5>
             <div className="space-y-1 text-xs">

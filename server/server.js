@@ -7120,7 +7120,8 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
         label: rel.label,
         description: rel.description,
         stepNumber: rel.stepNumber || null,
-        executionOrder: rel.executionOrder || null
+        executionOrder: rel.executionOrder || null,
+        relationStyle: classifyRelationshipStyle(rel.type)
       }
     });
   });
