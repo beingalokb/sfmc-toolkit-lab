@@ -35,6 +35,20 @@ const fetchNodeDetails = async (nodeId) => {
   }
 };
 
+// New: fetch expansion data for a node (1-hop dependencies and orchestrators)
+const fetchExpandDependencies = async (nodeId) => {
+  try {
+    const response = await fetch(`/graph/expand/${nodeId}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error expanding node dependencies:', error);
+    throw error;
+  }
+};
+
 const fetchObjects = async () => {
   try {
     const response = await fetch('/objects');
@@ -79,7 +93,11 @@ const SchemaBuilder = () => {
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [automationSteps, setAutomationSteps] = useState([]);
   const [hoveredStepIndex, setHoveredStepIndex] = useState(null);
-  
+
+  // New: extra graph state from dependency expansion
+  const [extraGraph, setExtraGraph] = useState({ nodes: [], edges: [] });
+  const [isExpanding, setIsExpanding] = useState(false);
+
   const cyRef = useRef(null);
 
   // Filter objects based on search term
@@ -299,6 +317,17 @@ const getTypeFromCategory = (category) => {
   return mapping[category] || category;
 };
 
+// Helper: dedupe by id
+const dedupeById = (arr) => {
+  const map = new Map();
+  for (const el of arr || []) {
+    const id = el?.data?.id || el?.id;
+    if (!id) continue;
+    if (!map.has(id)) map.set(id, el);
+  }
+  return Array.from(map.values());
+};
+
 // Toggle category expansion
   const toggleCategory = (category) => {
     setExpandedCategories(prev => ({
@@ -370,12 +399,18 @@ const getTypeFromCategory = (category) => {
   const updateGraph = useCallback(async () => {
     console.log('🔧 [Graph Update] Starting enhanced graph update with selections:', selectedObjects);
     
-    const graphData = await loadGraphData();
+    const baseGraphData = await loadGraphData();
+
+    // Merge in any expanded graph elements (deduped by id)
+    const mergedGraphData = {
+      nodes: dedupeById([...(baseGraphData.nodes || []), ...(extraGraph.nodes || [])]),
+      edges: dedupeById([...(baseGraphData.edges || []), ...(extraGraph.edges || [])])
+    };
     
     // Initialize debugging information
     const debugData = {
-      totalNodes: graphData.nodes.length,
-      totalEdges: graphData.edges.length,
+      totalNodes: mergedGraphData.nodes.length,
+      totalEdges: mergedGraphData.edges.length,
       nodeTypes: {},
       edgeTypes: {},
       relationshipLevels: { direct: 0, indirect: 0, metadata: 0, unknown: 0 },
@@ -391,7 +426,7 @@ const getTypeFromCategory = (category) => {
     const edgeMap = new Map();
     
     // Initialize connection tracking for all nodes
-    graphData.nodes.forEach(node => {
+    mergedGraphData.nodes.forEach(node => {
       nodeConnections.set(node.data.id, {
         node: node,
         inbound: [],
@@ -408,7 +443,7 @@ const getTypeFromCategory = (category) => {
     
     // Process edges and classify relationships
     const validEdges = [];
-    graphData.edges.forEach(edge => {
+    mergedGraphData.edges.forEach(edge => {
       const sourceConn = nodeConnections.get(edge.data.source);
       const targetConn = nodeConnections.get(edge.data.target);
       
@@ -705,10 +740,10 @@ const getTypeFromCategory = (category) => {
     
     setDebugInfo(debugData);
     setRelationshipStats({
-      totalObjects: graphData.nodes.length,
+      totalObjects: mergedGraphData.nodes.length,
       connectedObjects: connectedNodes.length,
       orphanObjects: orphanNodes.length,
-      totalRelationships: graphData.edges.length,
+      totalRelationships: mergedGraphData.edges.length,
       displayedRelationships: validEdges.length,
       filteredRelationships: debugData.filteredEdges,
       directRelationships: debugData.relationshipLevels.direct,
@@ -722,7 +757,7 @@ const getTypeFromCategory = (category) => {
 
     setGraphElements([...styledNodes, ...styledEdges]);
     setHighlightedElements(new Set([...highlightedNodes, ...highlightedEdges]));
-  }, [selectedObjects, loadGraphData, showOrphans, showIndirect, selectedNodeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedObjects, loadGraphData, showOrphans, showIndirect, selectedNodeId, extraGraph]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Enhanced node click handler with automation steps tracking
   const handleNodeClick = useCallback(async (event) => {
@@ -799,6 +834,81 @@ const getTypeFromCategory = (category) => {
     
     return null;
   }, []);
+
+  // New: expand a selected node's dependencies (1-hop)
+  const expandSelectedNode = useCallback(async () => {
+    if (!selectedNodeId) return;
+    try {
+      setIsExpanding(true);
+      const data = await fetchExpandDependencies(selectedNodeId);
+      const newNodes = dedupeById([...(data.nodes || [])]);
+      const newEdges = dedupeById([...(data.edges || [])]);
+
+      setExtraGraph(prev => ({
+        nodes: dedupeById([...(prev.nodes || []), ...newNodes]),
+        edges: dedupeById([...(prev.edges || []), ...newEdges])
+      }));
+
+      console.log(`🧩 [Expand] Added ${newNodes.length} nodes and ${newEdges.length} edges for ${selectedNodeId}`);
+
+      // Rebuild graph with expansions
+      await updateGraph();
+    } catch (e) {
+      console.error('❌ [Expand] Failed to expand dependencies:', e);
+    } finally {
+      setIsExpanding(false);
+    }
+  }, [selectedNodeId, updateGraph]);
+
+  // New: recursively expand dependencies up to a depth
+  const expandSelectedNodeRecursively = useCallback(async (maxDepth = 3) => {
+    if (!selectedNodeId) return;
+    setIsExpanding(true);
+    try {
+      const visited = new Set((extraGraph.nodes || []).map(n => n?.data?.id).filter(Boolean));
+      let frontier = [selectedNodeId];
+      let depth = 0;
+      while (frontier.length && depth < maxDepth) {
+        const nextFrontier = new Set();
+        await Promise.all(frontier.map(async (nodeId) => {
+          try {
+            const res = await fetchExpandDependencies(nodeId);
+            const nodes = res.nodes || [];
+            const edges = res.edges || [];
+
+            setExtraGraph(prev => ({
+              nodes: dedupeById([...(prev.nodes || []), ...nodes]),
+              edges: dedupeById([...(prev.edges || []), ...edges])
+            }));
+
+            nodes.forEach(n => {
+              const id = n?.data?.id;
+              if (id && !visited.has(id)) {
+                visited.add(id);
+                nextFrontier.add(id);
+              }
+            });
+          } catch (err) {
+            console.warn('⚠️ [Expand-All] Failed expanding node', nodeId, err);
+          }
+        }));
+        frontier = Array.from(nextFrontier);
+        depth += 1;
+      }
+      await updateGraph();
+      console.log(`✅ [Expand-All] Finished recursive expansion up to depth ${depth}`);
+    } catch (err) {
+      console.error('❌ [Expand-All] Error:', err);
+    } finally {
+      setIsExpanding(false);
+    }
+  }, [selectedNodeId, extraGraph, updateGraph]);
+
+  // New: reset expansions
+  const resetExpansions = useCallback(async () => {
+    setExtraGraph({ nodes: [], edges: [] });
+    await updateGraph();
+  }, [updateGraph]);
 
   // Function to highlight automation step
   const highlightAutomationStep = useCallback((step) => {
@@ -1452,6 +1562,104 @@ const getTypeFromCategory = (category) => {
                 </div>
               </div>
 
+              {/* Dependencies and usage details using enriched API data */}
+              {selectedNode.apiDetails && (
+                <div className="space-y-6">
+                  {/* Resolved Targets for activities or steps */}
+                  {Array.isArray(selectedNode.apiDetails.resolvedTargets) && selectedNode.apiDetails.resolvedTargets.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Resolved Targets</h4>
+                      <ul className="space-y-1">
+                        {selectedNode.apiDetails.resolvedTargets.map((t, idx) => (
+                          <li key={idx} className="text-sm text-gray-800 flex items-start">
+                            <span className="mt-1 mr-2 w-2 h-2 rounded-full" style={{ backgroundColor: getNodeColor(t?.type || t?.category || 'default') }}></span>
+                            <div>
+                              <div className="font-medium">{t?.name || t?.label || t?.id}</div>
+                              {t?.type && <div className="text-xs text-gray-500">{t.type}</div>}
+                              {t?.metadata?.reason && <div className="text-xs text-gray-500">{t.metadata.reason}</div>}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Inbound/Outbound Relationships */}
+                  {(Array.isArray(selectedNode.apiDetails.inbound) || Array.isArray(selectedNode.apiDetails.outbound)) && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Relationships</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-2 bg-gray-50 rounded border">
+                          <div className="text-xs font-semibold text-gray-600">Inbound</div>
+                          <ul className="mt-1 space-y-1 max-h-28 overflow-y-auto">
+                            {(selectedNode.apiDetails.inbound || []).map((r, idx) => (
+                              <li key={idx} className="text-xs text-gray-700 truncate">{r.type}: {r.fromName || r.sourceName || r.sourceId || r.fromId}</li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="p-2 bg-gray-50 rounded border">
+                          <div className="text-xs font-semibold text-gray-600">Outbound</div>
+                          <ul className="mt-1 space-y-1 max-h-28 overflow-y-auto">
+                            {(selectedNode.apiDetails.outbound || []).map((r, idx) => (
+                              <li key={idx} className="text-xs text-gray-700 truncate">{r.type}: {r.toName || r.targetName || r.targetId || r.toId}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* DE Usage Summary */}
+                  {selectedNode.type === 'DataExtension' && selectedNode.apiDetails.deUsage && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Data Extension Usage</h4>
+                      <div className="space-y-2 text-sm text-gray-800">
+                        {selectedNode.apiDetails.deUsage.automations && selectedNode.apiDetails.deUsage.automations.length > 0 && (
+                          <div>
+                            <div className="text-xs font-semibold text-gray-600">Automations</div>
+                            <ul className="list-disc ml-5">
+                              {selectedNode.apiDetails.deUsage.automations.map((a, idx) => (
+                                <li key={idx} className="truncate">{a.name || a.label || a.id}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {selectedNode.apiDetails.deUsage.journeys && selectedNode.apiDetails.deUsage.journeys.length > 0 && (
+                          <div>
+                            <div className="text-xs font-semibold text-gray-600">Journeys</div>
+                            <ul className="list-disc ml-5">
+                              {selectedNode.apiDetails.deUsage.journeys.map((j, idx) => (
+                                <li key={idx} className="truncate">{j.name || j.label || j.id}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {selectedNode.apiDetails.deUsage.triggeredSends && selectedNode.apiDetails.deUsage.triggeredSends.length > 0 && (
+                          <div>
+                            <div className="text-xs font-semibold text-gray-600">Triggered Sends</div>
+                            <ul className="list-disc ml-5">
+                              {selectedNode.apiDetails.deUsage.triggeredSends.map((t, idx) => (
+                                <li key={idx} className="truncate">{t.name || t.label || t.id}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {selectedNode.apiDetails.deUsage.queries && selectedNode.apiDetails.deUsage.queries.length > 0 && (
+                          <div>
+                            <div className="text-xs font-semibold text-gray-600">Queries</div>
+                            <ul className="list-disc ml-5">
+                              {selectedNode.apiDetails.deUsage.queries.map((q, idx) => (
+                                <li key={idx} className="truncate">{q.name || q.label || q.id}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Metadata section - show API details if available */}
               {selectedNode.apiDetails && (
                 <div>
@@ -1471,13 +1679,13 @@ const getTypeFromCategory = (category) => {
                       <div>
                         <label className="text-sm font-medium text-gray-700">Last Modified</label>
                         <p className="text-sm text-gray-900">
-                          {new Date(selectedNode.apiDetails.lastModified).toLocaleString()}
+                          {selectedNode.apiDetails.lastModified ? new Date(selectedNode.apiDetails.lastModified).toLocaleString() : '—'}
                         </p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700">Created Date</label>
                         <p className="text-sm text-gray-900">
-                          {new Date(selectedNode.apiDetails.createdDate).toLocaleString()}
+                          {selectedNode.apiDetails.createdDate ? new Date(selectedNode.apiDetails.createdDate).toLocaleString() : '—'}
                         </p>
                       </div>
                       {selectedNode.apiDetails.metadata?.recordCount && (
@@ -1515,6 +1723,43 @@ const getTypeFromCategory = (category) => {
                   No additional details available
                 </div>
               )}
+
+              {/* Drawer actions: Expand dependencies */}
+              <div className="space-y-2">
+                <button
+                  onClick={expandSelectedNode}
+                  disabled={!selectedNodeId || isExpanding}
+                  className={`w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isExpanding ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors`}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  {isExpanding ? 'Expanding…' : 'Expand Dependencies'}
+                </button>
+
+                <button
+                  onClick={() => expandSelectedNodeRecursively(3)}
+                  disabled={!selectedNodeId || isExpanding}
+                  className={`w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors`}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h4l3-3 4 6 3-2 4 5" />
+                  </svg>
+                  Expand All (Depth 3)
+                </button>
+
+                {(extraGraph.nodes.length > 0 || extraGraph.edges.length > 0) && (
+                  <button
+                    onClick={resetExpansions}
+                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-colors"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.5 4.5l15 15m0-15l-15 15" />
+                    </svg>
+                    Reset Expansions
+                  </button>
+                )}
+              </div>
 
               <div>
                 <button
