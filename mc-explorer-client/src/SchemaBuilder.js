@@ -1133,6 +1133,15 @@ const extractTargetAsset = (nodeData = {}) => {
   const boardNodes = graphElements.filter(el => el?.data && !(el.data.source && el.data.target));
   const boardEdges = graphElements.filter(el => el?.data && (el.data.source && el.data.target));
 
+  // Debug: log what's being passed to the card board
+  console.log('🎨 [CardBoard] Data being rendered:', {
+    totalGraphElements: graphElements.length,
+    boardNodes: boardNodes.length,
+    boardEdges: boardEdges.length,
+    selectedObjects: selectedObjects,
+    nodeIds: boardNodes.map(n => ({ id: n.data?.id, name: n.data?.label, type: n.data?.type }))
+  });
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Left Sidebar */}
@@ -1407,15 +1416,36 @@ const extractTargetAsset = (nodeData = {}) => {
                 </div>
               </div>
             ) : (
-              <SchemaCardBoard
-                nodes={boardNodes}
-                edges={boardEdges}
-                selectedNodeId={selectedNodeId}
-                onSelectNode={handleCardSelect}
-                onExpandNode={() => expandSelectedNode()}
-                getTypeColor={getNodeColor}
-                fetchDetails={fetchNodeDetails}
-              />
+              <div className="flex flex-col h-full">
+                {/* Card Board Header */}
+                <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-blue-900">
+                        Card View - Filtered Results
+                      </h3>
+                      <p className="text-xs text-blue-700">
+                        Showing {boardNodes.length} objects, {boardEdges.length} relationships
+                      </p>
+                    </div>
+                    <div className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                      Backend Filtered Data Only
+                    </div>
+                  </div>
+                </div>
+                {/* Card Board Component */}
+                <div className="flex-1">
+                  <SchemaCardBoard
+                    nodes={boardNodes}
+                    edges={boardEdges}
+                    selectedNodeId={selectedNodeId}
+                    onSelectNode={handleCardSelect}
+                    onExpandNode={() => expandSelectedNode()}
+                    getTypeColor={getNodeColor}
+                    fetchDetails={fetchNodeDetails}
+                  />
+                </div>
+              </div>
             )
           ) : (
             <div className="flex items-center justify-center h-full">
