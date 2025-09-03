@@ -6903,6 +6903,12 @@ function classifyRelationshipStyle(relationshipType) {
  */
 function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjects = {}) {
   console.log('🔍 [Graph] === STARTING ENHANCED GRAPH GENERATION ===');
+  console.log('🔍 [Graph] Input parameters:', {
+    types,
+    keys,
+    selectedObjectsCount: Object.keys(selectedObjects).length,
+    selectedObjects: JSON.stringify(selectedObjects, null, 2)
+  });
   
   const debugStats = {
     inputObjects: {},
@@ -6934,6 +6940,14 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
     );
   
   console.log(`🎯 [Graph] Selection mode: ${hasAnySelection ? 'FILTERED' : 'ALL_OBJECTS'}`);
+  console.log(`🎯 [Graph] Raw selectedObjects parameter:`, selectedObjects);
+  console.log(`🎯 [Graph] hasAnySelection calculation:`, {
+    hasKeys: Object.keys(selectedObjects).length > 0,
+    hasValues: Object.values(selectedObjects).some(categoryObj => 
+      Object.values(categoryObj || {}).some(selected => selected)
+    ),
+    finalResult: hasAnySelection
+  });
   
   if (hasAnySelection) {
     Object.entries(selectedObjects).forEach(([category, selections]) => {

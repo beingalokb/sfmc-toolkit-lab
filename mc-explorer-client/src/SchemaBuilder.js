@@ -436,13 +436,35 @@ const extractTargetAsset = (nodeData = {}) => {
   const updateGraph = useCallback(async () => {
     console.log('🔧 [Graph Update] Starting enhanced graph update with selections:', selectedObjects);
     
+    // Clear extraGraph when we have new selections to avoid showing cached/expanded data
+    const hasActiveSelections = Object.keys(selectedObjects).length > 0 && 
+      Object.values(selectedObjects).some(categoryObj => 
+        Object.values(categoryObj || {}).some(selected => selected)
+      );
+    
+    if (hasActiveSelections) {
+      console.log('🧹 [Graph Update] Clearing extraGraph due to active selections');
+      setExtraGraph({ nodes: [], edges: [] });
+    }
+    
     const baseGraphData = await loadGraphData();
 
-    // Merge in any expanded graph elements (deduped by id)
-    const mergedGraphData = {
+    // For focused selections, use only backend data (no merging with extraGraph)
+    // For general browsing, merge in expanded data
+    const mergedGraphData = hasActiveSelections ? {
+      nodes: baseGraphData.nodes || [],
+      edges: baseGraphData.edges || []
+    } : {
       nodes: dedupeById([...(baseGraphData.nodes || []), ...(extraGraph.nodes || [])]),
       edges: dedupeById([...(baseGraphData.edges || []), ...(extraGraph.edges || [])])
     };
+    
+    console.log('📊 [Graph Update] Data source:', {
+      backend: { nodes: baseGraphData.nodes?.length || 0, edges: baseGraphData.edges?.length || 0 },
+      extraGraph: { nodes: extraGraph.nodes?.length || 0, edges: extraGraph.edges?.length || 0 },
+      merged: { nodes: mergedGraphData.nodes?.length || 0, edges: mergedGraphData.edges?.length || 0 },
+      usingOnlyBackend: hasActiveSelections
+    });
     
     // Initialize debugging information
     const debugData = {
