@@ -7322,6 +7322,24 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
             if (sourceNode && sourceNode.category === 'SQL Queries' && rel.type === 'writes_to') {
               relevantQueries.add(rel.source);
               console.log(`    📝 Found targeting query: ${sourceNode.object.name} → ${nodeData.object.name} (${rel.type})`);
+              
+              // Find activities that execute this query
+              sourceNode.inbound.forEach(queryRel => {
+                const activityNode = relationshipMap.get(queryRel.source);
+                if (activityNode && activityNode.category === 'Activity' && queryRel.type === 'executes_query') {
+                  relevantActivities.add(queryRel.source);
+                  console.log(`    🎯 Found activity executing query: ${activityNode.object.name} executes ${sourceNode.object.name}`);
+                  
+                  // Find the automation that contains this activity
+                  activityNode.inbound.forEach(activityRel => {
+                    const automationNode = relationshipMap.get(activityRel.source);
+                    if (automationNode && automationNode.category === 'Automations' && activityRel.type === 'executes_activity') {
+                      relevantAutomations.add(activityRel.source);
+                      console.log(`    🤖 Found parent automation: ${automationNode.object.name} contains activity ${activityNode.object.name}`);
+                    }
+                  });
+                }
+              });
             }
           });
           
@@ -7331,6 +7349,24 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
             if (targetNode && targetNode.category === 'SQL Queries' && rel.type === 'reads_from') {
               relevantQueries.add(rel.target);
               console.log(`    📖 Found reading query: ${nodeData.object.name} → ${targetNode.object.name} (${rel.type})`);
+              
+              // Find activities that execute this query
+              targetNode.inbound.forEach(queryRel => {
+                const activityNode = relationshipMap.get(queryRel.source);
+                if (activityNode && activityNode.category === 'Activity' && queryRel.type === 'executes_query') {
+                  relevantActivities.add(queryRel.source);
+                  console.log(`    🎯 Found activity executing query: ${activityNode.object.name} executes ${targetNode.object.name}`);
+                  
+                  // Find the automation that contains this activity
+                  activityNode.inbound.forEach(activityRel => {
+                    const automationNode = relationshipMap.get(activityRel.source);
+                    if (automationNode && automationNode.category === 'Automations' && activityRel.type === 'executes_activity') {
+                      relevantAutomations.add(activityRel.source);
+                      console.log(`    🤖 Found parent automation: ${automationNode.object.name} contains activity ${activityNode.object.name}`);
+                    }
+                  });
+                }
+              });
             }
           });
           
@@ -7439,13 +7475,31 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
                 // For each activity, add its target DEs and queries
                 targetNode.outbound.forEach(activityRel => {
                   const activityTargetNode = relationshipMap.get(activityRel.target);
-                  if (activityTargetNode && 
-                      (activityTargetNode.category === 'Data Extensions' || 
-                       activityTargetNode.category === 'SQL Queries')) {
-                    if (!finalObjectIds.has(activityRel.target)) {
-                      finalObjectIds.add(activityRel.target);
-                      debugStats.nodes.related++;
-                      console.log(`    ✅ Adding activity target: ${activityTargetNode.category} - ${activityTargetNode.object.name}`);
+                  if (activityTargetNode) {
+                    if (activityTargetNode.category === 'Data Extensions') {
+                      if (!finalObjectIds.has(activityRel.target)) {
+                        finalObjectIds.add(activityRel.target);
+                        debugStats.nodes.related++;
+                        console.log(`    ✅ Adding activity target DE: ${activityTargetNode.object.name}`);
+                      }
+                    } else if (activityTargetNode.category === 'SQL Queries') {
+                      if (!finalObjectIds.has(activityRel.target)) {
+                        finalObjectIds.add(activityRel.target);
+                        debugStats.nodes.related++;
+                        console.log(`    ✅ Adding activity target query: ${activityTargetNode.object.name}`);
+                        
+                        // Also add DEs that this query targets
+                        activityTargetNode.outbound.forEach(queryRel => {
+                          const queryTargetNode = relationshipMap.get(queryRel.target);
+                          if (queryTargetNode && queryTargetNode.category === 'Data Extensions') {
+                            if (!finalObjectIds.has(queryRel.target)) {
+                              finalObjectIds.add(queryRel.target);
+                              debugStats.nodes.related++;
+                              console.log(`    ✅ Adding query target DE: ${queryTargetNode.object.name}`);
+                            }
+                          }
+                        });
+                      }
                     }
                   }
                 });
