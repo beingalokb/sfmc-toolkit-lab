@@ -436,18 +436,13 @@ const extractTargetAsset = (nodeData = {}) => {
   const updateGraph = useCallback(async () => {
     console.log('🔧 [Graph Update] Starting enhanced graph update with selections:', selectedObjects);
     
-    // Clear extraGraph when we have new selections to avoid showing cached/expanded data
+    const baseGraphData = await loadGraphData();
+
+    // Check if we have active selections
     const hasActiveSelections = Object.keys(selectedObjects).length > 0 && 
       Object.values(selectedObjects).some(categoryObj => 
         Object.values(categoryObj || {}).some(selected => selected)
       );
-    
-    if (hasActiveSelections) {
-      console.log('🧹 [Graph Update] Clearing extraGraph due to active selections');
-      setExtraGraph({ nodes: [], edges: [] });
-    }
-    
-    const baseGraphData = await loadGraphData();
 
     // For focused selections, use only backend data (no merging with extraGraph)
     // For general browsing, merge in expanded data
