@@ -73,6 +73,9 @@ const SchemaBuilder = () => {
   // New: view mode toggle (cards vs graph)
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'graph'
   
+  // New: flag for explicitly showing all objects
+  const [showAllObjects, setShowAllObjects] = useState(false);
+  
   // API state
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState(null);
@@ -375,6 +378,12 @@ const extractTargetAsset = (nodeData = {}) => {
         [objectId]: isSelected
       }
     }));
+    
+    // When user makes a selection, switch to focused mode
+    if (isSelected && showAllObjects) {
+      console.log('🎯 [Selection] Switching to focused mode due to object selection');
+      setShowAllObjects(false);
+    }
 
     // updateGraph will be called automatically via useEffect dependency on selectedObjects
     // No need to call it manually here to avoid double execution
@@ -403,8 +412,17 @@ const extractTargetAsset = (nodeData = {}) => {
     setApiLoading(true);
     setApiError(null);
     try {
-      console.log('🔄 [Graph] Loading graph data with selections:', selectedObjects);
-      const data = await fetchGraphData(selectedObjects);
+      // When showAllObjects is true, pass empty selection to get all objects
+      // When showAllObjects is false, pass actual selectedObjects for focused selection
+      const selectionToSend = showAllObjects ? {} : selectedObjects;
+      
+      console.log('🔄 [Graph] Loading graph data with mode:', { 
+        showAllObjects, 
+        selectionToSend, 
+        originalSelection: selectedObjects 
+      });
+      
+      const data = await fetchGraphData(selectionToSend);
       console.log('✅ [Graph] Graph data loaded:', { 
         nodes: data.nodes?.length || 0, 
         edges: data.edges?.length || 0 
@@ -418,7 +436,7 @@ const extractTargetAsset = (nodeData = {}) => {
     } finally {
       setApiLoading(false);
     }
-  }, [selectedObjects]);
+  }, [selectedObjects, showAllObjects]);
 
   // Enhanced relationship classification
   const classifyRelationship = (relationshipType) => {
@@ -816,7 +834,7 @@ const extractTargetAsset = (nodeData = {}) => {
 
     setGraphElements([...styledNodes, ...styledEdges]);
     setHighlightedElements(new Set([...highlightedNodes, ...highlightedEdges]));
-  }, [selectedObjects, loadGraphData, showOrphans, showIndirect, selectedNodeId, extraGraph]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedObjects, loadGraphData, showOrphans, showIndirect, selectedNodeId, extraGraph, showAllObjects]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Enhanced node click handler with automation steps tracking
   const handleNodeClick = useCallback(async (event) => {
@@ -1073,8 +1091,22 @@ const extractTargetAsset = (nodeData = {}) => {
   };
 
   useEffect(() => {
-    updateGraph();
-  }, [selectedObjects, updateGraph]);
+    // Only update graph if we have active selections OR user explicitly wants to see all
+    const hasActiveSelections = Object.keys(selectedObjects).length > 0 && 
+      Object.values(selectedObjects).some(categoryObj => 
+        Object.values(categoryObj || {}).some(selected => selected)
+      );
+    
+    if (hasActiveSelections || showAllObjects) {
+      console.log('🔧 [Graph Effect] Triggering updateGraph:', { hasActiveSelections, showAllObjects, selectedObjects });
+      updateGraph();
+    } else {
+      console.log('🔧 [Graph Effect] Skipping updateGraph - no active selections and showAllObjects=false');
+      // Clear the graph when no selections and not showing all
+      setGraphElements([]);
+      setCardBoardData({ nodes: [], edges: [] });
+    }
+  }, [selectedObjects, updateGraph, showAllObjects]);
 
   // Load objects on mount
   useEffect(() => {
@@ -1151,20 +1183,39 @@ const extractTargetAsset = (nodeData = {}) => {
           <p className="text-sm text-gray-600">Select objects to visualize relationships</p>
           
           {/* View Mode Toggle */}
-          <div className="mt-3 inline-flex rounded-md shadow-sm" role="group">
+          <div className="mt-3 flex items-center space-x-2">
+            <div className="inline-flex rounded-md shadow-sm" role="group">
+              <button
+                type="button"
+                className={`px-3 py-1.5 text-xs font-medium border ${viewMode === 'cards' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                onClick={() => setViewMode('cards')}
+              >
+                Cards
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1.5 text-xs font-medium border -ml-px ${viewMode === 'graph' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                onClick={() => setViewMode('graph')}
+              >
+                Graph
+              </button>
+            </div>
+            
+            {/* Show All Button */}
             <button
               type="button"
-              className={`px-3 py-1.5 text-xs font-medium border ${viewMode === 'cards' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-              onClick={() => setViewMode('cards')}
+              className={`px-3 py-1.5 text-xs font-medium border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${showAllObjects ? 'bg-indigo-600 text-white border-indigo-600' : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50'}`}
+              onClick={() => {
+                console.log('🔄 [Show All] Toggling show all objects');
+                setShowAllObjects(prev => !prev);
+                if (!showAllObjects) {
+                  // When turning on "Show All", clear any focused selections
+                  setSelectedObjects({});
+                }
+              }}
+              title={showAllObjects ? "Switch to focused selection mode" : "Show all objects (no focused selection)"}
             >
-              Cards
-            </button>
-            <button
-              type="button"
-              className={`px-3 py-1.5 text-xs font-medium border -ml-px ${viewMode === 'graph' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-              onClick={() => setViewMode('graph')}
-            >
-              Graph
+              {showAllObjects ? "Focused" : "Show All"}
             </button>
           </div>
           
@@ -1457,6 +1508,23 @@ const extractTargetAsset = (nodeData = {}) => {
                 <p className="text-gray-600 mb-4">
                   Visualize relationships between your Salesforce Marketing Cloud assets
                 </p>
+                
+                {!showAllObjects ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-blue-800 mb-2 font-medium">📍 Focused Selection Mode</p>
+                    <p className="text-sm text-blue-700">
+                      Select one or more objects from the sidebar to see their relationships, 
+                      or click <strong>"Show All"</strong> to browse all objects.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-gray-700">
+                      Loading all objects...
+                    </p>
+                  </div>
+                )}
+                
                 <div className="text-sm text-gray-500 space-y-2">
                   <p className="flex items-center justify-center space-x-2">
                     <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
