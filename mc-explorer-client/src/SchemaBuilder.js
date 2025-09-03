@@ -1104,7 +1104,6 @@ const extractTargetAsset = (nodeData = {}) => {
       console.log('🔧 [Graph Effect] Skipping updateGraph - no active selections and showAllObjects=false');
       // Clear the graph when no selections and not showing all
       setGraphElements([]);
-      setCardBoardData({ nodes: [], edges: [] });
     }
   }, [selectedObjects, updateGraph, showAllObjects]);
 
