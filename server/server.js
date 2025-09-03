@@ -6843,6 +6843,56 @@ async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
 // ==================== GRAPH API UTILITY FUNCTIONS ====================
 
 /**
+ * Classify relationship style for frontend edge rendering
+ * @param {string} relationshipType - The type of relationship
+ * @returns {string} - 'direct', 'workflow', or 'metadata'
+ */
+function classifyRelationshipStyle(relationshipType) {
+  // Direct data flow relationships (solid lines)
+  const directTypes = [
+    'writes_to',
+    'reads_from', 
+    'imports_to_de',
+    'updates_de',
+    'journey_entry_source',
+    'subscriber_source',
+    'sends_email'
+  ];
+  
+  // Workflow/orchestration relationships (dashed lines)
+  const workflowTypes = [
+    'contains_query',
+    'contains_filter',
+    'executes_query',
+    'triggers_automation',
+    'executes_activity',
+    'next_step'
+  ];
+  
+  // Metadata/reference relationships (dotted lines)
+  const metadataTypes = [
+    'filters_de',
+    'uses_in_decision',
+    'provides_data_to'
+  ];
+  
+  if (directTypes.includes(relationshipType)) {
+    return 'direct';
+  }
+  
+  if (workflowTypes.includes(relationshipType)) {
+    return 'workflow';
+  }
+  
+  if (metadataTypes.includes(relationshipType)) {
+    return 'metadata';
+  }
+  
+  // Default fallback
+  return 'direct';
+}
+
+/**
  * Generate graph data from live SFMC objects with enhanced filtering and debugging
  * Creates nodes and edges for visualization, showing only meaningful relationships
  * @param {Object} sfmcObjects - The SFMC objects organized by category
