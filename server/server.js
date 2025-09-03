@@ -7223,6 +7223,22 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
     if (objects) initializeObjectTracking(category, objects);
   });
   
+  // Also initialize tracking for activity nodes if they exist
+  if (global.activityNodes && global.activityNodes.size > 0) {
+    console.log(`🔗 [Graph] Adding ${global.activityNodes.size} activity nodes to relationship map`);
+    global.activityNodes.forEach((activityNode, activityId) => {
+      if (!relationshipMap.has(activityId)) {
+        relationshipMap.set(activityId, {
+          object: activityNode,
+          category: 'Activity',
+          inbound: [],
+          outbound: [],
+          hasConnections: false
+        });
+      }
+    });
+  }
+  
   // Populate relationship map
   allRelationships.forEach(rel => {
     const sourceNode = relationshipMap.get(rel.source);
@@ -7596,9 +7612,16 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
     console.log(`📦 [Graph] Adding ${global.activityNodes.size} activity nodes to graph`);
     
     global.activityNodes.forEach((activityNode, activityId) => {
-      // Only include activity nodes if their parent automation is in finalObjectIds
-      if (finalObjectIds.has(activityNode.automationId)) {
-        finalObjectIds.add(activityId); // Add activity to final object IDs for edge filtering
+      // Include activity nodes if either:
+      // 1. They are in finalObjectIds (selected through filtering logic)
+      // 2. Their parent automation is in finalObjectIds
+      // 3. No selection is active (show all mode)
+      const shouldIncludeActivity = !hasAnySelection || 
+                                   finalObjectIds.has(activityId) || 
+                                   finalObjectIds.has(activityNode.automationId);
+      
+      if (shouldIncludeActivity) {
+        finalObjectIds.add(activityId); // Ensure activity ID is in final set for edge filtering
         
         nodes.push({
           data: {
