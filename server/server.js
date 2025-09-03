@@ -6028,6 +6028,32 @@ function detectQueryToDataExtensionRelationships(queries, dataExtensions) {
         console.log(`✅ [Relationship] Found TARGET DE: ${query.name} → ${targetDe.name}`);
       }
     }
+    
+    // Fallback: For queries that don't match standard patterns, try name-based matching
+    if (query.name && query.name.toLowerCase().includes('bu unsub')) {
+      console.log(`🔍 [BU Unsubs Query Debug] Attempting name-based fallback for query: ${query.name}`);
+      const matchingDe = deMap.get(query.name.toLowerCase()) || deKeyMap.get(query.name.toLowerCase());
+      if (matchingDe) {
+        // Check if we already have a relationship to this DE
+        const existingRelationship = relationships.find(rel => 
+          rel.source === query.id && rel.target === matchingDe.id && rel.type === 'writes_to'
+        );
+        if (!existingRelationship) {
+          const relationshipId = `${query.id}-${matchingDe.id}`;
+          relationships.push({
+            id: relationshipId,
+            source: query.id,
+            target: matchingDe.id,
+            type: 'writes_to',
+            label: 'writes to',
+            description: `Query "${query.name}" writes to DE "${matchingDe.name}" (inferred by name matching)`
+          });
+          console.log(`🔗 [BU Unsubs Query Fallback] Found DE by name matching: ${query.name} → ${matchingDe.name}`);
+        }
+      } else {
+        console.log(`❌ [BU Unsubs Query Debug] No matching DE found for query: ${query.name}`);
+      }
+    }
   });
   
   console.log(`📈 [Relationship] SQL Query analysis complete: ${relationships.length} relationships found`);
