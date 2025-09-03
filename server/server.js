@@ -6096,6 +6096,18 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
   automations.forEach(automation => {
     console.log(`🔍 [Relationship] Analyzing automation "${automation.name}" (ID: ${automation.id})`);
     
+    // Debug: Full structure dump for BU Unsubs automation
+    if (automation.name === 'BU Unsubs') {
+      console.log(`🔍 [BU Unsubs Debug] Full automation structure:`);
+      console.log(JSON.stringify(automation, null, 2));
+      
+      const activities = automation.steps || automation.activities || automation.program?.activities || [];
+      console.log(`🔍 [BU Unsubs Debug] Activities array:`, activities);
+      activities.forEach((activity, index) => {
+        console.log(`🔍 [BU Unsubs Debug] Activity ${index + 1}:`, JSON.stringify(activity, null, 2));
+      });
+    }
+    
     // Check multiple possible activity containers
     const activities = automation.steps || automation.activities || automation.program?.activities || [];
     
@@ -6116,7 +6128,7 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
     // Process each activity/step with execution order
     activities.forEach((activity, stepIndex) => {
       const stepNumber = stepIndex + 1;
-      const activityType = getActivityType(activity);
+      const activityType = getActivityType(activity, automation.name, queries);
       const activityId = `${automation.id}_activity_${stepNumber}_${activityType}`;
       
       console.log(`🔧 [Relationship] Processing Step ${stepNumber}: ${activityType} (${activity.name || activity.displayName || 'Unnamed'})`);
@@ -6154,6 +6166,9 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
       });
       
       // Detect Activity → Asset relationships based on activity type
+      // Add automation name to activity for context
+      activity.automationName = automation.name;
+      
       detectActivityToAssetRelationships(activityId, activity, activityType, dataExtensions, queries, fileTransfers, dataExtracts, relationships, deMap, deKeyMap);
       
       // If this is not the last activity, create next step relationship
@@ -6184,20 +6199,14 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
 /**
  * Get standardized activity type from activity object
  */
-function getActivityType(activity) {
+function getActivityType(activity, automationName = null, queries = []) {
   const type = activity.type || activity.activityType || activity.objectType || '';
   const name = (activity.name || activity.displayName || '').toLowerCase();
   
   // Debug: log activity properties for BU Unsubs activities
-  if (name.includes('bu unsub') || (activity.name && activity.name.includes('BU Unsub'))) {
-    console.log(`🔍 [Activity Debug] BU Unsubs activity properties:`, {
-      type: activity.type,
-      activityType: activity.activityType,
-      objectType: activity.objectType,
-      name: activity.name,
-      displayName: activity.displayName,
-      allKeys: Object.keys(activity)
-    });
+  if (name.includes('bu unsub') || (activity.name && activity.name.includes('BU Unsub')) || 
+      (activity.automation && activity.automation.name === 'BU Unsubs')) {
+    console.log(`🔍 [Activity Debug] BU Unsubs activity full structure:`, JSON.stringify(activity, null, 2));
   }
   
   // Map various activity types to standardized names
@@ -6260,6 +6269,34 @@ function getActivityType(activity) {
     }
   }
   
+  // ENHANCED: Check if automation name matches a SQL query name
+  // This handles the common pattern where an automation is named after its main query
+  if (automationName && queries && queries.length > 0) {
+    const matchingQuery = queries.find(q => 
+      q.name.toLowerCase() === automationName.toLowerCase() ||
+      q.name === automationName
+    );
+    if (matchingQuery) {
+      console.log(`🔍 [Activity Type] Found matching query for automation "${automationName}" → QueryActivity`);
+      return 'QueryActivity';
+    }
+  }
+  
+  // Check if the activity has query-related properties (even if not explicitly typed)
+  const hasQueryProperties = !!(
+    activity.queryDefinitionId || 
+    activity.queryId || 
+    activity.definitionId || 
+    activity.queryName ||
+    activity.sqlStatement ||
+    activity.queryText
+  );
+  
+  if (hasQueryProperties) {
+    console.log(`🔍 [Activity Type] Found query properties → QueryActivity`);
+    return 'QueryActivity';
+  }
+  
   // Default fallback
   return 'GenericActivity';
 }
@@ -6270,16 +6307,9 @@ function getActivityType(activity) {
 function detectActivityToAssetRelationships(activityId, activity, activityType, dataExtensions, queries, fileTransfers, dataExtracts, relationships, deMap, deKeyMap) {
   
   // Debug: log activity details for BU Unsubs
-  if (activityId.includes('BU_Unsubs') || (activity.name && activity.name.includes('BU Unsub'))) {
-    console.log(`🔍 [Activity Asset Debug] Processing BU Unsubs activity:`, {
-      activityId,
-      activityType,
-      name: activity.name,
-      displayName: activity.displayName,
-      hasQueryId: !!(activity.queryDefinitionId || activity.queryId || activity.definitionId),
-      hasTargetDE: !!(activity.targetDataExtension || activity.targetDataExtensionName || activity.dataExtensionName),
-      allKeys: Object.keys(activity)
-    });
+  if (activityId.includes('BU_Unsubs') || (activity.name && activity.name.includes('BU Unsub')) || 
+      (activity.automation && activity.automation.name === 'BU Unsubs')) {
+    console.log(`🔍 [Activity Asset Debug] BU Unsubs activity full structure:`, JSON.stringify(activity, null, 2));
   }
   
   // Query Activity → Data Extension relationships
@@ -6287,13 +6317,37 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
     // Find the associated query first
     const queryId = activity.queryDefinitionId || activity.queryId || activity.definitionId || activity.objectId;
     const queryName = activity.queryName || activity.name || activity.displayName;
+    const automationName = activity.automationName; // This should be passed from the calling context
     
     let query = null;
+    
+    // Try to find by ID first
     if (queryId) {
       query = queries.find(q => q.id === queryId || q.objectId === queryId || q.id === `query_${queryId}`);
     }
+    
+    // Try to find by name
     if (!query && queryName) {
       query = queries.find(q => q.name === queryName);
+    }
+    
+    // ENHANCED: Try to find by automation name (common pattern in MC)
+    if (!query && automationName) {
+      query = queries.find(q => q.name === automationName);
+      if (query) {
+        console.log(`🔍 [Query Match] Found query by automation name: "${automationName}" → "${query.name}"`);
+      }
+    }
+    
+    // Final fallback: try partial name matching
+    if (!query && queryName) {
+      query = queries.find(q => 
+        q.name.toLowerCase().includes(queryName.toLowerCase()) ||
+        queryName.toLowerCase().includes(q.name.toLowerCase())
+      );
+      if (query) {
+        console.log(`🔍 [Query Match] Found query by partial name match: "${queryName}" → "${query.name}"`);
+      }
     }
     
     if (query) {
