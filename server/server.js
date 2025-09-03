@@ -7041,120 +7041,156 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
         console.log(`🔍 [Graph] Finding focused relationships for: ${nodeData.category} - ${nodeData.object.name}`);
         
         if (nodeData.category === 'Data Extensions') {
-          // For Data Extensions, show related objects that use this DE
-          console.log(`  📊 [DE Logic] Adding objects that use DE: ${nodeData.object.name}`);
+          // For Data Extensions, show ONLY objects that directly target this specific DE
+          console.log(`  📊 [DE Logic] Finding objects that specifically target DE: ${nodeData.object.name}`);
           
-          // Add Automations where this DE is used (inbound to DE)
+          // Track relevant automations and activities that target this DE
+          const relevantAutomations = new Set();
+          const relevantActivities = new Set();
+          const relevantQueries = new Set();
+          
+          // 1. Find activities that write to this DE
           nodeData.inbound.forEach(rel => {
             const sourceNode = relationshipMap.get(rel.source);
-            if (sourceNode && (sourceNode.category === 'Automations' || sourceNode.category === 'Activity')) {
-              if (!finalObjectIds.has(rel.source)) {
-                finalObjectIds.add(rel.source);
-                debugStats.nodes.related++;
-                console.log(`    ➡️ Automation uses DE: ${sourceNode.category} - ${sourceNode.object.name} (${rel.type})`);
-              }
+            if (sourceNode && sourceNode.category === 'Activity' && rel.type === 'writes_to') {
+              relevantActivities.add(rel.source);
+              console.log(`    🎯 Found targeting activity: ${sourceNode.object.name} → ${nodeData.object.name} (${rel.type})`);
+              
+              // Find the automation that contains this activity
+              sourceNode.inbound.forEach(activityRel => {
+                const automationNode = relationshipMap.get(activityRel.source);
+                if (automationNode && automationNode.category === 'Automations' && activityRel.type === 'executes_activity') {
+                  relevantAutomations.add(activityRel.source);
+                  console.log(`    🤖 Found parent automation: ${automationNode.object.name} contains activity ${sourceNode.object.name}`);
+                }
+              });
             }
           });
           
-          // Add SQL Queries where this DE is source or target
+          // 2. Find queries that write to this DE
           nodeData.inbound.forEach(rel => {
             const sourceNode = relationshipMap.get(rel.source);
-            if (sourceNode && sourceNode.category === 'SQL Queries') {
-              if (!finalObjectIds.has(rel.source)) {
-                finalObjectIds.add(rel.source);
-                debugStats.nodes.related++;
-                console.log(`    ➡️ Query writes to DE: ${sourceNode.category} - ${sourceNode.object.name} (${rel.type})`);
-              }
+            if (sourceNode && sourceNode.category === 'SQL Queries' && rel.type === 'writes_to') {
+              relevantQueries.add(rel.source);
+              console.log(`    📝 Found targeting query: ${sourceNode.object.name} → ${nodeData.object.name} (${rel.type})`);
             }
           });
           
+          // 3. Find queries that read from this DE (source for other operations)
           nodeData.outbound.forEach(rel => {
             const targetNode = relationshipMap.get(rel.target);
-            if (targetNode && targetNode.category === 'SQL Queries') {
-              if (!finalObjectIds.has(rel.target)) {
-                finalObjectIds.add(rel.target);
-                debugStats.nodes.related++;
-                console.log(`    ➡️ Query reads from DE: ${targetNode.category} - ${targetNode.object.name} (${rel.type})`);
-              }
+            if (targetNode && targetNode.category === 'SQL Queries' && rel.type === 'reads_from') {
+              relevantQueries.add(rel.target);
+              console.log(`    📖 Found reading query: ${nodeData.object.name} → ${targetNode.object.name} (${rel.type})`);
             }
           });
           
-          // Add Journeys where this DE is entry source
-          nodeData.inbound.forEach(rel => {
-            const sourceNode = relationshipMap.get(rel.source);
-            if (sourceNode && sourceNode.category === 'Journeys') {
-              if (!finalObjectIds.has(rel.source)) {
-                finalObjectIds.add(rel.source);
-                debugStats.nodes.related++;
-                console.log(`    ➡️ Journey uses DE: ${sourceNode.category} - ${sourceNode.object.name} (${rel.type})`);
-              }
+          // 4. Add only the relevant objects to the final set
+          relevantAutomations.forEach(automationId => {
+            if (!finalObjectIds.has(automationId)) {
+              finalObjectIds.add(automationId);
+              debugStats.nodes.related++;
+              const automationNode = relationshipMap.get(automationId);
+              console.log(`    ✅ Adding relevant automation: ${automationNode.object.name}`);
             }
           });
           
-          // Add Filters where this DE is the base
-          nodeData.inbound.forEach(rel => {
-            const sourceNode = relationshipMap.get(rel.source);
-            if (sourceNode && sourceNode.category === 'Filters') {
-              if (!finalObjectIds.has(rel.source)) {
-                finalObjectIds.add(rel.source);
-                debugStats.nodes.related++;
-                console.log(`    ➡️ Filter uses DE: ${sourceNode.category} - ${sourceNode.object.name} (${rel.type})`);
-              }
+          relevantActivities.forEach(activityId => {
+            if (!finalObjectIds.has(activityId)) {
+              finalObjectIds.add(activityId);
+              debugStats.nodes.related++;
+              const activityNode = relationshipMap.get(activityId);
+              console.log(`    ✅ Adding relevant activity: ${activityNode.object.name}`);
+            }
+          });
+          
+          relevantQueries.forEach(queryId => {
+            if (!finalObjectIds.has(queryId)) {
+              finalObjectIds.add(queryId);
+              debugStats.nodes.related++;
+              const queryNode = relationshipMap.get(queryId);
+              console.log(`    ✅ Adding relevant query: ${queryNode.object.name}`);
             }
           });
           
         } else if (nodeData.category === 'SQL Queries') {
-          // For SQL Queries, show source and target DEs only
-          console.log(`  📝 [Query Logic] Adding DEs related to Query: ${nodeData.object.name}`);
+          // For SQL Queries, show only the directly connected DEs and parent activities
+          console.log(`  📝 [Query Logic] Finding objects related to Query: ${nodeData.object.name}`);
           
-          // Add source DEs (outbound from query perspective = query reads from DE)
+          // Add source DEs (query reads from these DEs)
           nodeData.outbound.forEach(rel => {
             const targetNode = relationshipMap.get(rel.target);
-            if (targetNode && targetNode.category === 'Data Extensions') {
+            if (targetNode && targetNode.category === 'Data Extensions' && rel.type === 'reads_from') {
               if (!finalObjectIds.has(rel.target)) {
                 finalObjectIds.add(rel.target);
                 debugStats.nodes.related++;
-                console.log(`    ➡️ Query reads from DE: ${targetNode.category} - ${targetNode.object.name} (${rel.type})`);
+                console.log(`    ✅ Query reads from DE: ${targetNode.object.name}`);
               }
             }
           });
           
-          // Add target DEs (inbound to query perspective = query writes to DE)
+          // Add target DEs (query writes to these DEs)
           nodeData.inbound.forEach(rel => {
             const sourceNode = relationshipMap.get(rel.source);
-            if (sourceNode && sourceNode.category === 'Data Extensions') {
+            if (sourceNode && sourceNode.category === 'Data Extensions' && rel.type === 'writes_to') {
               if (!finalObjectIds.has(rel.source)) {
                 finalObjectIds.add(rel.source);
                 debugStats.nodes.related++;
-                console.log(`    ➡️ Query writes to DE: ${sourceNode.category} - ${sourceNode.object.name} (${rel.type})`);
+                console.log(`    ✅ Query writes to DE: ${sourceNode.object.name}`);
+              }
+            }
+          });
+          
+          // Add parent activities that execute this query
+          nodeData.inbound.forEach(rel => {
+            const sourceNode = relationshipMap.get(rel.source);
+            if (sourceNode && sourceNode.category === 'Activity' && rel.type === 'executes_query') {
+              if (!finalObjectIds.has(rel.source)) {
+                finalObjectIds.add(rel.source);
+                debugStats.nodes.related++;
+                console.log(`    ✅ Query executed by activity: ${sourceNode.object.name}`);
+                
+                // Also add the automation that contains this activity
+                sourceNode.inbound.forEach(activityRel => {
+                  const automationNode = relationshipMap.get(activityRel.source);
+                  if (automationNode && automationNode.category === 'Automations' && activityRel.type === 'executes_activity') {
+                    if (!finalObjectIds.has(activityRel.source)) {
+                      finalObjectIds.add(activityRel.source);
+                      debugStats.nodes.related++;
+                      console.log(`    ✅ Parent automation: ${automationNode.object.name}`);
+                    }
+                  }
+                });
               }
             }
           });
           
         } else if (nodeData.category === 'Automations') {
-          // For Automations, show DEs that are input/output
-          console.log(`  🤖 [Automation Logic] Adding DEs related to Automation: ${nodeData.object.name}`);
+          // For Automations, show only the activities and DEs that are directly involved
+          console.log(`  🤖 [Automation Logic] Finding objects related to Automation: ${nodeData.object.name}`);
           
-          // Add DEs used by automation
+          // Add all activities in this automation
           nodeData.outbound.forEach(rel => {
             const targetNode = relationshipMap.get(rel.target);
-            if (targetNode && targetNode.category === 'Data Extensions') {
+            if (targetNode && targetNode.category === 'Activity' && rel.type === 'executes_activity') {
               if (!finalObjectIds.has(rel.target)) {
                 finalObjectIds.add(rel.target);
                 debugStats.nodes.related++;
-                console.log(`    ➡️ Automation uses DE: ${targetNode.category} - ${targetNode.object.name} (${rel.type})`);
-              }
-            }
-          });
-          
-          // Also add related SQL queries and activities
-          nodeData.outbound.forEach(rel => {
-            const targetNode = relationshipMap.get(rel.target);
-            if (targetNode && (targetNode.category === 'SQL Queries' || targetNode.category === 'Activity')) {
-              if (!finalObjectIds.has(rel.target)) {
-                finalObjectIds.add(rel.target);
-                debugStats.nodes.related++;
-                console.log(`    ➡️ Automation contains: ${targetNode.category} - ${targetNode.object.name} (${rel.type})`);
+                console.log(`    ✅ Adding automation activity: ${targetNode.object.name}`);
+                
+                // For each activity, add its target DEs and queries
+                targetNode.outbound.forEach(activityRel => {
+                  const activityTargetNode = relationshipMap.get(activityRel.target);
+                  if (activityTargetNode && 
+                      (activityTargetNode.category === 'Data Extensions' || 
+                       activityTargetNode.category === 'SQL Queries')) {
+                    if (!finalObjectIds.has(activityRel.target)) {
+                      finalObjectIds.add(activityRel.target);
+                      debugStats.nodes.related++;
+                      console.log(`    ✅ Adding activity target: ${activityTargetNode.category} - ${activityTargetNode.object.name}`);
+                    }
+                  }
+                });
               }
             }
           });
