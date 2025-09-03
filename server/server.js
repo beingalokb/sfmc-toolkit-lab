@@ -7017,9 +7017,11 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
   
   if (hasAnySelection) {
     console.log('🎯 [Graph] === STEP 3: APPLYING FOCUSED SELECTION FILTER ===');
+    console.log('🎯 [Graph] Selected objects input:', JSON.stringify(selectedObjects, null, 2));
     
     // First, add all directly selected objects
     Object.entries(selectedObjects).forEach(([category, selections]) => {
+      console.log(`🔍 [Graph] Processing category: ${category}, selections:`, selections);
       if (sfmcObjects[category]) {
         sfmcObjects[category].forEach(obj => {
           if (selections[obj.id] === true) {
@@ -7031,7 +7033,7 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
       }
     });
     
-    console.log(`🎯 [Graph] Total selected objects: ${finalObjectIds.size}`);
+    console.log(`🎯 [Graph] Total selected objects after initial add: ${finalObjectIds.size}`);
     
     // Now add related objects based on the specific logic for each selected object type
     const selectedIds = Array.from(finalObjectIds);
@@ -7043,6 +7045,26 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
         if (nodeData.category === 'Data Extensions') {
           // For Data Extensions, show ONLY objects that directly target this specific DE
           console.log(`  📊 [DE Logic] Finding objects that specifically target DE: ${nodeData.object.name}`);
+          console.log(`  📊 [DE Logic] DE "${nodeData.object.name}" has:`);
+          console.log(`    - ${nodeData.inbound.length} inbound relationships`);
+          console.log(`    - ${nodeData.outbound.length} outbound relationships`);
+          
+          // Debug: log all relationships for this DE
+          if (nodeData.inbound.length > 0) {
+            console.log(`  📊 [DE Logic] Inbound relationships for "${nodeData.object.name}":`);
+            nodeData.inbound.forEach((rel, idx) => {
+              const sourceNode = relationshipMap.get(rel.source);
+              console.log(`    ${idx + 1}. ${sourceNode ? sourceNode.category + ' - ' + sourceNode.object.name : 'Unknown'} --${rel.type}--> ${nodeData.object.name}`);
+            });
+          }
+          
+          if (nodeData.outbound.length > 0) {
+            console.log(`  📊 [DE Logic] Outbound relationships for "${nodeData.object.name}":`);
+            nodeData.outbound.forEach((rel, idx) => {
+              const targetNode = relationshipMap.get(rel.target);
+              console.log(`    ${idx + 1}. ${nodeData.object.name} --${rel.type}--> ${targetNode ? targetNode.category + ' - ' + targetNode.object.name : 'Unknown'}`);
+            });
+          }
           
           // Track relevant automations and activities that target this DE
           const relevantAutomations = new Set();
