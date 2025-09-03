@@ -7086,6 +7086,15 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
           });
           
           // 4. Add only the relevant objects to the final set
+          console.log(`  📊 [DE Logic] Summary for DE "${nodeData.object.name}":`);
+          console.log(`    - Relevant automations found: ${relevantAutomations.size}`);
+          console.log(`    - Relevant activities found: ${relevantActivities.size}`);
+          console.log(`    - Relevant queries found: ${relevantQueries.size}`);
+          
+          if (relevantAutomations.size === 0 && relevantActivities.size === 0 && relevantQueries.size === 0) {
+            console.log(`    ⚠️ No related objects found for DE "${nodeData.object.name}" - showing only the DE itself`);
+          }
+          
           relevantAutomations.forEach(automationId => {
             if (!finalObjectIds.has(automationId)) {
               finalObjectIds.add(automationId);
@@ -7212,6 +7221,18 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
             }
           });
         }
+      }
+    });
+    
+    // Safety check: Ensure all originally selected objects are still in the final set
+    Object.entries(selectedObjects).forEach(([category, selections]) => {
+      if (sfmcObjects[category]) {
+        sfmcObjects[category].forEach(obj => {
+          if (selections[obj.id] === true && !finalObjectIds.has(obj.id)) {
+            finalObjectIds.add(obj.id);
+            console.log(`🛡️ [Graph] Safety: Re-adding selected object: ${category} - ${obj.name} (${obj.id})`);
+          }
+        });
       }
     });
     

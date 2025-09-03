@@ -403,10 +403,17 @@ const extractTargetAsset = (nodeData = {}) => {
     setApiLoading(true);
     setApiError(null);
     try {
+      console.log('🔄 [Graph] Loading graph data with selections:', selectedObjects);
       const data = await fetchGraphData(selectedObjects);
+      console.log('✅ [Graph] Graph data loaded:', { 
+        nodes: data.nodes?.length || 0, 
+        edges: data.edges?.length || 0 
+      });
       return data;
     } catch (error) {
+      console.error('❌ [Graph] Error loading graph data:', error);
       setApiError(error.message);
+      // Return previous data instead of empty to prevent blank screen
       return { nodes: [], edges: [] };
     } finally {
       setApiLoading(false);
@@ -1360,6 +1367,28 @@ const extractTargetAsset = (nodeData = {}) => {
                 boxSelectionEnabled={false}
                 autounselectify={false}
               />
+            ) : boardNodes.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center max-w-md mx-auto p-8">
+                  <div className="text-gray-400 mb-4">
+                    📭
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Objects Found</h3>
+                  <p className="text-gray-600 mb-4">
+                    The selected objects don't have any relationships or data to display.
+                  </p>
+                  <div className="text-sm text-gray-500 space-y-1">
+                    <p>• Check if the objects exist in Marketing Cloud</p>
+                    <p>• Verify that relationships can be detected</p>
+                    <p>• Try selecting different objects</p>
+                  </div>
+                  {apiError && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                      Error: {apiError}
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : (
               <SchemaCardBoard
                 nodes={boardNodes}
