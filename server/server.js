@@ -6388,16 +6388,22 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
     
     // ENHANCED: Handle targetDataExtensions array (common in automation activities)
     if (activity.targetDataExtensions && Array.isArray(activity.targetDataExtensions)) {
+      console.log(`🔍 [Activity Debug] Processing targetDataExtensions for activity ${activityId}:`, activity.targetDataExtensions);
+      
       activity.targetDataExtensions.forEach(targetDE => {
         const targetDeName = targetDE.name?.toLowerCase();
         const targetDeKey = targetDE.key?.toLowerCase();
         
+        console.log(`🔍 [Activity Debug] Processing target DE:`, { name: targetDeName, key: targetDeKey });
+        
         let targetDe = null;
         if (targetDeName) {
           targetDe = deMap.get(targetDeName);
+          console.log(`🔍 [Activity Debug] DE lookup by name "${targetDeName}":`, targetDe ? `Found ${targetDe.name}` : 'Not found');
         }
         if (!targetDe && targetDeKey) {
           targetDe = deKeyMap.get(targetDeKey);
+          console.log(`🔍 [Activity Debug] DE lookup by key "${targetDeKey}":`, targetDe ? `Found ${targetDe.name}` : 'Not found');
         }
         
         if (targetDe) {
@@ -6410,8 +6416,82 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
             description: `Query activity writes to DE "${targetDe.name}"`
           });
           console.log(`🔗 [Activity Relationship] Found targetDataExtensions: ${activityId} → ${targetDe.id} (${targetDe.name})`);
+        } else {
+          console.log(`❌ [Activity Debug] Failed to find DE for target:`, { name: targetDeName, key: targetDeKey });
         }
       });
+    } else {
+      // Try to find DE references in other common activity fields
+      console.log(`🔍 [Activity Debug] No targetDataExtensions array for ${activityId}, checking other patterns...`);
+      
+      // Common field names that might contain DE references
+      const possibleDeFields = [
+        'targetDataExtension',
+        'sourceDataExtension', 
+        'dataExtension',
+        'outputDataExtension',
+        'resultDataExtension',
+        'destinationDataExtension',
+        'subscriberDataExtension',
+        'audienceDataExtension',
+        'sendDataExtension',
+        'dataExtensionName',
+        'targetDE',
+        'sourceDE',
+        'outputDE',
+        'de',
+        'deName',
+        'dataExtensionKey',
+        'deKey'
+      ];
+      
+      let foundDeReference = false;
+      
+      possibleDeFields.forEach(fieldName => {
+        if (activity[fieldName] && typeof activity[fieldName] === 'string') {
+          const deName = activity[fieldName].toLowerCase();
+          let targetDe = deMap.get(deName) || deKeyMap.get(deName);
+          
+          if (targetDe) {
+            foundDeReference = true;
+            console.log(`🔗 [Activity Debug] Found DE reference in field "${fieldName}": ${activity[fieldName]} → ${targetDe.name}`);
+            
+            // Determine relationship direction based on field name
+            const isSource = fieldName.includes('source') || fieldName.includes('from') || fieldName.includes('input');
+            const isTarget = fieldName.includes('target') || fieldName.includes('output') || fieldName.includes('destination') || fieldName.includes('result') || fieldName.includes('to');
+            
+            if (isSource) {
+              relationships.push({
+                id: `${targetDe.id}-${activityId}`,
+                source: targetDe.id,
+                target: activityId,
+                type: 'reads_from',
+                label: 'reads from',
+                description: `Activity reads from DE "${targetDe.name}"`
+              });
+              console.log(`🔗 [Activity Relationship] ${targetDe.name} → ${activityId} (reads_from)`);
+            } else {
+              // Default to writes_to for target/output fields or ambiguous fields
+              relationships.push({
+                id: `${activityId}-${targetDe.id}`,
+                source: activityId,
+                target: targetDe.id,
+                type: 'writes_to',
+                label: 'writes to',
+                description: `Activity writes to DE "${targetDe.name}"`
+              });
+              console.log(`🔗 [Activity Relationship] ${activityId} → ${targetDe.name} (writes_to)`);
+            }
+          }
+        }
+      });
+      
+      if (!foundDeReference && (activity.automationName === 'BU Unsubs' || activityId.includes('BU_Unsubs'))) {
+        console.log(`🔍 [BU Unsubs Activity Debug] Activity has no DE references in standard fields. Full activity object:`, {
+          activityKeys: Object.keys(activity),
+          activity: JSON.stringify(activity, null, 2)
+        });
+      }
     }
   }
   
