@@ -376,8 +376,8 @@ const extractTargetAsset = (nodeData = {}) => {
       }
     }));
 
-    // Update graph when objects are selected/deselected
-    updateGraph();
+    // updateGraph will be called automatically via useEffect dependency on selectedObjects
+    // No need to call it manually here to avoid double execution
   };
 
   // Load objects data from API
