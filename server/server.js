@@ -6385,6 +6385,34 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
         }
       }
     });
+    
+    // ENHANCED: Handle targetDataExtensions array (common in automation activities)
+    if (activity.targetDataExtensions && Array.isArray(activity.targetDataExtensions)) {
+      activity.targetDataExtensions.forEach(targetDE => {
+        const targetDeName = targetDE.name?.toLowerCase();
+        const targetDeKey = targetDE.key?.toLowerCase();
+        
+        let targetDe = null;
+        if (targetDeName) {
+          targetDe = deMap.get(targetDeName);
+        }
+        if (!targetDe && targetDeKey) {
+          targetDe = deKeyMap.get(targetDeKey);
+        }
+        
+        if (targetDe) {
+          relationships.push({
+            id: `${activityId}-${targetDe.id}`,
+            source: activityId,
+            target: targetDe.id,
+            type: 'writes_to',
+            label: 'writes to',
+            description: `Query activity writes to DE "${targetDe.name}"`
+          });
+          console.log(`🔗 [Activity Relationship] Found targetDataExtensions: ${activityId} → ${targetDe.id} (${targetDe.name})`);
+        }
+      });
+    }
   }
   
   // Filter Activity → Data Extension relationships  
