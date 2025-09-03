@@ -7012,13 +7012,13 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
     }
   });
   
-  // Step 3: Apply selection filtering if needed
+  // Step 3: Apply focused selection filtering if needed
   let finalObjectIds = new Set();
   
   if (hasAnySelection) {
-    console.log('🎯 [Graph] === STEP 3: APPLYING SELECTION FILTER ===');
+    console.log('🎯 [Graph] === STEP 3: APPLYING FOCUSED SELECTION FILTER ===');
     
-    // Add all selected objects
+    // First, add all directly selected objects
     Object.entries(selectedObjects).forEach(([category, selections]) => {
       if (sfmcObjects[category]) {
         sfmcObjects[category].forEach(obj => {
@@ -7033,36 +7033,153 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
     
     console.log(`🎯 [Graph] Total selected objects: ${finalObjectIds.size}`);
     
-    // Add directly related objects (only 1-hop relationships)
+    // Now add related objects based on the specific logic for each selected object type
     const selectedIds = Array.from(finalObjectIds);
     selectedIds.forEach(selectedId => {
       const nodeData = relationshipMap.get(selectedId);
       if (nodeData) {
-        console.log(`🔍 [Graph] Finding relationships for: ${nodeData.category} - ${nodeData.object.name}`);
+        console.log(`🔍 [Graph] Finding focused relationships for: ${nodeData.category} - ${nodeData.object.name}`);
         
-        // Add targets of outbound relationships
-        nodeData.outbound.forEach(rel => {
-          if (!finalObjectIds.has(rel.target)) {
-            finalObjectIds.add(rel.target);
-            debugStats.nodes.related++;
-            const targetNode = relationshipMap.get(rel.target);
-            console.log(`  ➡️  Related (outbound): ${targetNode?.category} - ${targetNode?.object.name} (${rel.type})`);
-          }
-        });
-        
-        // Add sources of inbound relationships  
-        nodeData.inbound.forEach(rel => {
-          if (!finalObjectIds.has(rel.source)) {
-            finalObjectIds.add(rel.source);
-            debugStats.nodes.related++;
+        if (nodeData.category === 'Data Extensions') {
+          // For Data Extensions, show related objects that use this DE
+          console.log(`  📊 [DE Logic] Adding objects that use DE: ${nodeData.object.name}`);
+          
+          // Add Automations where this DE is used (inbound to DE)
+          nodeData.inbound.forEach(rel => {
             const sourceNode = relationshipMap.get(rel.source);
-            console.log(`  ⬅️  Related (inbound): ${sourceNode?.category} - ${sourceNode?.object.name} (${rel.type})`);
-          }
-        });
+            if (sourceNode && (sourceNode.category === 'Automations' || sourceNode.category === 'Activity')) {
+              if (!finalObjectIds.has(rel.source)) {
+                finalObjectIds.add(rel.source);
+                debugStats.nodes.related++;
+                console.log(`    ➡️ Automation uses DE: ${sourceNode.category} - ${sourceNode.object.name} (${rel.type})`);
+              }
+            }
+          });
+          
+          // Add SQL Queries where this DE is source or target
+          nodeData.inbound.forEach(rel => {
+            const sourceNode = relationshipMap.get(rel.source);
+            if (sourceNode && sourceNode.category === 'SQL Queries') {
+              if (!finalObjectIds.has(rel.source)) {
+                finalObjectIds.add(rel.source);
+                debugStats.nodes.related++;
+                console.log(`    ➡️ Query writes to DE: ${sourceNode.category} - ${sourceNode.object.name} (${rel.type})`);
+              }
+            }
+          });
+          
+          nodeData.outbound.forEach(rel => {
+            const targetNode = relationshipMap.get(rel.target);
+            if (targetNode && targetNode.category === 'SQL Queries') {
+              if (!finalObjectIds.has(rel.target)) {
+                finalObjectIds.add(rel.target);
+                debugStats.nodes.related++;
+                console.log(`    ➡️ Query reads from DE: ${targetNode.category} - ${targetNode.object.name} (${rel.type})`);
+              }
+            }
+          });
+          
+          // Add Journeys where this DE is entry source
+          nodeData.inbound.forEach(rel => {
+            const sourceNode = relationshipMap.get(rel.source);
+            if (sourceNode && sourceNode.category === 'Journeys') {
+              if (!finalObjectIds.has(rel.source)) {
+                finalObjectIds.add(rel.source);
+                debugStats.nodes.related++;
+                console.log(`    ➡️ Journey uses DE: ${sourceNode.category} - ${sourceNode.object.name} (${rel.type})`);
+              }
+            }
+          });
+          
+          // Add Filters where this DE is the base
+          nodeData.inbound.forEach(rel => {
+            const sourceNode = relationshipMap.get(rel.source);
+            if (sourceNode && sourceNode.category === 'Filters') {
+              if (!finalObjectIds.has(rel.source)) {
+                finalObjectIds.add(rel.source);
+                debugStats.nodes.related++;
+                console.log(`    ➡️ Filter uses DE: ${sourceNode.category} - ${sourceNode.object.name} (${rel.type})`);
+              }
+            }
+          });
+          
+        } else if (nodeData.category === 'SQL Queries') {
+          // For SQL Queries, show source and target DEs only
+          console.log(`  📝 [Query Logic] Adding DEs related to Query: ${nodeData.object.name}`);
+          
+          // Add source DEs (outbound from query perspective = query reads from DE)
+          nodeData.outbound.forEach(rel => {
+            const targetNode = relationshipMap.get(rel.target);
+            if (targetNode && targetNode.category === 'Data Extensions') {
+              if (!finalObjectIds.has(rel.target)) {
+                finalObjectIds.add(rel.target);
+                debugStats.nodes.related++;
+                console.log(`    ➡️ Query reads from DE: ${targetNode.category} - ${targetNode.object.name} (${rel.type})`);
+              }
+            }
+          });
+          
+          // Add target DEs (inbound to query perspective = query writes to DE)
+          nodeData.inbound.forEach(rel => {
+            const sourceNode = relationshipMap.get(rel.source);
+            if (sourceNode && sourceNode.category === 'Data Extensions') {
+              if (!finalObjectIds.has(rel.source)) {
+                finalObjectIds.add(rel.source);
+                debugStats.nodes.related++;
+                console.log(`    ➡️ Query writes to DE: ${sourceNode.category} - ${sourceNode.object.name} (${rel.type})`);
+              }
+            }
+          });
+          
+        } else if (nodeData.category === 'Automations') {
+          // For Automations, show DEs that are input/output
+          console.log(`  🤖 [Automation Logic] Adding DEs related to Automation: ${nodeData.object.name}`);
+          
+          // Add DEs used by automation
+          nodeData.outbound.forEach(rel => {
+            const targetNode = relationshipMap.get(rel.target);
+            if (targetNode && targetNode.category === 'Data Extensions') {
+              if (!finalObjectIds.has(rel.target)) {
+                finalObjectIds.add(rel.target);
+                debugStats.nodes.related++;
+                console.log(`    ➡️ Automation uses DE: ${targetNode.category} - ${targetNode.object.name} (${rel.type})`);
+              }
+            }
+          });
+          
+          // Also add related SQL queries and activities
+          nodeData.outbound.forEach(rel => {
+            const targetNode = relationshipMap.get(rel.target);
+            if (targetNode && (targetNode.category === 'SQL Queries' || targetNode.category === 'Activity')) {
+              if (!finalObjectIds.has(rel.target)) {
+                finalObjectIds.add(rel.target);
+                debugStats.nodes.related++;
+                console.log(`    ➡️ Automation contains: ${targetNode.category} - ${targetNode.object.name} (${rel.type})`);
+              }
+            }
+          });
+          
+        } else {
+          // For other object types, add immediate neighbors only (conservative approach)
+          console.log(`  🔗 [Generic Logic] Adding immediate neighbors for: ${nodeData.category} - ${nodeData.object.name}`);
+          
+          // Add only directly connected Data Extensions
+          [...nodeData.inbound, ...nodeData.outbound].forEach(rel => {
+            const relatedId = rel.source === selectedId ? rel.target : rel.source;
+            const relatedNode = relationshipMap.get(relatedId);
+            if (relatedNode && relatedNode.category === 'Data Extensions') {
+              if (!finalObjectIds.has(relatedId)) {
+                finalObjectIds.add(relatedId);
+                debugStats.nodes.related++;
+                console.log(`    ➡️ Connected DE: ${relatedNode.category} - ${relatedNode.object.name} (${rel.type})`);
+              }
+            }
+          });
+        }
       }
     });
     
-    console.log(`🔗 [Graph] Total objects after adding related: ${finalObjectIds.size}`);
+    console.log(`🔗 [Graph] Total objects after focused filtering: ${finalObjectIds.size}`);
     
   } else {
     // No selection - include only connected objects (filter out orphans by default)
