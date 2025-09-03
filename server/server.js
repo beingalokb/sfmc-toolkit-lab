@@ -6188,6 +6188,18 @@ function getActivityType(activity) {
   const type = activity.type || activity.activityType || activity.objectType || '';
   const name = (activity.name || activity.displayName || '').toLowerCase();
   
+  // Debug: log activity properties for BU Unsubs activities
+  if (name.includes('bu unsub') || (activity.name && activity.name.includes('BU Unsub'))) {
+    console.log(`🔍 [Activity Debug] BU Unsubs activity properties:`, {
+      type: activity.type,
+      activityType: activity.activityType,
+      objectType: activity.objectType,
+      name: activity.name,
+      displayName: activity.displayName,
+      allKeys: Object.keys(activity)
+    });
+  }
+  
   // Map various activity types to standardized names
   const typeMapping = {
     // SQL Query activities
@@ -6256,6 +6268,19 @@ function getActivityType(activity) {
  * Detect relationships between activities and assets (DEs, Emails, Files)
  */
 function detectActivityToAssetRelationships(activityId, activity, activityType, dataExtensions, queries, fileTransfers, dataExtracts, relationships, deMap, deKeyMap) {
+  
+  // Debug: log activity details for BU Unsubs
+  if (activityId.includes('BU_Unsubs') || (activity.name && activity.name.includes('BU Unsub'))) {
+    console.log(`🔍 [Activity Asset Debug] Processing BU Unsubs activity:`, {
+      activityId,
+      activityType,
+      name: activity.name,
+      displayName: activity.displayName,
+      hasQueryId: !!(activity.queryDefinitionId || activity.queryId || activity.definitionId),
+      hasTargetDE: !!(activity.targetDataExtension || activity.targetDataExtensionName || activity.dataExtensionName),
+      allKeys: Object.keys(activity)
+    });
+  }
   
   // Query Activity → Data Extension relationships
   if (activityType === 'QueryActivity') {
