@@ -80,6 +80,9 @@ const SchemaBuilder = () => {
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState(null);
   
+  // New: Loading state specifically for right side when selections change
+  const [rightSideLoading, setRightSideLoading] = useState(false);
+  
   // Objects data state
   const [objectData, setObjectData] = useState({});
   const [objectsLoading, setObjectsLoading] = useState(false);
@@ -371,6 +374,19 @@ const extractTargetAsset = (nodeData = {}) => {
 
   // Handle object selection
   const handleObjectSelect = (category, objectId, isSelected) => {
+    // Set loading state for right side immediately when user makes a selection
+    if (isSelected) {
+      setRightSideLoading(true);
+    }
+    
+    console.log('🎯 [Frontend] Object selection changed:', {
+      category,
+      objectId,
+      isSelected,
+      objectIdType: typeof objectId,
+      objectIdValue: objectId
+    });
+    
     setSelectedObjects(prev => ({
       ...prev,
       [category]: {
@@ -427,10 +443,15 @@ const extractTargetAsset = (nodeData = {}) => {
         nodes: data.nodes?.length || 0, 
         edges: data.edges?.length || 0 
       });
+      
+      // Clear right side loading when data is received
+      setRightSideLoading(false);
+      
       return data;
     } catch (error) {
       console.error('❌ [Graph] Error loading graph data:', error);
       setApiError(error.message);
+      setRightSideLoading(false); // Clear loading on error too
       // Return previous data instead of empty to prevent blank screen
       return { nodes: [], edges: [] };
     } finally {
@@ -1443,6 +1464,26 @@ const extractTargetAsset = (nodeData = {}) => {
                 boxSelectionEnabled={false}
                 autounselectify={false}
               />
+            ) : apiLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center max-w-md mx-auto p-8">
+                  <div className="flex items-center justify-center mb-4">
+                    <svg className="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span className="text-lg font-medium text-gray-900">Loading...</span>
+                  </div>
+                  <p className="text-gray-600 mb-4">
+                    Generating relationship graph for your selected objects...
+                  </p>
+                  <div className="text-sm text-gray-500">
+                    <p>• Analyzing object dependencies</p>
+                    <p>• Mapping data flows and connections</p>
+                    <p>• Preparing visualization</p>
+                  </div>
+                </div>
+              </div>
             ) : boardNodes.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center max-w-md mx-auto p-8">
@@ -1466,7 +1507,21 @@ const extractTargetAsset = (nodeData = {}) => {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col h-full">
+              <div className="flex flex-col h-full relative">
+                {/* Loading overlay for right side */}
+                {rightSideLoading && (
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div className="text-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <p className="text-sm font-medium text-blue-900">Loading relationships...</p>
+                      <p className="text-xs text-blue-700 mt-1">Analyzing connections and dependencies</p>
+                    </div>
+                  </div>
+                )}
+                
                 {/* Card Board Header */}
                 <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
                   <div className="flex items-center justify-between">

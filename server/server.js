@@ -7286,32 +7286,98 @@ function generateGraphFromSchemaData(schemaData, types = [], keys = [], selected
     Object.entries(selectedObjects).forEach(([category, selections]) => {
       if (!selections) return;
       
+      console.log(`🔍 [Schema Graph] Processing category: ${category}, selections:`, selections);
+      
       Object.entries(selections).forEach(([objectKey, isSelected]) => {
         if (isSelected) {
-          // Find matching nodes by various ID patterns
+          console.log(`🔍 [Schema Graph] Looking for matches for objectKey: "${objectKey}" (type: ${typeof objectKey})`);
+          
+          // Enhanced matching logic - try multiple approaches
           const matchingNodes = filteredNodes.filter(node => {
-            return node.id.includes(objectKey) || 
-                   node.data.name === objectKey ||
-                   node.data.key === objectKey ||
-                   node.label === objectKey;
+            const nodeId = node.id;
+            const nodeName = node.data?.name || node.label;
+            const nodeKey = node.data?.key;
+            
+            // Try exact matches first
+            if (nodeId === objectKey || nodeName === objectKey || nodeKey === objectKey) {
+              console.log(`  ✅ Exact match found: ${node.label} (${node.type}) - nodeId: ${nodeId}, nodeName: ${nodeName}`);
+              return true;
+            }
+            
+            // Try substring matches (for IDs that might have prefixes/suffixes)
+            if (nodeId.includes(objectKey) || objectKey.includes(nodeId)) {
+              console.log(`  ✅ Substring match found: ${node.label} (${node.type}) - nodeId: ${nodeId}`);
+              return true;
+            }
+            
+            // Try name-based matching
+            if (nodeName && (nodeName.includes(objectKey) || objectKey.includes(nodeName))) {
+              console.log(`  ✅ Name match found: ${node.label} (${node.type}) - nodeName: ${nodeName}`);
+              return true;
+            }
+            
+            console.log(`  ❌ No match: nodeId="${nodeId}", nodeName="${nodeName}", objectKey="${objectKey}"`);
+            return false;
           });
+          
+          if (matchingNodes.length === 0) {
+            console.warn(`⚠️ [Schema Graph] No matching nodes found for objectKey: "${objectKey}" in category: ${category}`);
+            console.log(`  Available nodes in this category:`, filteredNodes
+              .filter(n => n.type === category || n.data?.category === category)
+              .map(n => ({ id: n.id, name: n.data?.name || n.label, type: n.type }))
+            );
+          }
           
           matchingNodes.forEach(node => {
             selectedNodeIds.add(node.id);
-            console.log(`✅ [Schema Graph] Selected node: ${node.label} (${node.type})`);
+            console.log(`✅ [Schema Graph] Selected node: ${node.label} (${node.type}) - ID: ${node.id}`);
           });
         }
       });
     });
     
-    // Find related nodes (1-hop connections)
+    // Find related nodes (deeper connection analysis for automation workflows)
     if (selectedNodeIds.size > 0) {
-      filteredEdges.forEach(edge => {
-        if (selectedNodeIds.has(edge.source)) {
-          relatedNodeIds.add(edge.target);
-        }
-        if (selectedNodeIds.has(edge.target)) {
-          relatedNodeIds.add(edge.source);
+      console.log(`🔗 [Schema Graph] Finding related nodes for ${selectedNodeIds.size} selected nodes...`);
+      
+      // For automations, we need to find their activities and the activities' targets
+      selectedNodeIds.forEach(nodeId => {
+        const node = filteredNodes.find(n => n.id === nodeId);
+        if (node && node.type === 'Automation') {
+          console.log(`🤖 [Schema Graph] Finding automation workflow for: ${node.label}`);
+          
+          // Find all direct connections (1-hop)
+          filteredEdges.forEach(edge => {
+            if (edge.source === nodeId) {
+              relatedNodeIds.add(edge.target);
+              console.log(`  ➡️ Direct outbound: ${nodeId} -> ${edge.target} (${edge.type})`);
+              
+              // For automation activities, also find their targets (2-hop)
+              const targetNode = filteredNodes.find(n => n.id === edge.target);
+              if (targetNode && (targetNode.type === 'Activity' || targetNode.type.includes('Activity'))) {
+                filteredEdges.forEach(secondHopEdge => {
+                  if (secondHopEdge.source === edge.target) {
+                    relatedNodeIds.add(secondHopEdge.target);
+                    console.log(`    ➡️➡️ Activity target: ${edge.target} -> ${secondHopEdge.target} (${secondHopEdge.type})`);
+                  }
+                });
+              }
+            }
+            if (edge.target === nodeId) {
+              relatedNodeIds.add(edge.source);
+              console.log(`  ⬅️ Direct inbound: ${edge.source} -> ${nodeId} (${edge.type})`);
+            }
+          });
+        } else {
+          // For non-automation nodes, use standard 1-hop connection
+          filteredEdges.forEach(edge => {
+            if (edge.source === nodeId) {
+              relatedNodeIds.add(edge.target);
+            }
+            if (edge.target === nodeId) {
+              relatedNodeIds.add(edge.source);
+            }
+          });
         }
       });
       
@@ -7325,6 +7391,10 @@ function generateGraphFromSchemaData(schemaData, types = [], keys = [], selected
       );
       
       console.log(`🎯 [Schema Graph] Final filtered result: ${filteredNodes.length} nodes, ${filteredEdges.length} edges`);
+      console.log(`🎯 [Schema Graph] Final node types:`, filteredNodes.reduce((acc, node) => {
+        acc[node.type] = (acc[node.type] || 0) + 1;
+        return acc;
+      }, {}));
     }
   }
   
@@ -7526,13 +7596,18 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
     Object.entries(selectedObjects).forEach(([category, selections]) => {
       console.log(`🔍 [Graph] Processing category: ${category}, selections:`, selections);
       if (sfmcObjects[category]) {
+        console.log(`📊 [Graph] Available objects in ${category}:`, sfmcObjects[category].map(obj => ({ id: obj.id, name: obj.name })));
         sfmcObjects[category].forEach(obj => {
           if (selections[obj.id] === true) {
             finalObjectIds.add(obj.id);
             debugStats.nodes.selected++;
             console.log(`✅ [Graph] Selected: ${category} - ${obj.name} (${obj.id})`);
+          } else {
+            console.log(`❌ [Graph] Not selected: ${category} - ${obj.name} (${obj.id}) - selection value: ${selections[obj.id]}`);
           }
         });
+      } else {
+        console.warn(`⚠️ [Graph] Category ${category} not found in sfmcObjects`);
       }
     });
     
