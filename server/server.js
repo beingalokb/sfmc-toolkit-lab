@@ -7859,18 +7859,65 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
           });
           
         } else {
-          // For other object types, add immediate neighbors only (conservative approach)
+          // For other object types (Journeys, Triggered Sends, Filters, File Transfers, Data Extracts, etc.)
+          // Add all immediate neighbors to show complete workflow context
           console.log(`  🔗 [Generic Logic] Adding immediate neighbors for: ${nodeData.category} - ${nodeData.object.name}`);
           
-          // Add only directly connected Data Extensions
+          // Add all directly connected objects (not just Data Extensions)
           [...nodeData.inbound, ...nodeData.outbound].forEach(rel => {
             const relatedId = rel.source === selectedId ? rel.target : rel.source;
             const relatedNode = relationshipMap.get(relatedId);
-            if (relatedNode && relatedNode.category === 'Data Extensions') {
-              if (!finalObjectIds.has(relatedId)) {
-                finalObjectIds.add(relatedId);
-                debugStats.nodes.related++;
-                console.log(`    ➡️ Connected DE: ${relatedNode.category} - ${relatedNode.object.name} (${rel.type})`);
+            if (relatedNode && !finalObjectIds.has(relatedId)) {
+              finalObjectIds.add(relatedId);
+              debugStats.nodes.related++;
+              console.log(`    ➡️ Connected ${relatedNode.category}: ${relatedNode.object.name} (${rel.type})`);
+              
+              // If the connected object is an Activity, also add its automation parent
+              if (relatedNode.category === 'Activity') {
+                relatedNode.inbound.forEach(activityRel => {
+                  const automationNode = relationshipMap.get(activityRel.source);
+                  if (automationNode && automationNode.category === 'Automations' && activityRel.type === 'executes_activity') {
+                    if (!finalObjectIds.has(activityRel.source)) {
+                      finalObjectIds.add(activityRel.source);
+                      debugStats.nodes.related++;
+                      console.log(`    🤖 Parent automation: ${automationNode.object.name}`);
+                    }
+                  }
+                });
+                
+                // Also add objects that the activity targets
+                relatedNode.outbound.forEach(activityRel => {
+                  const targetNode = relationshipMap.get(activityRel.target);
+                  if (targetNode && !finalObjectIds.has(activityRel.target)) {
+                    finalObjectIds.add(activityRel.target);
+                    debugStats.nodes.related++;
+                    console.log(`    🎯 Activity target: ${targetNode.category} - ${targetNode.object.name} (${activityRel.type})`);
+                  }
+                });
+              }
+              
+              // If the connected object is an Automation, add its activities
+              if (relatedNode.category === 'Automations') {
+                relatedNode.outbound.forEach(autoRel => {
+                  const activityNode = relationshipMap.get(autoRel.target);
+                  if (activityNode && activityNode.category === 'Activity' && autoRel.type === 'executes_activity') {
+                    if (!finalObjectIds.has(autoRel.target)) {
+                      finalObjectIds.add(autoRel.target);
+                      debugStats.nodes.related++;
+                      console.log(`    🎯 Automation activity: ${activityNode.object.name}`);
+                      
+                      // Add targets of these activities too
+                      activityNode.outbound.forEach(actRel => {
+                        const actTargetNode = relationshipMap.get(actRel.target);
+                        if (actTargetNode && !finalObjectIds.has(actRel.target)) {
+                          finalObjectIds.add(actRel.target);
+                          debugStats.nodes.related++;
+                          console.log(`      📊 Activity target: ${actTargetNode.category} - ${actTargetNode.object.name} (${actRel.type})`);
+                        }
+                      });
+                    }
+                  }
+                });
               }
             }
           });
