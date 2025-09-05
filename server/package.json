@@ -1,4 +1,13 @@
 {
+  "scripts": {
+    "client": "cd mc-explorer-client && npm start",
+    "server": "cross-env NODE_OPTIONS=--max-old-space-size=8192 node server/server.js",
+    "server:dev": "cross-env NODE_OPTIONS=--max-old-space-size=8192 nodemon server/server.js",
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "cd mc-explorer-client && npm install && npm run build && cd ../server && npm install",
+    "test": "cd mc-explorer-client && npm test",
+    "eject": "cd mc-explorer-client && npm run eject"
+  },
   "dependencies": {
     "archiver": "^7.0.1",
     "ssh2-sftp-client": "^12.0.1",

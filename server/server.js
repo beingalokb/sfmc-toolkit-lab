@@ -6952,8 +6952,121 @@ function detectAllAssetRelationships(sfmcObjects) {
 /**
  * Main function to fetch all SFMC objects
  */
+/**
+ * Fetch all SFMC objects using the new efficient MetadataCrawler
+ */
 async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
-  console.log('🔍 [SFMC API] Fetching all objects from Marketing Cloud...');
+  console.log('� [SFMC Fetch] Using new MetadataCrawler for efficient data collection...');
+  
+  const startTime = Date.now();
+  
+  try {
+    const MetadataCrawler = require('./metadataCrawler');
+    const crawler = new MetadataCrawler(accessToken, subdomain);
+    
+    // Use the new efficient crawler
+    const schemaData = await crawler.crawlMetadata();
+    
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000;
+    
+    console.log('✅ [SFMC Fetch] MetadataCrawler completed:', {
+      totalNodes: schemaData.nodes.length,
+      totalEdges: schemaData.edges.length,
+      dataExtensions: schemaData.metadata.dataExtensions,
+      automations: schemaData.metadata.automations,
+      journeys: schemaData.metadata.journeys,
+      triggeredSends: schemaData.metadata.triggeredSends,
+      duration: `${duration}s`
+    });
+    
+    // Convert to legacy format for compatibility with existing graph generation
+    const result = {
+      'Data Extensions': schemaData.nodes.filter(n => n.type === 'DataExtension').map(n => ({
+        id: n.id,
+        name: n.data.name,
+        externalKey: n.data.key,
+        description: '',
+        createdDate: n.data.createdDate,
+        modifiedDate: n.data.modifiedDate,
+        isSendable: n.data.isSendable,
+        type: 'DataExtension',
+        path: n.data.path
+      })),
+      'SQL Queries': schemaData.nodes.filter(n => n.type === 'SQL').map(n => ({
+        id: n.id,
+        name: n.data.name,
+        description: '',
+        queryType: n.data.type,
+        queryText: '',
+        sqlStatement: '',
+        createdDate: n.data.createdDate,
+        modifiedDate: n.data.modifiedDate,
+        status: 'Active',
+        type: 'Query',
+        automationId: n.data.automationId
+      })),
+      'Automations': schemaData.nodes.filter(n => n.type === 'Automation').map(n => ({
+        id: n.id,
+        name: n.data.name,
+        description: '',
+        status: n.data.status,
+        createdDate: n.data.createdDate,
+        modifiedDate: n.data.modifiedDate,
+        steps: [],
+        activities: [],
+        type: 'Automation',
+        path: n.data.path
+      })),
+      'Journeys': schemaData.nodes.filter(n => n.type === 'Journey').map(n => ({
+        id: n.id,
+        name: n.data.name,
+        description: '',
+        status: n.data.status,
+        createdDate: n.data.createdDate,
+        modifiedDate: n.data.modifiedDate,
+        version: n.data.version,
+        entrySource: {},
+        activities: [],
+        type: 'Journey',
+        path: n.data.path
+      })),
+      'Triggered Sends': schemaData.nodes.filter(n => n.type === 'TriggeredSend').map(n => ({
+        id: n.id,
+        name: n.data.name,
+        customerKey: n.data.customerKey,
+        description: '',
+        status: 'Active',
+        createdDate: n.data.createdDate,
+        modifiedDate: '',
+        type: 'TriggeredSend'
+      })),
+      'Filters': [], // Filters will be added later if needed
+      'File Transfers': [], // File Transfers will be added later if needed
+      'Data Extracts': [], // Data Extracts will be added later if needed
+      
+      // Include raw schema data for new graph generation
+      schemaData: schemaData
+    };
+    
+    return result;
+    
+  } catch (error) {
+    console.error('❌ [SFMC Fetch] MetadataCrawler error:', error.message);
+    console.log('🔄 [SFMC Fetch] Falling back to legacy method...');
+    
+    // Fallback to original method if MetadataCrawler fails
+    return await fetchAllSFMCObjectsLegacy(accessToken, subdomain, restEndpoint);
+  }
+}
+
+/**
+ * Legacy SFMC object fetching method (fallback)
+ */
+async function fetchAllSFMCObjectsLegacy(accessToken, subdomain, restEndpoint) {
+  console.log('🔄 [SFMC Fetch] Using legacy parallel fetch method...');
+  
+  const startTime = Date.now();
   
   const allObjects = {
     'Data Extensions': [],
@@ -6987,6 +7100,9 @@ async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
       fetchSFMCFileTransfers(accessToken, restEndpoint),
       fetchSFMCDataExtracts(accessToken, restEndpoint)
     ]);
+
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000;
 
     // Process results and handle any failures
     if (dataExtensions.status === 'fulfilled') {
@@ -7045,10 +7161,11 @@ async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
       console.error('❌ [SFMC API] Failed to fetch Data Extracts:', dataExtracts.reason.message);
     }
 
+    console.log(`✅ [SFMC Fetch] Completed legacy fetch in ${duration}s`);
     return allObjects;
     
   } catch (error) {
-    console.error('❌ [SFMC API] Error in fetchAllSFMCObjects:', error.message);
+    console.error('❌ [SFMC API] Error in fetchAllSFMCObjectsLegacy:', error.message);
     throw error;
   }
 }
@@ -7122,6 +7239,149 @@ function generateLiveGraphData(sfmcObjects, types = [], keys = [], selectedObjec
     selectedObjectsCount: Object.keys(selectedObjects).length,
     selectedObjects: JSON.stringify(selectedObjects, null, 2)
   });
+  
+  // 🚀 NEW: Check if we have efficient schema data from MetadataCrawler
+  if (sfmcObjects.schemaData) {
+    console.log('🚀 [Graph] Using efficient schema data from MetadataCrawler');
+    return generateGraphFromSchemaData(sfmcObjects.schemaData, types, keys, selectedObjects);
+  }
+  
+  console.log('🔄 [Graph] Using legacy graph generation method');
+  return generateLegacyGraphData(sfmcObjects, types, keys, selectedObjects);
+}
+
+/**
+ * 🚀 NEW: Generate graph data from efficient MetadataCrawler schema
+ */
+function generateGraphFromSchemaData(schemaData, types = [], keys = [], selectedObjects = {}) {
+  console.log('🚀 [Schema Graph] Generating graph from efficient schema data...');
+  console.log('📊 [Schema Graph] Schema contains:', {
+    nodes: schemaData.nodes.length,
+    edges: schemaData.edges.length,
+    metadata: schemaData.metadata
+  });
+  
+  let filteredNodes = [...schemaData.nodes];
+  let filteredEdges = [...schemaData.edges];
+  
+  // Apply type filtering if specified
+  if (types.length > 0) {
+    filteredNodes = filteredNodes.filter(node => types.includes(node.type));
+    console.log(`🔍 [Schema Graph] Filtered to ${filteredNodes.length} nodes by type: [${types.join(', ')}]`);
+  }
+  
+  // Apply selection filtering if specified
+  const hasAnySelection = Object.keys(selectedObjects).length > 0 && 
+    Object.values(selectedObjects).some(categoryObj => 
+      Object.values(categoryObj || {}).some(selected => selected)
+    );
+  
+  if (hasAnySelection) {
+    console.log('🎯 [Schema Graph] Applying selection filtering...');
+    
+    const selectedNodeIds = new Set();
+    const relatedNodeIds = new Set();
+    
+    // Collect selected nodes
+    Object.entries(selectedObjects).forEach(([category, selections]) => {
+      if (!selections) return;
+      
+      Object.entries(selections).forEach(([objectKey, isSelected]) => {
+        if (isSelected) {
+          // Find matching nodes by various ID patterns
+          const matchingNodes = filteredNodes.filter(node => {
+            return node.id.includes(objectKey) || 
+                   node.data.name === objectKey ||
+                   node.data.key === objectKey ||
+                   node.label === objectKey;
+          });
+          
+          matchingNodes.forEach(node => {
+            selectedNodeIds.add(node.id);
+            console.log(`✅ [Schema Graph] Selected node: ${node.label} (${node.type})`);
+          });
+        }
+      });
+    });
+    
+    // Find related nodes (1-hop connections)
+    if (selectedNodeIds.size > 0) {
+      filteredEdges.forEach(edge => {
+        if (selectedNodeIds.has(edge.source)) {
+          relatedNodeIds.add(edge.target);
+        }
+        if (selectedNodeIds.has(edge.target)) {
+          relatedNodeIds.add(edge.source);
+        }
+      });
+      
+      console.log(`🔗 [Schema Graph] Found ${relatedNodeIds.size} related nodes`);
+      
+      // Combine selected and related nodes
+      const finalNodeIds = new Set([...selectedNodeIds, ...relatedNodeIds]);
+      filteredNodes = filteredNodes.filter(node => finalNodeIds.has(node.id));
+      filteredEdges = filteredEdges.filter(edge => 
+        finalNodeIds.has(edge.source) && finalNodeIds.has(edge.target)
+      );
+      
+      console.log(`🎯 [Schema Graph] Final filtered result: ${filteredNodes.length} nodes, ${filteredEdges.length} edges`);
+    }
+  }
+  
+  // Convert to Cytoscape format
+  const cytoscapeNodes = filteredNodes.map(node => ({
+    data: {
+      id: node.id,
+      label: node.label || node.data.name,
+      type: node.type,
+      name: node.data.name,
+      path: node.data.path || '',
+      status: node.data.status || 'Active',
+      createdDate: node.data.createdDate || '',
+      modifiedDate: node.data.modifiedDate || '',
+      // Additional metadata
+      isSendable: node.data.isSendable,
+      version: node.data.version,
+      activityCount: node.data.activityCount
+    }
+  }));
+  
+  const cytoscapeEdges = filteredEdges.map(edge => ({
+    data: {
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      type: edge.type,
+      label: edge.label,
+      style: classifyRelationshipStyle(edge.type)
+    }
+  }));
+  
+  const result = {
+    nodes: cytoscapeNodes,
+    edges: cytoscapeEdges,
+    metadata: {
+      ...schemaData.metadata,
+      filteredNodes: cytoscapeNodes.length,
+      filteredEdges: cytoscapeEdges.length,
+      generatedAt: new Date().toISOString(),
+      source: 'MetadataCrawler'
+    }
+  };
+  
+  console.log('✅ [Schema Graph] Graph generation complete:', {
+    nodes: result.nodes.length,
+    edges: result.edges.length,
+    source: result.metadata.source
+  });
+  
+  return result;
+}
+
+/**
+ * 🔄 Legacy graph generation method (fallback)
+ */
+function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObjects = {}) {
   
   const debugStats = {
     inputObjects: {},

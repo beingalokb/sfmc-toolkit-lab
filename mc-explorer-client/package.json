@@ -20,11 +20,14 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
+    "client": "cd mc-explorer-client && npm start",
+  "server": "cross-env NODE_OPTIONS=--max-old-space-size=8192 node server/server.js",
+  "server:dev": "cross-env NODE_OPTIONS=--max-old-space-size=8192 nodemon server/server.js",
+  "start": "concurrently \"npm run server\" \"npm run client\"",
+  "build": "cross-env NODE_OPTIONS=--max-old-space-size=12288 GENERATE_SOURCEMAP=false react-scripts build",
+  "test": "cd mc-explorer-client && npm test",
+  "eject": "cd mc-explorer-client && npm run eject"
+},
   "proxy": "http://localhost:3001",
   "eslintConfig": {
     "extends": [
