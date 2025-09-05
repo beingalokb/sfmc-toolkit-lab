@@ -7983,7 +7983,7 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
         if (activityNode.metadata && activityNode.metadata.targetDataExtensions) {
           console.log(`🎯 [Graph] Checking activity ${activityNode.name} for target DEs...`);
           activityNode.metadata.targetDataExtensions.forEach(targetDE => {
-            console.log(`  📊 [Graph] Found target DE in activity metadata: ${targetDE.name} (${targetDE.id})`);
+            console.log(`  📊 [Graph] Found target DE in activity metadata: ${targetDE.name} (${targetDE.id || targetDE.key || 'no-id'})`);
             
             // Look for this DE in the available Data Extensions
             const matchingDE = allDataExtensions.find(de => 
@@ -7992,20 +7992,37 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
               de.name === targetDE.name
             );
             
-            if (matchingDE && !finalObjectIds.has(matchingDE.id)) {
-              finalObjectIds.add(matchingDE.id);
+            let deToAdd = matchingDE;
+            let deId = matchingDE ? matchingDE.id : (targetDE.id || targetDE.key || `de-${targetDE.name?.replace(/\s+/g, '-').toLowerCase()}`);
+            
+            // If we don't have the full DE data, create a stub node
+            if (!matchingDE) {
+              console.log(`  📊 [Graph] DE not found in fetched data, creating stub node for: ${targetDE.name}`);
+              deToAdd = {
+                id: deId,
+                name: targetDE.name || targetDE.key || 'Unknown DE',
+                key: targetDE.key,
+                // Mark as stub so we can style it differently if needed
+                isStub: true,
+                description: `Referenced by ${activityNode.name}`
+              };
+            }
+            
+            if (deToAdd && !finalObjectIds.has(deId)) {
+              finalObjectIds.add(deId);
               
               nodes.push({
                 data: {
-                  id: matchingDE.id,
-                  label: matchingDE.name,
+                  id: deId,
+                  label: deToAdd.name,
                   category: 'Data Extensions',
                   type: 'Data Extensions',
                   metadata: {
-                    ...matchingDE,
+                    ...deToAdd,
                     category: 'Data Extensions',
                     isRelated: hasAnySelection, // Mark as related since it was found through relationship
                     isSelected: false,
+                    isStub: deToAdd.isStub || false, // Mark stub nodes
                     connectionCount: 1 // At least connected to this activity
                   }
                 }
@@ -8013,27 +8030,25 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
               
               debugStats.nodes.final++;
               debugStats.nodes.related++;
-              console.log(`    ✅ [Graph] Added target DE: ${matchingDE.name} (${matchingDE.id})`);
+              console.log(`    ✅ [Graph] Added target DE: ${deToAdd.name} (${deId}) ${deToAdd.isStub ? '[STUB]' : '[FULL]'}`);
               
               // Also create edge from activity to this DE
               allRelationships.push({
-                id: `${activityId}-${matchingDE.id}-writes_to`,
+                id: `${activityId}-${deId}-writes_to`,
                 source: activityId,
-                target: matchingDE.id,
+                target: deId,
                 type: 'writes_to',
-                label: `writes to ${matchingDE.name}`,
-                description: `Activity "${activityNode.name}" writes to Data Extension "${matchingDE.name}"`,
+                label: `writes to ${deToAdd.name}`,
+                description: `Activity "${activityNode.name}" writes to Data Extension "${deToAdd.name}"`,
                 metadata: {
                   discoveredFrom: 'activity_target_metadata'
                 }
               });
               
-              console.log(`    🔗 [Graph] Added relationship: ${activityNode.name} -> ${matchingDE.name} (writes_to)`);
+              console.log(`    🔗 [Graph] Added relationship: ${activityNode.name} -> ${deToAdd.name} (writes_to)`);
               
-            } else if (matchingDE) {
-              console.log(`    ↩️ [Graph] Target DE already included: ${matchingDE.name}`);
             } else {
-              console.warn(`    ⚠️ [Graph] Target DE not found in available DEs: ${targetDE.name} (${targetDE.id})`);
+              console.log(`    ↩️ [Graph] Target DE already included: ${deToAdd.name}`);
             }
           });
         }
