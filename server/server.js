@@ -8135,24 +8135,181 @@ app.get('/graph', async (req, res) => {
     console.log('🔍 [Graph API] Request received:', { types, keys: parsedKeys, hasSelectedObjects: Object.keys(parsedSelectedObjects).length > 0 });
     
     if (!req.session.mcCreds) {
-      console.log('⚠️ [Graph API] No authentication found, providing mock graph data...');
+      console.log('⚠️ [Graph API] No authentication found, providing enhanced mock graph data...');
       
-      // Return mock graph data in correct Cytoscape.js format
+      // Check if a specific automation is selected
+      const hasAutomationSelection = parsedSelectedObjects.Automations && 
+        Object.keys(parsedSelectedObjects.Automations).some(key => parsedSelectedObjects.Automations[key]);
+      
+      if (hasAutomationSelection) {
+        console.log('🎯 [Mock] Providing realistic automation workflow mock data');
+        
+        // Return enhanced mock data that matches the real structure you showed in the console
+        const mockGraphData = {
+          nodes: [
+            // Main automation
+            { 
+              data: { 
+                id: "auto_9fe4e098-4560-4601-b320-cc269a8c9061", 
+                label: "0800 FSP Flatten Subscriber Preferences", 
+                type: "Automations",
+                category: "Automations",
+                metadata: {
+                  isSelected: true,
+                  isRelated: false,
+                  connectionCount: 5
+                }
+              } 
+            },
+            // Activity 1
+            { 
+              data: { 
+                id: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_1_GenericActivity", 
+                label: "Returns the subscriber key for the flattened preference table", 
+                type: "Activity",
+                category: "Activity",
+                activityType: "GenericActivity",
+                stepNumber: 1,
+                metadata: {
+                  isSelected: false,
+                  isRelated: true,
+                  connectionCount: 2
+                }
+              } 
+            },
+            // Activity 2
+            { 
+              data: { 
+                id: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_2_QueryActivity", 
+                label: "Updates the first preference column with hard coded SQL query", 
+                type: "Activity",
+                category: "Activity",
+                activityType: "QueryActivity",
+                stepNumber: 2,
+                metadata: {
+                  isSelected: false,
+                  isRelated: true,
+                  connectionCount: 3
+                }
+              } 
+            },
+            // Activity 3
+            { 
+              data: { 
+                id: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_3_QueryActivity", 
+                label: "Updates the second preference column with hard coded SQL query", 
+                type: "Activity",
+                category: "Activity",
+                activityType: "QueryActivity",
+                stepNumber: 3,
+                metadata: {
+                  isSelected: false,
+                  isRelated: true,
+                  connectionCount: 3
+                }
+              } 
+            },
+            // Activity 4
+            { 
+              data: { 
+                id: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_4_QueryActivity", 
+                label: "Updates the third preference column with hard coded SQL query", 
+                type: "Activity",
+                category: "Activity",
+                activityType: "QueryActivity",
+                stepNumber: 4,
+                metadata: {
+                  isSelected: false,
+                  isRelated: true,
+                  connectionCount: 3
+                }
+              } 
+            },
+            // Activity 5
+            { 
+              data: { 
+                id: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_5_QueryActivity", 
+                label: "Updates the fourth preference column with hard coded SQL query", 
+                type: "Activity",
+                category: "Activity",
+                activityType: "QueryActivity",
+                stepNumber: 5,
+                metadata: {
+                  isSelected: false,
+                  isRelated: true,
+                  connectionCount: 2
+                }
+              } 
+            },
+            // Target Data Extension
+            { 
+              data: { 
+                id: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", 
+                label: "PF_Preference", 
+                type: "Data Extensions",
+                category: "Data Extensions",
+                metadata: {
+                  isSelected: false,
+                  isRelated: true,
+                  connectionCount: 5,
+                  description: "Subscription preferences",
+                  rowCount: 3
+                }
+              } 
+            }
+          ],
+          edges: [
+            // Automation to activities
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061", target: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_1_GenericActivity", type: "executes_activity", label: "Step 1" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061", target: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_2_QueryActivity", type: "executes_activity", label: "Step 2" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061", target: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_3_QueryActivity", type: "executes_activity", label: "Step 3" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061", target: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_4_QueryActivity", type: "executes_activity", label: "Step 4" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061", target: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_5_QueryActivity", type: "executes_activity", label: "Step 5" } },
+            // Activity flow
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_1_GenericActivity", target: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_2_QueryActivity", type: "next_step", label: "next" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_2_QueryActivity", target: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_3_QueryActivity", type: "next_step", label: "next" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_3_QueryActivity", target: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_4_QueryActivity", type: "next_step", label: "next" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_4_QueryActivity", target: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_5_QueryActivity", type: "next_step", label: "next" } },
+            // Activities to Data Extension
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_1_GenericActivity", target: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", type: "writes_to", label: "writes to PF_Preference" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_2_QueryActivity", target: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", type: "writes_to", label: "writes to PF_Preference" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_3_QueryActivity", target: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", type: "writes_to", label: "writes to PF_Preference" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_4_QueryActivity", target: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", type: "writes_to", label: "writes to PF_Preference" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_5_QueryActivity", target: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", type: "writes_to", label: "writes to PF_Preference" } }
+          ],
+          metadata: {
+            totalNodes: 7,
+            totalEdges: 14,
+            format: 'cytoscape',
+            source: 'enhanced-mock-automation-workflow',
+            generatedAt: new Date().toISOString()
+          }
+        };
+        
+        console.log('✅ [Mock] Providing enhanced automation workflow mock data:', {
+          nodeCount: mockGraphData.nodes.length,
+          edgeCount: mockGraphData.edges.length
+        });
+        
+        return res.json(mockGraphData);
+      }
+      
+      // Default mock data for other cases
       const mockGraphData = {
         nodes: [
-          { data: { id: "de1", label: "BU Unsubs", type: "DataExtension", createdDate: "2024-07-23" } },
-          { data: { id: "auto1", label: "Daily BU Unsub Cleanup", type: "Automation", createdDate: "2024-07-25" } },
-          { data: { id: "query1", label: "Unsub SQL", type: "QueryActivity", createdDate: "2024-07-25" } },
-          { data: { id: "journey1", label: "Welcome Journey", type: "Journey", createdDate: "2024-08-01" } },
-          { data: { id: "ts1", label: "Unsub Confirmation TS", type: "TriggeredSend", createdDate: "2024-08-02" } },
-          { data: { id: "imp1", label: "Daily File Import", type: "Import", createdDate: "2024-07-30" } }
+          { data: { id: "de1", label: "BU Unsubs", type: "Data Extensions", category: "Data Extensions", createdDate: "2024-07-23" } },
+          { data: { id: "auto1", label: "Daily BU Unsub Cleanup", type: "Automations", category: "Automations", createdDate: "2024-07-25" } },
+          { data: { id: "query1", label: "Unsub SQL", type: "SQL Queries", category: "SQL Queries", createdDate: "2024-07-25" } },
+          { data: { id: "journey1", label: "Welcome Journey", type: "Journeys", category: "Journeys", createdDate: "2024-08-01" } },
+          { data: { id: "ts1", label: "Unsub Confirmation TS", type: "Triggered Sends", category: "Triggered Sends", createdDate: "2024-08-02" } },
+          { data: { id: "imp1", label: "Daily File Import", type: "File Transfers", category: "File Transfers", createdDate: "2024-07-30" } }
         ],
         edges: [
           { data: { source: "auto1", target: "query1", type: "contains" } },
-          { data: { source: "query1", target: "de1", type: "targets" } },
-          { data: { source: "journey1", target: "de1", type: "entrySource" } },
-          { data: { source: "ts1", target: "de1", type: "targets" } },
-          { data: { source: "imp1", target: "de1", type: "imports" } }
+          { data: { source: "query1", target: "de1", type: "writes_to" } },
+          { data: { source: "journey1", target: "de1", type: "reads_from" } },
+          { data: { source: "ts1", target: "de1", type: "reads_from" } },
+          { data: { source: "imp1", target: "de1", type: "imports_to" } }
         ],
         metadata: {
           totalNodes: 6,
@@ -8163,7 +8320,7 @@ app.get('/graph', async (req, res) => {
         }
       };
       
-      console.log('✅ [Graph API] Providing mock graph data:', {
+      console.log('✅ [Graph API] Providing default mock graph data:', {
         nodeCount: mockGraphData.nodes.length,
         edgeCount: mockGraphData.edges.length
       });
