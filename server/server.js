@@ -6961,6 +6961,9 @@ async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
   const startTime = Date.now();
   
   try {
+    // Skip MetadataCrawler for now and use proven SOAP API methods
+    throw new Error('Using proven SOAP API methods instead of MetadataCrawler');
+    
     const MetadataCrawler = require('./metadataCrawler');
     const crawler = new MetadataCrawler(accessToken, subdomain);
     
