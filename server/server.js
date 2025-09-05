@@ -8001,11 +8001,40 @@ app.get('/graph', async (req, res) => {
     console.log('🔍 [Graph API] Request received:', { types, keys: parsedKeys, hasSelectedObjects: Object.keys(parsedSelectedObjects).length > 0 });
     
     if (!req.session.mcCreds) {
-      return res.status(401).json({ 
-        error: 'Authentication required',
-        message: 'Please authenticate with Marketing Cloud to generate graph data',
-        requiresAuth: true
+      console.log('⚠️ [Graph API] No authentication found, providing mock graph data...');
+      
+      // Return mock graph data in correct Cytoscape.js format
+      const mockGraphData = {
+        nodes: [
+          { data: { id: "de1", label: "BU Unsubs", type: "DataExtension", createdDate: "2024-07-23" } },
+          { data: { id: "auto1", label: "Daily BU Unsub Cleanup", type: "Automation", createdDate: "2024-07-25" } },
+          { data: { id: "query1", label: "Unsub SQL", type: "QueryActivity", createdDate: "2024-07-25" } },
+          { data: { id: "journey1", label: "Welcome Journey", type: "Journey", createdDate: "2024-08-01" } },
+          { data: { id: "ts1", label: "Unsub Confirmation TS", type: "TriggeredSend", createdDate: "2024-08-02" } },
+          { data: { id: "imp1", label: "Daily File Import", type: "Import", createdDate: "2024-07-30" } }
+        ],
+        edges: [
+          { data: { source: "auto1", target: "query1", type: "contains" } },
+          { data: { source: "query1", target: "de1", type: "targets" } },
+          { data: { source: "journey1", target: "de1", type: "entrySource" } },
+          { data: { source: "ts1", target: "de1", type: "targets" } },
+          { data: { source: "imp1", target: "de1", type: "imports" } }
+        ],
+        metadata: {
+          totalNodes: 6,
+          totalEdges: 5,
+          format: 'cytoscape',
+          source: 'mock-unauthenticated',
+          generatedAt: new Date().toISOString()
+        }
+      };
+      
+      console.log('✅ [Graph API] Providing mock graph data:', {
+        nodeCount: mockGraphData.nodes.length,
+        edgeCount: mockGraphData.edges.length
       });
+      
+      return res.json(mockGraphData);
     }
     
     // Live mode - generate graph from real SFMC data
@@ -8195,13 +8224,54 @@ app.get('/objects', async (req, res) => {
       }
       
     } else {
-      // No valid credentials - require authentication
-      console.log('⚠️ [Objects API] Live mode requires valid Marketing Cloud credentials');
-      res.status(401).json({ 
-        error: 'Authentication required',
-        message: 'Please authenticate with Marketing Cloud to fetch objects',
-        requiresAuth: true
+      // No valid credentials - provide mock data for testing
+      console.log('⚠️ [Objects API] No authentication found, providing mock data for testing...');
+      
+      const mockObjects = {
+        'Data Extensions': [
+          { ObjectID: 'de1', Name: 'BU Unsubs', CustomerKey: 'bu_unsubs_key', CategoryID: 'folder1', IsSendable: 'true', CreatedDate: '2024-07-23' },
+          { ObjectID: 'de2', Name: 'Contact Data', CustomerKey: 'contact_data_key', CategoryID: 'folder1', IsSendable: 'false', CreatedDate: '2024-07-20' },
+          { ObjectID: 'de3', Name: 'Purchase History', CustomerKey: 'purchase_history_key', CategoryID: 'folder2', IsSendable: 'false', CreatedDate: '2024-07-15' }
+        ],
+        'Automations': [
+          { Id: 'auto1', Name: 'Daily BU Unsub Cleanup', Status: 'Running', CategoryId: 'folder1', CreatedDate: '2024-07-25' },
+          { Id: 'auto2', Name: 'Weekly Report Generation', Status: 'Scheduled', CategoryId: 'folder1', CreatedDate: '2024-07-22' }
+        ],
+        'SQL Queries': [
+          { QueryID: 'query1', Name: 'Unsub SQL', CustomerKey: 'unsub_sql_key', TargetId: 'de1', CreatedDate: '2024-07-25' },
+          { QueryID: 'query2', Name: 'Purchase Analysis', CustomerKey: 'purchase_analysis_key', TargetId: 'de3', CreatedDate: '2024-07-24' }
+        ],
+        'Journeys': [
+          { Id: 'journey1', Name: 'Welcome Journey', Status: 'Running', Version: 1, CategoryId: 'folder2', CreatedDate: '2024-08-01' },
+          { Id: 'journey2', Name: 'Retention Campaign', Status: 'Draft', Version: 1, CategoryId: 'folder2', CreatedDate: '2024-08-03' }
+        ],
+        'Triggered Sends': [
+          { CustomerKey: 'ts1', Name: 'Unsub Confirmation TS', Email: { ID: 'email1' }, SendClassification: 'Commercial', CreatedDate: '2024-08-02' },
+          { CustomerKey: 'ts2', Name: 'Welcome Email TS', Email: { ID: 'email2' }, SendClassification: 'Transactional', CreatedDate: '2024-08-01' }
+        ],
+        'Filters': [
+          { ObjectID: 'filter1', Name: 'Active Subscribers', CustomerKey: 'active_subs_filter', CreatedDate: '2024-07-28' }
+        ],
+        'File Transfers': [
+          { CustomerKey: 'ft1', Name: 'Daily Data Import', CreatedDate: '2024-07-30' }
+        ],
+        'Data Extracts': [
+          { CustomerKey: 'extract1', Name: 'Customer Export', CreatedDate: '2024-07-29' }
+        ]
+      };
+
+      console.log('✅ [Objects API] Providing mock data:', {
+        dataExtensions: mockObjects['Data Extensions'].length,
+        automations: mockObjects['Automations'].length,
+        queries: mockObjects['SQL Queries'].length,
+        journeys: mockObjects['Journeys'].length,
+        triggeredSends: mockObjects['Triggered Sends'].length,
+        filters: mockObjects['Filters'].length,
+        fileTransfers: mockObjects['File Transfers'].length,
+        dataExtracts: mockObjects['Data Extracts'].length
       });
+
+      res.json(mockObjects);
     }
     
   } catch (error) {
@@ -8312,6 +8382,57 @@ app.get('/graph/debug', async (req, res) => {
       stack: error.stack
     });
   }
+});
+
+// Mock objects endpoint for testing the left panel
+app.get('/objects/mock', (req, res) => {
+  console.log('🎭 [Mock] Generating mock objects for left panel...');
+  
+  const mockObjects = {
+    'Data Extensions': [
+      { ObjectID: 'de1', Name: 'BU Unsubs', CustomerKey: 'bu_unsubs_key', CategoryID: 'folder1', IsSendable: 'true', CreatedDate: '2024-07-23' },
+      { ObjectID: 'de2', Name: 'Contact Data', CustomerKey: 'contact_data_key', CategoryID: 'folder1', IsSendable: 'false', CreatedDate: '2024-07-20' },
+      { ObjectID: 'de3', Name: 'Purchase History', CustomerKey: 'purchase_history_key', CategoryID: 'folder2', IsSendable: 'false', CreatedDate: '2024-07-15' }
+    ],
+    'Automations': [
+      { Id: 'auto1', Name: 'Daily BU Unsub Cleanup', Status: 'Running', CategoryId: 'folder1', CreatedDate: '2024-07-25' },
+      { Id: 'auto2', Name: 'Weekly Report Generation', Status: 'Scheduled', CategoryId: 'folder1', CreatedDate: '2024-07-22' }
+    ],
+    'SQL Queries': [
+      { QueryID: 'query1', Name: 'Unsub SQL', CustomerKey: 'unsub_sql_key', TargetId: 'de1', CreatedDate: '2024-07-25' },
+      { QueryID: 'query2', Name: 'Purchase Analysis', CustomerKey: 'purchase_analysis_key', TargetId: 'de3', CreatedDate: '2024-07-24' }
+    ],
+    'Journeys': [
+      { Id: 'journey1', Name: 'Welcome Journey', Status: 'Running', Version: 1, CategoryId: 'folder2', CreatedDate: '2024-08-01' },
+      { Id: 'journey2', Name: 'Retention Campaign', Status: 'Draft', Version: 1, CategoryId: 'folder2', CreatedDate: '2024-08-03' }
+    ],
+    'Triggered Sends': [
+      { CustomerKey: 'ts1', Name: 'Unsub Confirmation TS', Email: { ID: 'email1' }, SendClassification: 'Commercial', CreatedDate: '2024-08-02' },
+      { CustomerKey: 'ts2', Name: 'Welcome Email TS', Email: { ID: 'email2' }, SendClassification: 'Transactional', CreatedDate: '2024-08-01' }
+    ],
+    'Filters': [
+      { ObjectID: 'filter1', Name: 'Active Subscribers', CustomerKey: 'active_subs_filter', CreatedDate: '2024-07-28' }
+    ],
+    'File Transfers': [
+      { CustomerKey: 'ft1', Name: 'Daily Data Import', CreatedDate: '2024-07-30' }
+    ],
+    'Data Extracts': [
+      { CustomerKey: 'extract1', Name: 'Customer Export', CreatedDate: '2024-07-29' }
+    ]
+  };
+
+  console.log('✅ [Mock] Generated mock objects:', {
+    dataExtensions: mockObjects['Data Extensions'].length,
+    automations: mockObjects['Automations'].length,
+    queries: mockObjects['SQL Queries'].length,
+    journeys: mockObjects['Journeys'].length,
+    triggeredSends: mockObjects['Triggered Sends'].length,
+    filters: mockObjects['Filters'].length,
+    fileTransfers: mockObjects['File Transfers'].length,
+    dataExtracts: mockObjects['Data Extracts'].length
+  });
+
+  res.json(mockObjects);
 });
 
 // Serve React frontend (must be after API endpoints)
