@@ -7043,10 +7043,7 @@ async function fetchAllSFMCObjects(accessToken, subdomain, restEndpoint) {
       })),
       'Filters': [], // Filters will be added later if needed
       'File Transfers': [], // File Transfers will be added later if needed
-      'Data Extracts': [], // Data Extracts will be added later if needed
-      
-      // Include raw schema data for new graph generation
-      schemaData: schemaData
+      'Data Extracts': [] // Data Extracts will be added later if needed
     };
     
     return result;
@@ -8229,34 +8226,34 @@ app.get('/objects', async (req, res) => {
       
       const mockObjects = {
         'Data Extensions': [
-          { ObjectID: 'de1', Name: 'BU Unsubs', CustomerKey: 'bu_unsubs_key', CategoryID: 'folder1', IsSendable: 'true', CreatedDate: '2024-07-23' },
-          { ObjectID: 'de2', Name: 'Contact Data', CustomerKey: 'contact_data_key', CategoryID: 'folder1', IsSendable: 'false', CreatedDate: '2024-07-20' },
-          { ObjectID: 'de3', Name: 'Purchase History', CustomerKey: 'purchase_history_key', CategoryID: 'folder2', IsSendable: 'false', CreatedDate: '2024-07-15' }
+          { id: 'de1', name: 'BU Unsubs', externalKey: 'bu_unsubs_key', categoryID: 'folder1', isSendable: true, createdDate: '2024-07-23' },
+          { id: 'de2', name: 'Contact Data', externalKey: 'contact_data_key', categoryID: 'folder1', isSendable: false, createdDate: '2024-07-20' },
+          { id: 'de3', name: 'Purchase History', externalKey: 'purchase_history_key', categoryID: 'folder2', isSendable: false, createdDate: '2024-07-15' }
         ],
         'Automations': [
-          { Id: 'auto1', Name: 'Daily BU Unsub Cleanup', Status: 'Running', CategoryId: 'folder1', CreatedDate: '2024-07-25' },
-          { Id: 'auto2', Name: 'Weekly Report Generation', Status: 'Scheduled', CategoryId: 'folder1', CreatedDate: '2024-07-22' }
+          { id: 'auto1', name: 'Daily BU Unsub Cleanup', status: 'Running', categoryId: 'folder1', createdDate: '2024-07-25' },
+          { id: 'auto2', name: 'Weekly Report Generation', status: 'Scheduled', categoryId: 'folder1', createdDate: '2024-07-22' }
         ],
         'SQL Queries': [
-          { QueryID: 'query1', Name: 'Unsub SQL', CustomerKey: 'unsub_sql_key', TargetId: 'de1', CreatedDate: '2024-07-25' },
-          { QueryID: 'query2', Name: 'Purchase Analysis', CustomerKey: 'purchase_analysis_key', TargetId: 'de3', CreatedDate: '2024-07-24' }
+          { id: 'query1', name: 'Unsub SQL', externalKey: 'unsub_sql_key', targetId: 'de1', createdDate: '2024-07-25' },
+          { id: 'query2', name: 'Purchase Analysis', externalKey: 'purchase_analysis_key', targetId: 'de3', createdDate: '2024-07-24' }
         ],
         'Journeys': [
-          { Id: 'journey1', Name: 'Welcome Journey', Status: 'Running', Version: 1, CategoryId: 'folder2', CreatedDate: '2024-08-01' },
-          { Id: 'journey2', Name: 'Retention Campaign', Status: 'Draft', Version: 1, CategoryId: 'folder2', CreatedDate: '2024-08-03' }
+          { id: 'journey1', name: 'Welcome Journey', status: 'Running', version: 1, categoryId: 'folder2', createdDate: '2024-08-01' },
+          { id: 'journey2', name: 'Retention Campaign', status: 'Draft', version: 1, categoryId: 'folder2', createdDate: '2024-08-03' }
         ],
         'Triggered Sends': [
-          { CustomerKey: 'ts1', Name: 'Unsub Confirmation TS', Email: { ID: 'email1' }, SendClassification: 'Commercial', CreatedDate: '2024-08-02' },
-          { CustomerKey: 'ts2', Name: 'Welcome Email TS', Email: { ID: 'email2' }, SendClassification: 'Transactional', CreatedDate: '2024-08-01' }
+          { id: 'ts1', name: 'Unsub Confirmation TS', externalKey: 'ts1', email: { ID: 'email1' }, sendClassification: 'Commercial', createdDate: '2024-08-02' },
+          { id: 'ts2', name: 'Welcome Email TS', externalKey: 'ts2', email: { ID: 'email2' }, sendClassification: 'Transactional', createdDate: '2024-08-01' }
         ],
         'Filters': [
-          { ObjectID: 'filter1', Name: 'Active Subscribers', CustomerKey: 'active_subs_filter', CreatedDate: '2024-07-28' }
+          { id: 'filter1', name: 'Active Subscribers', externalKey: 'active_subs_filter', createdDate: '2024-07-28' }
         ],
         'File Transfers': [
-          { CustomerKey: 'ft1', Name: 'Daily Data Import', CreatedDate: '2024-07-30' }
+          { id: 'ft1', name: 'Daily Data Import', externalKey: 'ft1', createdDate: '2024-07-30' }
         ],
         'Data Extracts': [
-          { CustomerKey: 'extract1', Name: 'Customer Export', CreatedDate: '2024-07-29' }
+          { id: 'extract1', name: 'Customer Export', externalKey: 'extract1', createdDate: '2024-07-29' }
         ]
       };
 
@@ -8390,34 +8387,34 @@ app.get('/objects/mock', (req, res) => {
   
   const mockObjects = {
     'Data Extensions': [
-      { ObjectID: 'de1', Name: 'BU Unsubs', CustomerKey: 'bu_unsubs_key', CategoryID: 'folder1', IsSendable: 'true', CreatedDate: '2024-07-23' },
-      { ObjectID: 'de2', Name: 'Contact Data', CustomerKey: 'contact_data_key', CategoryID: 'folder1', IsSendable: 'false', CreatedDate: '2024-07-20' },
-      { ObjectID: 'de3', Name: 'Purchase History', CustomerKey: 'purchase_history_key', CategoryID: 'folder2', IsSendable: 'false', CreatedDate: '2024-07-15' }
+      { id: 'de1', name: 'BU Unsubs', externalKey: 'bu_unsubs_key', categoryID: 'folder1', isSendable: true, createdDate: '2024-07-23' },
+      { id: 'de2', name: 'Contact Data', externalKey: 'contact_data_key', categoryID: 'folder1', isSendable: false, createdDate: '2024-07-20' },
+      { id: 'de3', name: 'Purchase History', externalKey: 'purchase_history_key', categoryID: 'folder2', isSendable: false, createdDate: '2024-07-15' }
     ],
     'Automations': [
-      { Id: 'auto1', Name: 'Daily BU Unsub Cleanup', Status: 'Running', CategoryId: 'folder1', CreatedDate: '2024-07-25' },
-      { Id: 'auto2', Name: 'Weekly Report Generation', Status: 'Scheduled', CategoryId: 'folder1', CreatedDate: '2024-07-22' }
+      { id: 'auto1', name: 'Daily BU Unsub Cleanup', status: 'Running', categoryId: 'folder1', createdDate: '2024-07-25' },
+      { id: 'auto2', name: 'Weekly Report Generation', status: 'Scheduled', categoryId: 'folder1', createdDate: '2024-07-22' }
     ],
     'SQL Queries': [
-      { QueryID: 'query1', Name: 'Unsub SQL', CustomerKey: 'unsub_sql_key', TargetId: 'de1', CreatedDate: '2024-07-25' },
-      { QueryID: 'query2', Name: 'Purchase Analysis', CustomerKey: 'purchase_analysis_key', TargetId: 'de3', CreatedDate: '2024-07-24' }
+      { id: 'query1', name: 'Unsub SQL', externalKey: 'unsub_sql_key', targetId: 'de1', createdDate: '2024-07-25' },
+      { id: 'query2', name: 'Purchase Analysis', externalKey: 'purchase_analysis_key', targetId: 'de3', createdDate: '2024-07-24' }
     ],
     'Journeys': [
-      { Id: 'journey1', Name: 'Welcome Journey', Status: 'Running', Version: 1, CategoryId: 'folder2', CreatedDate: '2024-08-01' },
-      { Id: 'journey2', Name: 'Retention Campaign', Status: 'Draft', Version: 1, CategoryId: 'folder2', CreatedDate: '2024-08-03' }
+      { id: 'journey1', name: 'Welcome Journey', status: 'Running', version: 1, categoryId: 'folder2', createdDate: '2024-08-01' },
+      { id: 'journey2', name: 'Retention Campaign', status: 'Draft', version: 1, categoryId: 'folder2', createdDate: '2024-08-03' }
     ],
     'Triggered Sends': [
-      { CustomerKey: 'ts1', Name: 'Unsub Confirmation TS', Email: { ID: 'email1' }, SendClassification: 'Commercial', CreatedDate: '2024-08-02' },
-      { CustomerKey: 'ts2', Name: 'Welcome Email TS', Email: { ID: 'email2' }, SendClassification: 'Transactional', CreatedDate: '2024-08-01' }
+      { id: 'ts1', name: 'Unsub Confirmation TS', externalKey: 'ts1', email: { ID: 'email1' }, sendClassification: 'Commercial', createdDate: '2024-08-02' },
+      { id: 'ts2', name: 'Welcome Email TS', externalKey: 'ts2', email: { ID: 'email2' }, sendClassification: 'Transactional', createdDate: '2024-08-01' }
     ],
     'Filters': [
-      { ObjectID: 'filter1', Name: 'Active Subscribers', CustomerKey: 'active_subs_filter', CreatedDate: '2024-07-28' }
+      { id: 'filter1', name: 'Active Subscribers', externalKey: 'active_subs_filter', createdDate: '2024-07-28' }
     ],
     'File Transfers': [
-      { CustomerKey: 'ft1', Name: 'Daily Data Import', CreatedDate: '2024-07-30' }
+      { id: 'ft1', name: 'Daily Data Import', externalKey: 'ft1', createdDate: '2024-07-30' }
     ],
     'Data Extracts': [
-      { CustomerKey: 'extract1', Name: 'Customer Export', CreatedDate: '2024-07-29' }
+      { id: 'extract1', name: 'Customer Export', externalKey: 'extract1', createdDate: '2024-07-29' }
     ]
   };
 
