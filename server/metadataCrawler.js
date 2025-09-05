@@ -919,19 +919,19 @@ class MetadataCrawler {
   }
 
   /**
-   * 📤 Generate final schema output for consumption
+   * 📤 Generate final schema output for consumption (Cytoscape.js format)
    */
   generateSchemaOutput() {
     const nodes = [];
     const edges = [];
 
-    // Convert DEs to nodes
+    // Convert DEs to nodes (Cytoscape.js format)
     this.DEs.forEach(de => {
       nodes.push({
-        id: `de_${de.id}`,
-        label: de.name,
-        type: 'DataExtension',
         data: {
+          id: `de_${de.id}`,
+          label: de.name,
+          type: 'DataExtension',
           name: de.name,
           key: de.key,
           path: de.path,
@@ -942,13 +942,13 @@ class MetadataCrawler {
       });
     });
 
-    // Convert Automations to nodes
+    // Convert Automations to nodes (Cytoscape.js format)
     this.Automations.forEach(automation => {
       nodes.push({
-        id: `auto_${automation.id}`,
-        label: automation.name,
-        type: 'Automation',
         data: {
+          id: `auto_${automation.id}`,
+          label: automation.name,
+          type: 'Automation',
           name: automation.name,
           status: automation.status,
           path: automation.path,
@@ -958,15 +958,14 @@ class MetadataCrawler {
         }
       });
 
-      // Add activity nodes
+      // Add activity nodes (Cytoscape.js format)
       automation.activities.forEach(activity => {
         nodes.push({
-          id: `activity_${activity.id}`,
-          label: activity.name,
-          type: activity.type,
           data: {
-            name: activity.name,
+            id: `activity_${activity.id}`,
+            label: activity.name,
             type: activity.type,
+            name: activity.name,
             automationId: automation.id,
             createdDate: activity.createdDate,
             modifiedDate: activity.modifiedDate
@@ -975,13 +974,13 @@ class MetadataCrawler {
       });
     });
 
-    // Convert Journeys to nodes
+    // Convert Journeys to nodes (Cytoscape.js format)
     this.Journeys.forEach(journey => {
       nodes.push({
-        id: `journey_${journey.id}`,
-        label: journey.name,
-        type: 'Journey',
         data: {
+          id: `journey_${journey.id}`,
+          label: journey.name,
+          type: 'Journey',
           name: journey.name,
           status: journey.status,
           version: journey.version,
@@ -992,13 +991,13 @@ class MetadataCrawler {
       });
     });
 
-    // Convert Triggered Sends to nodes
+    // Convert Triggered Sends to nodes (Cytoscape.js format)
     this.TriggeredSends.forEach(ts => {
       nodes.push({
-        id: `ts_${ts.id}`,
-        label: ts.name,
-        type: 'TriggeredSend',
         data: {
+          id: `ts_${ts.id}`,
+          label: ts.name,
+          type: 'TriggeredSend',
           name: ts.name,
           customerKey: ts.id,
           emailId: ts.emailId,
@@ -1008,17 +1007,19 @@ class MetadataCrawler {
       });
     });
 
-    // Convert edges with proper prefixes
+    // Convert edges to Cytoscape.js format
     this.edges.forEach(edge => {
       const sourceId = this.addNodePrefix(edge.source);
       const targetId = this.addNodePrefix(edge.target);
       
       edges.push({
-        id: `${sourceId}_${targetId}`,
-        source: sourceId,
-        target: targetId,
-        type: edge.type,
-        label: edge.label
+        data: {
+          id: `${sourceId}_${targetId}`,
+          source: sourceId,
+          target: targetId,
+          type: edge.type,
+          label: edge.label
+        }
       });
     });
 
