@@ -8213,6 +8213,107 @@ app.get('/objects', async (req, res) => {
   }
 });
 
+// Debug endpoint with mock data in correct Cytoscape.js format
+app.get('/graph/mock', (req, res) => {
+  console.log('🎭 [Mock] Generating mock graph data in Cytoscape.js format...');
+  
+  const nodes = [
+    { data: { id: "de1", label: "BU Unsubs", type: "DataExtension", createdDate: "2024-07-23" } },
+    { data: { id: "auto1", label: "Daily BU Unsub Cleanup", type: "Automation", createdDate: "2024-07-25" } },
+    { data: { id: "query1", label: "Unsub SQL", type: "QueryActivity", createdDate: "2024-07-25" } },
+    { data: { id: "journey1", label: "Welcome Journey", type: "Journey", createdDate: "2024-08-01" } },
+    { data: { id: "ts1", label: "Unsub Confirmation TS", type: "TriggeredSend", createdDate: "2024-08-02" } },
+    { data: { id: "imp1", label: "Daily File Import", type: "Import", createdDate: "2024-07-30" } }
+  ];
+
+  const edges = [
+    { data: { source: "auto1", target: "query1", type: "contains" } },
+    { data: { source: "query1", target: "de1", type: "targets" } },
+    { data: { source: "journey1", target: "de1", type: "entrySource" } },
+    { data: { source: "ts1", target: "de1", type: "targets" } },
+    { data: { source: "imp1", target: "de1", type: "imports" } }
+  ];
+
+  const response = {
+    nodes,
+    edges,
+    metadata: {
+      totalNodes: nodes.length,
+      totalEdges: edges.length,
+      format: 'cytoscape',
+      source: 'mock',
+      generatedAt: new Date().toISOString()
+    }
+  };
+
+  console.log('✅ [Mock] Generated mock graph:', {
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    sampleNode: nodes[0],
+    sampleEdge: edges[0]
+  });
+
+  res.json(response);
+});
+
+app.get('/graph/debug', async (req, res) => {
+  try {
+    console.log('🐛 [Debug] Testing MetadataCrawler output format...');
+    
+    if (!req.session.mcCreds) {
+      return res.status(401).json({ 
+        error: 'Authentication required',
+        message: 'Please authenticate with Marketing Cloud to test metadata crawler'
+      });
+    }
+
+    const accessToken = getAccessTokenFromRequest(req);
+    const subdomain = getSubdomainFromRequest(req);
+    
+    if (!accessToken || !subdomain) {
+      return res.status(400).json({ error: 'Missing access token or subdomain' });
+    }
+
+    // Test the MetadataCrawler directly
+    const MetadataCrawler = require('./metadataCrawler');
+    const crawler = new MetadataCrawler(accessToken, subdomain);
+    
+    console.log('🔍 [Debug] Starting MetadataCrawler test...');
+    const schemaData = await crawler.crawlMetadata();
+    
+    console.log('✅ [Debug] MetadataCrawler completed. Sample output:', {
+      nodeCount: schemaData.nodes.length,
+      edgeCount: schemaData.edges.length,
+      sampleNode: schemaData.nodes[0],
+      sampleEdge: schemaData.edges[0],
+      metadata: schemaData.metadata
+    });
+    
+    res.json({
+      success: true,
+      message: 'MetadataCrawler test completed',
+      summary: {
+        nodeCount: schemaData.nodes.length,
+        edgeCount: schemaData.edges.length,
+        format: 'cytoscape'
+      },
+      sample: {
+        node: schemaData.nodes[0],
+        edge: schemaData.edges[0]
+      },
+      metadata: schemaData.metadata
+    });
+    
+  } catch (error) {
+    console.error('❌ [Debug] MetadataCrawler test failed:', error.message);
+    res.status(500).json({
+      error: 'MetadataCrawler test failed',
+      message: error.message,
+      stack: error.stack
+    });
+  }
+});
+
 // Serve React frontend (must be after API endpoints)
 const buildPath = path.join(__dirname, '../mc-explorer-client/build');
 
