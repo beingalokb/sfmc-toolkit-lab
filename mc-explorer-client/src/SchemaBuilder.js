@@ -476,6 +476,9 @@ const extractTargetAsset = (nodeData = {}) => {
     console.log('🔧 [Graph Update] Starting enhanced graph update with selections:', selectedObjects);
     
     const baseGraphData = await loadGraphData();
+    
+    // Clear right side loading state when data is loaded
+    setRightSideLoading(false);
 
     // Check if we have active selections
     const hasActiveSelections = Object.keys(selectedObjects).length > 0 && 

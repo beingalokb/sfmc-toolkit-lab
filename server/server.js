@@ -7978,6 +7978,65 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
         
         debugStats.nodes.final++;
         console.log(`  ✅ Added activity: ${activityNode.name} (Step ${activityNode.stepNumber})`);
+        
+        // 🆕 ENHANCED: Add target Data Extensions from activity metadata
+        if (activityNode.metadata && activityNode.metadata.targetDataExtensions) {
+          console.log(`🎯 [Graph] Checking activity ${activityNode.name} for target DEs...`);
+          activityNode.metadata.targetDataExtensions.forEach(targetDE => {
+            console.log(`  📊 [Graph] Found target DE in activity metadata: ${targetDE.name} (${targetDE.id})`);
+            
+            // Look for this DE in the available Data Extensions
+            const matchingDE = allDataExtensions.find(de => 
+              de.id === targetDE.id || 
+              de.key === targetDE.key || 
+              de.name === targetDE.name
+            );
+            
+            if (matchingDE && !finalObjectIds.has(matchingDE.id)) {
+              finalObjectIds.add(matchingDE.id);
+              
+              nodes.push({
+                data: {
+                  id: matchingDE.id,
+                  label: matchingDE.name,
+                  category: 'Data Extensions',
+                  type: 'Data Extensions',
+                  metadata: {
+                    ...matchingDE,
+                    category: 'Data Extensions',
+                    isRelated: hasAnySelection, // Mark as related since it was found through relationship
+                    isSelected: false,
+                    connectionCount: 1 // At least connected to this activity
+                  }
+                }
+              });
+              
+              debugStats.nodes.final++;
+              debugStats.nodes.related++;
+              console.log(`    ✅ [Graph] Added target DE: ${matchingDE.name} (${matchingDE.id})`);
+              
+              // Also create edge from activity to this DE
+              allRelationships.push({
+                id: `${activityId}-${matchingDE.id}-writes_to`,
+                source: activityId,
+                target: matchingDE.id,
+                type: 'writes_to',
+                label: `writes to ${matchingDE.name}`,
+                description: `Activity "${activityNode.name}" writes to Data Extension "${matchingDE.name}"`,
+                metadata: {
+                  discoveredFrom: 'activity_target_metadata'
+                }
+              });
+              
+              console.log(`    🔗 [Graph] Added relationship: ${activityNode.name} -> ${matchingDE.name} (writes_to)`);
+              
+            } else if (matchingDE) {
+              console.log(`    ↩️ [Graph] Target DE already included: ${matchingDE.name}`);
+            } else {
+              console.warn(`    ⚠️ [Graph] Target DE not found in available DEs: ${targetDE.name} (${targetDE.id})`);
+            }
+          });
+        }
       }
     });
   }
