@@ -5727,11 +5727,11 @@ async function fetchSFMCQueries(accessToken, restEndpoint) {
 }
 
 /**
- * Fetch Automations from SFMC using REST API
+ * Fetch Automations from SFMC using REST API with enhanced activity-level relationship detection
  */
 async function fetchSFMCAutomations(accessToken, restEndpoint) {
   try {
-    console.log('🔍 [SFMC API] Fetching Automations...');
+    console.log('🔍 [SFMC API] Fetching Automations with enhanced activity analysis...');
     
     const response = await axios.get(`${restEndpoint}/automation/v1/automations`, {
       headers: {
@@ -5747,14 +5747,18 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
     
     console.log(`✅ [SFMC API] Found ${automations.length} Automations`);
     
-    // Enhanced automation processing with detailed activity fetching
+    // Enhanced automation processing with detailed activity fetching and SOAP relationship detection
     const processedAutomations = [];
+    const automationRelationships = []; // Store discovered relationships
     
     for (const automation of automations) {
       console.log(`🔍 [SFMC API] Processing automation: ${automation.name} (ID: ${automation.id})`);
       
-      // Fetch detailed automation info including activities
-      let detailedActivities = [];
+      // Fetch detailed automation info including steps/activities  
+      let detailedSteps = [];
+      let targetDataExtensions = new Set(); // Track DEs this automation targets
+      let usedQueries = new Set(); // Track queries this automation uses
+      
       try {
         const detailResponse = await axios.get(`${restEndpoint}/automation/v1/automations/${automation.id}`, {
           headers: {
@@ -5765,32 +5769,131 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
         });
         
         const detailedAutomation = detailResponse.data;
-        console.log(`📋 [SFMC API] Automation "${automation.name}" raw structure:`, JSON.stringify({
+        console.log(`📋 [SFMC API] Automation "${automation.name}" structure:`, {
           id: detailedAutomation.id,
           name: detailedAutomation.name,
           steps: detailedAutomation.steps?.length || 0,
-          activities: detailedAutomation.activities?.length || 0,
-          program: detailedAutomation.program ? 'exists' : 'none',
-          programActivities: detailedAutomation.program?.activities?.length || 0
-        }, null, 2));
+          activities: detailedAutomation.activities?.length || 0
+        });
         
-        // Extract activities from various possible locations
-        detailedActivities = detailedAutomation.steps || 
-                           detailedAutomation.activities || 
-                           detailedAutomation.program?.activities || 
-                           [];
+        // Extract steps and process activities
+        detailedSteps = detailedAutomation.steps || [];
         
-        console.log(`📋 [SFMC API] Found ${detailedActivities.length} activities for automation "${automation.name}"`);
+        console.log(`📋 [SFMC API] Found ${detailedSteps.length} steps for automation "${automation.name}"`);
         
-        // Log sample activity structure if available
-        if (detailedActivities.length > 0) {
-          console.log(`🔍 [SFMC API] Sample activity structure:`, JSON.stringify(detailedActivities[0], null, 2));
+        // Process each step and its activities
+        for (const step of detailedSteps) {
+          console.log(`🔍 [Step] Processing step in automation "${automation.name}":`, {
+            stepNumber: step.stepNumber || 'unknown',
+            activities: step.activities?.length || 0
+          });
+          
+          const activities = step.activities || [];
+          
+          for (const activity of activities) {
+            console.log(`🔍 [Activity] Processing activity:`, {
+              activityType: activity.activityType,
+              objectId: activity.activityObjectId,
+              name: activity.name
+            });
+            
+            // Handle Query Activities
+            if (activity.activityType === 'query' && activity.activityObjectId) {
+              console.log(`🔍 [Query Activity] Fetching QueryDefinition for ObjectID: ${activity.activityObjectId}`);
+              
+              const queryDef = await retrieveSoapObjectById(
+                accessToken, 
+                restEndpoint, 
+                'QueryDefinition', 
+                activity.activityObjectId,
+                ['Name', 'QueryText', 'DataExtensionTarget.Name', 'DataExtensionTarget.CustomerKey']
+              );
+              
+              if (queryDef && queryDef.DataExtensionTarget) {
+                const targetDeName = queryDef.DataExtensionTarget.Name;
+                const targetDeKey = queryDef.DataExtensionTarget.CustomerKey;
+                
+                if (targetDeName) {
+                  targetDataExtensions.add(targetDeName);
+                  usedQueries.add(queryDef.Name);
+                  
+                  // Create relationship: Automation → Data Extension (via Query)
+                  automationRelationships.push({
+                    id: `auto_${automation.id}-de_${targetDeKey || targetDeName}`,
+                    source: `auto_${automation.id}`,
+                    target: targetDeKey || targetDeName, // Use key or name as identifier
+                    type: 'targets',
+                    label: 'targets via Query',
+                    description: `Automation "${automation.name}" targets DE "${targetDeName}" via Query "${queryDef.Name}"`,
+                    metadata: {
+                      queryName: queryDef.Name,
+                      queryObjectId: activity.activityObjectId,
+                      activityType: 'query'
+                    }
+                  });
+                  
+                  console.log(`✅ [Relationship] Automation → DE: ${automation.name} targets ${targetDeName} via Query ${queryDef.Name}`);
+                }
+              }
+            }
+            
+            // Handle Import Activities  
+            else if (activity.activityType === 'import' && activity.activityObjectId) {
+              console.log(`🔍 [Import Activity] Fetching ImportDefinition for ObjectID: ${activity.activityObjectId}`);
+              
+              const importDef = await retrieveSoapObjectById(
+                accessToken,
+                restEndpoint,
+                'ImportDefinition',
+                activity.activityObjectId,
+                ['Name', 'DestinationObjectId']
+              );
+              
+              if (importDef && importDef.DestinationObjectId) {
+                console.log(`🔍 [Import Activity] Fetching target DataExtension for ObjectID: ${importDef.DestinationObjectId}`);
+                
+                const targetDE = await retrieveSoapObjectById(
+                  accessToken,
+                  restEndpoint,
+                  'DataExtension',
+                  importDef.DestinationObjectId,
+                  ['Name', 'CustomerKey']
+                );
+                
+                if (targetDE) {
+                  targetDataExtensions.add(targetDE.Name);
+                  
+                  // Create relationship: Automation → Data Extension (via Import)
+                  automationRelationships.push({
+                    id: `auto_${automation.id}-de_${targetDE.CustomerKey || targetDE.Name}`,
+                    source: `auto_${automation.id}`,
+                    target: targetDE.CustomerKey || targetDE.Name,
+                    type: 'imports',
+                    label: 'imports to',
+                    description: `Automation "${automation.name}" imports to DE "${targetDE.Name}" via Import "${importDef.Name}"`,
+                    metadata: {
+                      importName: importDef.Name,
+                      importObjectId: activity.activityObjectId,
+                      activityType: 'import'
+                    }
+                  });
+                  
+                  console.log(`✅ [Relationship] Automation → DE: ${automation.name} imports to ${targetDE.Name} via Import ${importDef.Name}`);
+                }
+              }
+            }
+            
+            // Handle other activity types (can be extended)
+            else {
+              console.log(`ℹ️ [Activity] Unhandled activity type: ${activity.activityType}`);
+            }
+          }
         }
         
       } catch (detailError) {
         console.warn(`⚠️ [SFMC API] Could not fetch detailed info for automation ${automation.id}:`, detailError.message);
         // Fallback to basic automation data
-        detailedActivities = automation.steps || automation.activities || [];
+        detailedSteps = automation.steps || automation.activities || [];
       }
       
       processedAutomations.push({
@@ -5800,13 +5903,21 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
         status: automation.status,
         createdDate: automation.createdDate,
         modifiedDate: automation.modifiedDate,
-        steps: detailedActivities,
-        activities: detailedActivities,
+        steps: detailedSteps,
+        activities: detailedSteps, // Maintain backward compatibility
+        targetDataExtensions: Array.from(targetDataExtensions),
+        usedQueries: Array.from(usedQueries),
         type: 'Automation'
       });
     }
     
-    return processedAutomations;
+    console.log(`🔗 [SFMC API] Discovered ${automationRelationships.length} automation relationships`);
+    
+    // Return both automations and their discovered relationships
+    return {
+      automations: processedAutomations,
+      relationships: automationRelationships
+    };
     
   } catch (error) {
     console.error('❌ [SFMC API] Error fetching Automations:', error.message);
@@ -7194,8 +7305,10 @@ function detectAllAssetRelationships(sfmcObjects) {
   const filters = sfmcObjects['Filters'] || [];
   const fileTransfers = sfmcObjects['File Transfers'] || [];
   const dataExtracts = sfmcObjects['Data Extracts'] || [];
+  const automationRelationships = sfmcObjects['_AutomationRelationships'] || [];
   
   console.log('🔍 [Relationships] Detecting relationships between assets...');
+  console.log(`🔗 [Relationships] Including ${automationRelationships.length} discovered automation relationships`);
   
   const allRelationships = [
     ...detectQueryToDataExtensionRelationships(queries, dataExtensions),
@@ -7206,10 +7319,35 @@ function detectAllAssetRelationships(sfmcObjects) {
     ...detectFileTransferDataExtractRelationships(fileTransfers, dataExtracts, dataExtensions)
   ];
   
-  console.log(`✅ [Relationships] Detected ${allRelationships.length} relationships`);
+  // Process automation relationships and resolve DE identifiers to actual DE IDs
+  const resolvedAutomationRelationships = automationRelationships.map(rel => {
+    if (rel.type === 'targets' || rel.type === 'imports') {
+      const targetDE = resolveDataExtensionIdentifier(rel.target, dataExtensions);
+      if (targetDE) {
+        return {
+          ...rel,
+          target: targetDE.id, // Use the actual DE ID
+          resolvedDEName: targetDE.name
+        };
+      } else {
+        console.warn(`⚠️ [Relationships] Could not resolve DE identifier "${rel.target}" to actual DE`);
+        return null; // Filter out unresolved relationships
+      }
+    }
+    return rel;
+  }).filter(Boolean); // Remove null entries
+  
+  console.log(`✅ [Relationships] Resolved ${resolvedAutomationRelationships.length} automation relationships`);
+  
+  const finalRelationships = [
+    ...allRelationships,
+    ...resolvedAutomationRelationships
+  ];
+  
+  console.log(`✅ [Relationships] Detected ${finalRelationships.length} total relationships`);
   
   // Remove duplicates
-  const uniqueRelationships = allRelationships.filter((rel, index, arr) => 
+  const uniqueRelationships = finalRelationships.filter((rel, index, arr) => 
     arr.findIndex(r => r.id === rel.id) === index
   );
   
@@ -7391,8 +7529,20 @@ async function fetchAllSFMCObjectsLegacy(accessToken, subdomain, restEndpoint) {
     }
 
     if (automations.status === 'fulfilled') {
-      allObjects['Automations'] = automations.value;
-      console.log(`✅ [SFMC API] Fetched ${automations.value.length} Automations`);
+      // Handle new return format with automations and relationships
+      const automationResult = automations.value;
+      if (automationResult.automations) {
+        allObjects['Automations'] = automationResult.automations;
+        console.log(`✅ [SFMC API] Fetched ${automationResult.automations.length} Automations`);
+        console.log(`🔗 [SFMC API] Discovered ${automationResult.relationships.length} automation-level relationships`);
+        
+        // Store automation relationships for later use in graph generation
+        allObjects['_AutomationRelationships'] = automationResult.relationships;
+      } else {
+        // Fallback for old format
+        allObjects['Automations'] = automationResult;
+        console.log(`✅ [SFMC API] Fetched ${automationResult.length} Automations (legacy format)`);
+      }
     } else {
       console.error('❌ [SFMC API] Failed to fetch Automations:', automations.reason.message);
     }
