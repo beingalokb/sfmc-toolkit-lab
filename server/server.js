@@ -7825,8 +7825,66 @@ function generateGraphFromSchemaData(schemaData, types = [], keys = [], selected
               }
             }
           });
+        } else if (node && node.type === 'Data Extensions') {
+          console.log(`📊 [Schema Graph] Finding Data Extension workflow for: ${node.label}`);
+          
+          // For Data Extensions, find queries that read/write and their parent activities/automations
+          filteredEdges.forEach(edge => {
+            if (edge.source === nodeId) {
+              relatedNodeIds.add(edge.target);
+              console.log(`  ➡️ DE target: ${nodeId} -> ${edge.target} (${edge.type})`);
+              
+              // If target is a query, also find activities that execute it and their automations
+              const targetNode = filteredNodes.find(n => n.id === edge.target);
+              if (targetNode && targetNode.type === 'SQL Queries') {
+                filteredEdges.forEach(queryEdge => {
+                  if (queryEdge.target === edge.target && queryEdge.type === 'executes_query') {
+                    relatedNodeIds.add(queryEdge.source);
+                    console.log(`    ⬅️➡️ Query executed by: ${queryEdge.source} -> ${edge.target} (${queryEdge.type})`);
+                    
+                    // Find the automation that contains this activity
+                    const activityNode = filteredNodes.find(n => n.id === queryEdge.source);
+                    if (activityNode && (activityNode.type === 'Activity' || activityNode.type.includes('Activity'))) {
+                      filteredEdges.forEach(activityEdge => {
+                        if (activityEdge.target === queryEdge.source && activityEdge.type === 'executes_activity') {
+                          relatedNodeIds.add(activityEdge.source);
+                          console.log(`      ⬅️⬅️➡️ Parent automation: ${activityEdge.source} -> ${queryEdge.source} (${activityEdge.type})`);
+                        }
+                      });
+                    }
+                  }
+                });
+              }
+            }
+            if (edge.target === nodeId) {
+              relatedNodeIds.add(edge.source);
+              console.log(`  ⬅️ DE source: ${edge.source} -> ${nodeId} (${edge.type})`);
+              
+              // If source is a query, also find activities that execute it and their automations
+              const sourceNode = filteredNodes.find(n => n.id === edge.source);
+              if (sourceNode && sourceNode.type === 'SQL Queries') {
+                filteredEdges.forEach(queryEdge => {
+                  if (queryEdge.target === edge.source && queryEdge.type === 'executes_query') {
+                    relatedNodeIds.add(queryEdge.source);
+                    console.log(`    ⬅️⬅️ Query executed by: ${queryEdge.source} -> ${edge.source} (${queryEdge.type})`);
+                    
+                    // Find the automation that contains this activity
+                    const activityNode = filteredNodes.find(n => n.id === queryEdge.source);
+                    if (activityNode && (activityNode.type === 'Activity' || activityNode.type.includes('Activity'))) {
+                      filteredEdges.forEach(activityEdge => {
+                        if (activityEdge.target === queryEdge.source && activityEdge.type === 'executes_activity') {
+                          relatedNodeIds.add(activityEdge.source);
+                          console.log(`      ⬅️⬅️⬅️ Parent automation: ${activityEdge.source} -> ${queryEdge.source} (${activityEdge.type})`);
+                        }
+                      });
+                    }
+                  }
+                });
+              }
+            }
+          });
         } else {
-          // For non-automation/non-query nodes, use standard 1-hop connection
+          // For other node types, use standard 1-hop connection
           filteredEdges.forEach(edge => {
             if (edge.source === nodeId) {
               relatedNodeIds.add(edge.target);
@@ -8177,6 +8235,64 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
               });
             }
           });
+          
+          // 4. Fallback: Search through automation metadata for queries that target this DE
+          if (relevantAutomations.size === 0) {
+            console.log(`  📊 [DE Logic] No automations found via relationships, searching automation metadata...`);
+            
+            allAutomations.forEach(automation => {
+              const steps = automation.steps || automation.activities || [];
+              let foundInAutomation = false;
+              
+              steps.forEach(step => {
+                const activities = step.activities || [];
+                activities.forEach(activity => {
+                  // Check if this activity targets our DE
+                  if (activity.targetDataExtensions && activity.targetDataExtensions.length > 0) {
+                    const targetsThisDE = activity.targetDataExtensions.some(targetDE => 
+                      targetDE.id === nodeData.object.id ||
+                      targetDE.name === nodeData.object.name ||
+                      targetDE.key === nodeData.object.externalKey ||
+                      (nodeData.object.id && nodeData.object.id.includes(targetDE.id)) ||
+                      (nodeData.object.id && targetDE.id && targetDE.id.includes(nodeData.object.id.replace('de_', '')))
+                    );
+                    
+                    if (targetsThisDE) {
+                      relevantAutomations.add(automation.id);
+                      foundInAutomation = true;
+                      console.log(`    🔍 Found automation via metadata: ${automation.name} (activity: ${activity.name} targets DE)`);
+                      
+                      // Also create the activity node for this step
+                      const stepNumber = step.step || steps.indexOf(step) + 1;
+                      const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
+                      relevantActivities.add(activityId);
+                      console.log(`    🎯 Adding corresponding activity: ${activityId}`);
+                    }
+                  }
+                  
+                  // Also check if the activity's query is one of our relevant queries
+                  if (activity.activityObjectId) {
+                    const queryId = `query_${activity.activityObjectId}`;
+                    if (relevantQueries.has(queryId)) {
+                      relevantAutomations.add(automation.id);
+                      foundInAutomation = true;
+                      console.log(`    🔍 Found automation via query reference: ${automation.name} (activity executes query ${activity.activityObjectId})`);
+                      
+                      // Also create the activity node for this step
+                      const stepNumber = step.step || steps.indexOf(step) + 1;
+                      const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
+                      relevantActivities.add(activityId);
+                      console.log(`    🎯 Adding corresponding activity: ${activityId}`);
+                    }
+                  }
+                });
+              });
+              
+              if (foundInAutomation) {
+                console.log(`    ✅ Automation "${automation.name}" references DE "${nodeData.object.name}"`);
+              }
+            });
+          }
           
           // 4. Add only the relevant objects to the final set
           console.log(`  📊 [DE Logic] Summary for DE "${nodeData.object.name}":`);
