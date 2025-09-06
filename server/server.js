@@ -5464,6 +5464,74 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
 
 // ==================== SFMC API FUNCTIONS FOR SCHEMA BUILDER ====================
 
+// Helper function to recursively search for targetDataExtensions in any object structure
+function findTargetDataExtensionsRecursive(obj, path = '') {
+  const results = [];
+  
+  if (!obj || typeof obj !== 'object') {
+    return results;
+  }
+  
+  // If this object has targetDataExtensions, add them
+  if (Array.isArray(obj.targetDataExtensions)) {
+    console.log(`🎯 [Recursive Search] Found targetDataExtensions at path: ${path}`);
+    results.push(...obj.targetDataExtensions);
+  }
+  
+  // Recursively search all properties
+  for (const [key, value] of Object.entries(obj)) {
+    if (value && typeof value === 'object') {
+      const currentPath = path ? `${path}.${key}` : key;
+      const nestedResults = findTargetDataExtensionsRecursive(value, currentPath);
+      results.push(...nestedResults);
+    }
+  }
+  
+  return results;
+}
+
+// Helper function to find a DE by multiple potential identifiers (enhanced)
+function findDataExtensionByIdentifier(identifier, dataExtensions) {
+  if (!identifier || !dataExtensions) return null;
+  
+  // Convert identifier to string for consistent comparison
+  const idStr = String(identifier);
+  
+  console.log(`🔍 [DE Lookup] Searching for DE with identifier: "${idStr}"`);
+  
+  // Try multiple lookup strategies
+  const lookupStrategies = [
+    // Strategy 1: Direct ID match
+    de => de.id === idStr,
+    // Strategy 2: Check if ID ends with the identifier (for UUIDs)
+    de => de.id.endsWith(idStr),
+    // Strategy 3: Check if identifier ends with the DE ID
+    de => idStr.endsWith(de.id),
+    // Strategy 4: Name match
+    de => de.name === idStr,
+    // Strategy 5: Key match
+    de => de.key === idStr || de.externalKey === idStr || de.customerKey === idStr,
+    // Strategy 6: Check de_KEY format
+    de => de.id === `de_${idStr}`,
+    de => `de_${de.key}` === idStr,
+    de => `de_${de.externalKey}` === idStr,
+    de => `de_${de.customerKey}` === idStr,
+    de => `de_${de.id}` === idStr
+  ];
+  
+  for (let i = 0; i < lookupStrategies.length; i++) {
+    const strategy = lookupStrategies[i];
+    const found = dataExtensions.find(strategy);
+    if (found) {
+      console.log(`✅ [DE Lookup] Found DE "${found.name}" (${found.id}) using strategy ${i + 1}`);
+      return found;
+    }
+  }
+  
+  console.log(`❌ [DE Lookup] No DE found for identifier: "${idStr}"`);
+  return null;
+}
+
 /**
  * Fetch Data Extensions from SFMC using SOAP API
  */
