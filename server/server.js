@@ -6153,63 +6153,81 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
     
     // Process each activity/step with execution order
     activities.forEach((activity, stepIndex) => {
-      const stepNumber = stepIndex + 1;
-      const activityType = getActivityType(activity, automation.name, queries);
-      const activityId = `${automation.id}_activity_${stepNumber}_${activityType}`;
-      
-      console.log(`🔧 [Relationship] Processing Step ${stepNumber}: ${activityType} (${activity.name || activity.displayName || 'Unnamed'})`);
-      
-      // Create activity node
-      const activityNode = {
-        id: activityId,
-        name: activity.name || activity.displayName || `${activityType} Step ${stepNumber}`,
-        type: 'Activity',
-        activityType: activityType,
-        stepNumber: stepNumber,
-        automationId: automation.id,
-        automationName: automation.name,
-        description: activity.description || `${activityType} activity in ${automation.name}`,
-        metadata: {
-          ...activity,
+      try {
+        const stepNumber = stepIndex + 1;
+        const activityType = getActivityType(activity, automation.name, queries);
+        const activityId = `${automation.id}_activity_${stepNumber}_${activityType}`;
+        
+        console.log(`🔧 [Relationship] Processing Step ${stepNumber}: ${activityType} (${activity.name || activity.displayName || 'Unnamed'})`);
+        console.log(`🔧 [Relationship] Activity ID: ${activityId}`);
+        
+        // Create activity node
+        const activityNode = {
+          id: activityId,
+          name: activity.name || activity.displayName || `${activityType} Step ${stepNumber}`,
+          type: 'Activity',
+          activityType: activityType,
           stepNumber: stepNumber,
-          executionOrder: stepNumber,
-          parentAutomation: automation.name
-        }
-      };
-      
-      activityNodes.set(activityId, activityNode);
-      
-      // Create Automation → Activity relationship
-      relationships.push({
-        id: `${automation.id}-${activityId}`,
-        source: automation.id,
-        target: activityId,
-        type: 'executes_activity',
-        label: `Step ${stepNumber}`,
-        description: `Automation "${automation.name}" executes ${activityType} at step ${stepNumber}`,
-        stepNumber: stepNumber,
-        executionOrder: stepNumber
-      });
-      
-      // Detect Activity → Asset relationships based on activity type
-      // Add automation name to activity for context
-      activity.automationName = automation.name;
-      
-      detectActivityToAssetRelationships(activityId, activity, activityType, dataExtensions, queries, fileTransfers, dataExtracts, relationships, deMap, deKeyMap);
-      
-      // If this is not the last activity, create next step relationship
-      if (stepIndex < activities.length - 1) {
-        const nextActivityId = `${automation.id}_activity_${stepIndex + 2}_${getActivityType(activities[stepIndex + 1])}`;
-        relationships.push({
-          id: `${activityId}-${nextActivityId}`,
-          source: activityId,
-          target: nextActivityId,
-          type: 'next_step',
-          label: 'next',
-          description: `Step ${stepNumber} leads to Step ${stepIndex + 2}`,
+          automationId: automation.id,
+          automationName: automation.name,
+          description: activity.description || `${activityType} activity in ${automation.name}`,
+          metadata: {
+            ...activity,
+            stepNumber: stepNumber,
+            executionOrder: stepNumber,
+            parentAutomation: automation.name
+          }
+        };
+        
+        activityNodes.set(activityId, activityNode);
+        console.log(`✅ [Relationship] Created activity node: ${activityId}`);
+        
+        // Create Automation → Activity relationship
+        const autoToActivityRel = {
+          id: `${automation.id}-${activityId}`,
+          source: automation.id,
+          target: activityId,
+          type: 'executes_activity',
+          label: `Step ${stepNumber}`,
+          description: `Automation "${automation.name}" executes ${activityType} at step ${stepNumber}`,
           stepNumber: stepNumber,
           executionOrder: stepNumber
-        });
+        };
+        
+        relationships.push(autoToActivityRel);
+        console.log(`🔗 [Relationship] Created automation→activity relationship: ${automation.id} → ${activityId}`);
+        
+        // Detect Activity → Asset relationships based on activity type
+        // Add automation name to activity for context
+        activity.automationName = automation.name;
+        
+        console.log(`🔍 [Relationship] Detecting asset relationships for activity ${activityId}...`);
+        const assetRelationshipsCountBefore = relationships.length;
+        
+        detectActivityToAssetRelationships(activityId, activity, activityType, dataExtensions, queries, fileTransfers, dataExtracts, relationships, deMap, deKeyMap);
+        
+        const assetRelationshipsCountAfter = relationships.length;
+        console.log(`📊 [Relationship] Activity ${activityId} generated ${assetRelationshipsCountAfter - assetRelationshipsCountBefore} asset relationships`);
+        
+        // If this is not the last activity, create next step relationship
+        if (stepIndex < activities.length - 1) {
+          const nextActivityId = `${automation.id}_activity_${stepIndex + 2}_${getActivityType(activities[stepIndex + 1])}`;
+          const nextStepRel = {
+            id: `${activityId}-${nextActivityId}`,
+            source: activityId,
+            target: nextActivityId,
+            type: 'next_step',
+            label: 'next',
+            description: `Step ${stepNumber} leads to Step ${stepIndex + 2}`,
+            stepNumber: stepNumber,
+            executionOrder: stepNumber
+          };
+          relationships.push(nextStepRel);
+          console.log(`🔗 [Relationship] Created next step relationship: ${activityId} → ${nextActivityId}`);
+        }
+        
+      } catch (error) {
+        console.error(`❌ [Relationship] Error processing activity ${stepIndex + 1} in automation "${automation.name}":`, error);
       }
     });
   });
