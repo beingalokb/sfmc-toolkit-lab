@@ -8263,13 +8263,19 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                         const targetsThisDE = activity.targetDataExtensions.some(targetDE => {
                           if (!targetDE) return false;
                           
-                          return (
-                            (targetDE.id && nodeData.object.id && targetDE.id === nodeData.object.id) ||
-                            (targetDE.name && nodeData.object.name && targetDE.name === nodeData.object.name) ||
-                            (targetDE.key && nodeData.object.externalKey && targetDE.key === nodeData.object.externalKey) ||
-                            (nodeData.object.id && targetDE.id && nodeData.object.id.includes(targetDE.id)) ||
-                            (nodeData.object.id && targetDE.id && targetDE.id.includes(nodeData.object.id.replace('de_', '')))
-                          );
+                          try {
+                            return (
+                              (targetDE.id && nodeData.object.id && targetDE.id === nodeData.object.id) ||
+                              (targetDE.name && nodeData.object.name && targetDE.name === nodeData.object.name) ||
+                              (targetDE.key && nodeData.object.externalKey && targetDE.key === nodeData.object.externalKey) ||
+                              (nodeData.object.id && targetDE.id && typeof nodeData.object.id === 'string' && typeof targetDE.id === 'string' && nodeData.object.id.includes(targetDE.id)) ||
+                              (nodeData.object.id && targetDE.id && typeof nodeData.object.id === 'string' && typeof targetDE.id === 'string' && targetDE.id.includes(nodeData.object.id.replace('de_', '')))
+                            );
+                          } catch (comparisonError) {
+                            console.log(`    ⚠️ Error in DE comparison for activity "${activity.name || 'unnamed'}":`, comparisonError.message);
+                            console.log(`    📋 DE comparison debug: nodeData.object.id=${nodeData.object.id}, targetDE.id=${targetDE.id}`);
+                            return false;
+                          }
                         });
                         
                         if (targetsThisDE) {
@@ -9149,6 +9155,65 @@ app.get('/graph', async (req, res) => {
           parsedSelectedObjects['Data Extensions'][key] === true
         );
         console.error('❌ [Graph API] Error occurred while processing selected DEs:', selectedDEs);
+      }
+      
+      // 🆕 ATTEMPT MINIMAL GRAPH: Try to create a graph with just the selected objects
+      try {
+        console.log('🔄 [Graph API] Attempting to create minimal graph with selected objects...');
+        
+        if (sfmcObjects && parsedSelectedObjects && Object.keys(parsedSelectedObjects).length > 0) {
+          const minimalNodes = [];
+          const minimalEdges = [];
+          
+          // Add selected objects to the minimal graph
+          Object.entries(parsedSelectedObjects).forEach(([category, selections]) => {
+            if (sfmcObjects[category]) {
+              Object.entries(selections).forEach(([objectId, isSelected]) => {
+                if (isSelected) {
+                  const obj = sfmcObjects[category].find(item => item.id === objectId);
+                  if (obj) {
+                    minimalNodes.push({
+                      data: {
+                        id: obj.id,
+                        label: obj.name || 'Unnamed Object',
+                        type: category,
+                        category: category,
+                        createdDate: obj.createdDate || new Date().toISOString().split('T')[0]
+                      }
+                    });
+                    console.log(`✅ [Graph API] Added selected object to minimal graph: ${category} - ${obj.name}`);
+                  } else {
+                    console.log(`❌ [Graph API] Selected object not found in SFMC data: ${objectId}`);
+                  }
+                }
+              });
+            }
+          });
+          
+          if (minimalNodes.length > 0) {
+            const minimalGraphData = {
+              nodes: minimalNodes,
+              edges: minimalEdges,
+              metadata: {
+                totalNodes: minimalNodes.length,
+                totalEdges: minimalEdges.length,
+                format: 'cytoscape',
+                source: 'minimal-selected-objects',
+                generatedAt: new Date().toISOString(),
+                note: 'Minimal graph showing only selected objects due to relationship detection error'
+              }
+            };
+            
+            console.log('✅ [Graph API] Providing minimal graph with selected objects:', {
+              nodeCount: minimalGraphData.nodes.length,
+              edgeCount: minimalGraphData.edges.length
+            });
+            
+            return res.json(minimalGraphData);
+          }
+        }
+      } catch (minimalError) {
+        console.error('❌ [Graph API] Even minimal graph creation failed:', minimalError.message);
       }
       
       // Fall back to mock graph data when live generation fails
