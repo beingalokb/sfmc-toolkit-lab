@@ -5613,46 +5613,116 @@ async function fetchSFMCDataExtensions(accessToken, subdomain) {
 }
 
 /**
- * Fetch SQL Queries from SFMC using REST API
+ * Fetch SQL Queries from SFMC using SOAP API with enhanced DE relationship detection
+ * Uses QueryDefinition object type to get SQL text and target DE information
  */
 async function fetchSFMCQueries(accessToken, restEndpoint) {
   try {
-    console.log('🔍 [SFMC API] Fetching SQL Queries...');
+    console.log('🔍 [SFMC API] Fetching SQL Queries using SOAP QueryDefinition...');
     
-    const response = await axios.get(`${restEndpoint}/automation/v1/queries`, {
+    // Extract subdomain from restEndpoint for SOAP endpoint
+    const soapEndpoint = restEndpoint.replace('/rest', '/soap');
+    const subdomain = restEndpoint.match(/https:\/\/([^.]+)\./)?.[1] || 'mc';
+    const soapUrl = `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`;
+    
+    const soapEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+        <s:Header>
+          <fueloauth>${accessToken}</fueloauth>
+        </s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>QueryDefinition</ObjectType>
+              <Properties>Name</Properties>
+              <Properties>ObjectID</Properties>
+              <Properties>QueryText</Properties>
+              <Properties>DataExtensionTarget.Name</Properties>
+              <Properties>DataExtensionTarget.CustomerKey</Properties>
+              <Properties>CreatedDate</Properties>
+              <Properties>ModifiedDate</Properties>
+              <Properties>Status</Properties>
+              <Properties>CategoryID</Properties>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>
+    `;
+
+    console.log('📡 [SFMC SOAP] Sending QueryDefinition retrieve request...');
+    
+    const response = await axios.post(soapUrl, soapEnvelope, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'text/xml',
+        'SOAPAction': 'Retrieve'
       },
-      timeout: 30000 // 30 second timeout
+      timeout: 60000 // Increased timeout for SOAP requests
     });
 
-    console.log('📡 [SFMC API] SQL Queries REST response received');
+    console.log('📡 [SFMC SOAP] QueryDefinition response received');
 
-    const queries = response.data?.items || [];
+    // Parse SOAP response
+    const parser = new xml2js.Parser({ explicitArray: false });
+    let queries = [];
     
-    console.log(`✅ [SFMC API] Found ${queries.length} SQL Queries`);
+    await new Promise((resolve, reject) => {
+      parser.parseString(response.data, (err, result) => {
+        if (err) return reject(err);
+        
+        const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+        if (!results) {
+          console.log('⚠️ [SFMC SOAP] No QueryDefinition results found');
+          return resolve();
+        }
+        
+        const queryResults = Array.isArray(results) ? results : [results];
+        console.log(`📊 [SFMC SOAP] Found ${queryResults.length} QueryDefinition objects`);
+        
+        queries = queryResults.map((query, index) => {
+          const queryId = query.ObjectID || `query_${index}`;
+          const queryName = query.Name || 'Unnamed Query';
+          const queryText = query.QueryText || '';
+          const targetDeName = query.DataExtensionTarget?.Name || '';
+          const targetDeKey = query.DataExtensionTarget?.CustomerKey || '';
+          
+          console.log(`🔍 [SFMC SOAP] Processing query "${queryName}":`, {
+            id: queryId,
+            targetDE: targetDeName,
+            targetKey: targetDeKey,
+            hasQueryText: !!queryText
+          });
+          
+          return {
+            id: `query_${queryId}`,
+            objectId: queryId,
+            name: queryName,
+            description: `SQL Query${targetDeName ? ` targeting ${targetDeName}` : ''}`,
+            queryType: 'SQL',
+            queryText: queryText,
+            sqlStatement: queryText,
+            targetDataExtensionName: targetDeName,
+            targetDataExtensionKey: targetDeKey,
+            createdDate: query.CreatedDate,
+            modifiedDate: query.ModifiedDate,
+            status: query.Status || 'Unknown',
+            categoryId: query.CategoryID,
+            type: 'Query'
+          };
+        });
+        
+        resolve();
+      });
+    });
     
-    return queries.map(query => ({
-      id: `query_${query.queryDefinitionId || query.id}`,
-      name: query.name || 'Unnamed Query',
-      description: query.description || '',
-      queryType: query.queryType || 'Unknown',
-      queryText: query.queryText || '',
-      sqlStatement: query.queryText || '',
-      createdDate: query.createdDate,
-      modifiedDate: query.modifiedDate,
-      status: query.status,
-      type: 'Query'
-    }));
+    console.log(`✅ [SFMC SOAP] Successfully processed ${queries.length} SQL Queries`);
+    return queries;
     
   } catch (error) {
-    console.error('❌ [SFMC API] Error fetching Queries:', error.message);
-    if (error.response) {
-      console.error('❌ [SFMC API] Response status:', error.response.status);
-      console.error('❌ [SFMC API] Response data:', JSON.stringify(error.response.data, null, 2));
+    console.error('❌ [SFMC SOAP] Error fetching QueryDefinition objects:', error.message);
+    if (error.response?.data) {
+      console.error('❌ [SFMC SOAP] Response data:', error.response.data.substring(0, 500));
     }
-    throw error;
+    return [];
   }
 }
 
@@ -5998,16 +6068,54 @@ async function fetchSFMCDataExtracts(accessToken, restEndpoint) {
  * Detect Data Extension relationships in SQL Queries
  * Enhanced to handle various API response formats
  */
+/**
+ * Detect Data Extension relationships in SQL Queries
+ * Enhanced to use SOAP QueryDefinition data with explicit target DE and SQL text analysis
+ */
 function detectQueryToDataExtensionRelationships(queries, dataExtensions) {
   const relationships = [];
   const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
   const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
+  // Also map by customerKey and key variants
+  dataExtensions.forEach(de => {
+    if (de.customerKey) deKeyMap.set(de.customerKey.toLowerCase(), de);
+    if (de.key) deKeyMap.set(de.key.toLowerCase(), de);
+  });
   
   console.log('🔍 [Relationship] Analyzing SQL Query relationships...');
   console.log(`📊 [Relationship] Processing ${queries.length} queries against ${dataExtensions.length} DEs`);
   
   queries.forEach(query => {
-    // Try multiple possible fields for SQL text
+    console.log(`🔍 [Relationship] Analyzing query "${query.name}"`);
+    
+    // 1. EXPLICIT TARGET DE from SOAP QueryDefinition (DataExtensionTarget)
+    if (query.targetDataExtensionName) {
+      const targetDeName = query.targetDataExtensionName.toLowerCase();
+      let targetDe = deMap.get(targetDeName);
+      
+      // Also try to find by key if name lookup fails
+      if (!targetDe && query.targetDataExtensionKey) {
+        const targetDeKey = query.targetDataExtensionKey.toLowerCase();
+        targetDe = deKeyMap.get(targetDeKey);
+      }
+      
+      if (targetDe) {
+        const relationshipId = `${query.id}-${targetDe.id}`;
+        relationships.push({
+          id: relationshipId,
+          source: query.id,
+          target: targetDe.id,
+          type: 'writes_to',
+          label: 'writes to',
+          description: `Query "${query.name}" writes to target DE "${targetDe.name}"`
+        });
+        console.log(`✅ [Relationship] Found EXPLICIT TARGET: ${query.name} → ${targetDe.name}`);
+      } else {
+        console.log(`⚠️ [Relationship] Target DE "${query.targetDataExtensionName}" not found for query "${query.name}"`);
+      }
+    }
+    
+    // 2. IMPLICIT RELATIONSHIPS from SQL text analysis
     const sqlText = (
       query.queryText || 
       query.sqlStatement || 
@@ -6017,111 +6125,128 @@ function detectQueryToDataExtensionRelationships(queries, dataExtensions) {
     ).toLowerCase();
     
     if (!sqlText) {
-      console.log(`⚠️  [Relationship] No SQL text found for query: ${query.name}`);
+      console.log(`⚠️ [Relationship] No SQL text found for query: ${query.name}`);
       return;
     }
     
-    console.log(`🔍 [Relationship] Analyzing query "${query.name}" (${sqlText.length} chars)`);
+    console.log(`🔍 [Relationship] Parsing SQL text for query "${query.name}" (${sqlText.length} chars)`);
     
-    // Enhanced regex patterns for SQL parsing
-    const patterns = {
-      reads: [
-        /(?:from|join)\s+\[?([a-zA-Z_][a-zA-Z0-9_]*)\]?/gi,
-        /(?:from|join)\s+"([^"]+)"/gi,
-        /(?:from|join)\s+'([^']+)'/gi
-      ],
-      writes: [
-        /(?:into|overwrite|append)\s+\[?([a-zA-Z_][a-zA-Z0-9_]*)\]?/gi,
-        /(?:into|overwrite|append)\s+"([^"]+)"/gi,
-        /(?:into|overwrite|append)\s+'([^']+)'/gi
-      ]
-    };
-    
-    // Detect READ relationships (FROM, JOIN)
-    patterns.reads.forEach(pattern => {
-      let match;
-      while ((match = pattern.exec(sqlText)) !== null) {
-        const deName = match[1].trim();
-        const de = deMap.get(deName) || deKeyMap.get(deName);
-        if (de) {
-          const relationshipId = `${de.id}-${query.id}`;
-          relationships.push({
-            id: relationshipId,
-            source: de.id,
-            target: query.id,
-            type: 'reads_from',
-            label: 'reads from',
-            description: `Query "${query.name}" reads from DE "${de.name}"`
-          });
-          console.log(`✅ [Relationship] Found READ: ${query.name} → ${de.name}`);
-        }
-      }
-    });
-    
-    // Detect WRITE relationships (INTO, OVERWRITE, APPEND)
-    patterns.writes.forEach(pattern => {
-      let match;
-      while ((match = pattern.exec(sqlText)) !== null) {
-        const deName = match[1].trim();
-        const de = deMap.get(deName) || deKeyMap.get(deName);
-        if (de) {
-          const relationshipId = `${query.id}-${de.id}`;
-          relationships.push({
-            id: relationshipId,
-            source: query.id,
-            target: de.id,
-            type: 'writes_to',
-            label: 'writes to',
-            description: `Query "${query.name}" writes to DE "${de.name}"`
-          });
-          console.log(`✅ [Relationship] Found WRITE: ${query.name} → ${de.name}`);
-        }
-      }
-    });
-    
-    // Target Data Extension ID (common in SFMC query APIs)
-    if (query.targetDataExtensionId || query.targetId) {
-      const targetId = query.targetDataExtensionId || query.targetId;
-      const targetDe = dataExtensions.find(de => de.id === targetId || de.objectId === targetId);
-      if (targetDe) {
-        const relationshipId = `${query.id}-${targetDe.id}`;
-        relationships.push({
-          id: relationshipId,
-          source: query.id,
-          target: targetDe.id,
-          type: 'writes_to',
-          label: 'writes to',
-          description: `Query "${query.name}" writes to DE "${targetDe.name}"`
+    // Enhanced DE detection in SQL text - check every DE name AND CustomerKey in the SQL
+    dataExtensions.forEach(de => {
+      const deName = de.name.toLowerCase();
+      const deNameEscaped = deName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      // Also check for CustomerKey if available
+      const deKeys = [];
+      if (de.customerKey) deKeys.push(de.customerKey.toLowerCase());
+      if (de.externalKey) deKeys.push(de.externalKey.toLowerCase());
+      if (de.key) deKeys.push(de.key.toLowerCase());
+      
+      // Create patterns for name and all keys
+      const allIdentifiers = [deName, ...deKeys];
+      
+      allIdentifiers.forEach(identifier => {
+        const identifierEscaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
+        // Check various SQL contexts where DE names/keys might appear
+        const contexts = [
+          // FROM clauses (reads)
+          new RegExp(`\\bfrom\\s+\\[?${identifierEscaped}\\]?\\b`, 'gi'),
+          new RegExp(`\\bfrom\\s+"${identifierEscaped}"\\b`, 'gi'),
+          new RegExp(`\\bfrom\\s+'${identifierEscaped}'\\b`, 'gi'),
+          new RegExp(`\\bfrom\\s+${identifierEscaped}\\b`, 'gi'),
+          // JOIN clauses (reads)
+          new RegExp(`\\bjoin\\s+\\[?${identifierEscaped}\\]?\\b`, 'gi'),
+          new RegExp(`\\bjoin\\s+"${identifierEscaped}"\\b`, 'gi'),
+          new RegExp(`\\bjoin\\s+'${identifierEscaped}'\\b`, 'gi'),
+          new RegExp(`\\bjoin\\s+${identifierEscaped}\\b`, 'gi'),
+          // INTO clauses (writes)
+          new RegExp(`\\binto\\s+\\[?${identifierEscaped}\\]?\\b`, 'gi'),
+          new RegExp(`\\binto\\s+"${identifierEscaped}"\\b`, 'gi'),
+          new RegExp(`\\binto\\s+'${identifierEscaped}'\\b`, 'gi'),
+          new RegExp(`\\binto\\s+${identifierEscaped}\\b`, 'gi'),
+          // INSERT INTO clauses (writes)
+          new RegExp(`\\binsert\\s+into\\s+\\[?${identifierEscaped}\\]?\\b`, 'gi'),
+          new RegExp(`\\binsert\\s+into\\s+"${identifierEscaped}"\\b`, 'gi'),
+          new RegExp(`\\binsert\\s+into\\s+'${identifierEscaped}'\\b`, 'gi'),
+          new RegExp(`\\binsert\\s+into\\s+${identifierEscaped}\\b`, 'gi'),
+          // UPDATE clauses (writes)
+          new RegExp(`\\bupdate\\s+\\[?${identifierEscaped}\\]?\\b`, 'gi'),
+          new RegExp(`\\bupdate\\s+"${identifierEscaped}"\\b`, 'gi'),
+          new RegExp(`\\bupdate\\s+'${identifierEscaped}'\\b`, 'gi'),
+          new RegExp(`\\bupdate\\s+${identifierEscaped}\\b`, 'gi'),
+          // Simple name match anywhere in SQL (fallback)
+          new RegExp(`\\b${identifierEscaped}\\b`, 'gi')
+        ];
+      
+      let foundRead = false;
+      let foundWrite = false;
+        
+        contexts.forEach((regex, index) => {
+          if (regex.test(sqlText)) {
+            if (index < 8) { // FROM and JOIN patterns (reads)
+              if (!foundRead) {
+                const relationshipId = `${de.id}-${query.id}-read`;
+                relationships.push({
+                  id: relationshipId,
+                  source: de.id,
+                  target: query.id,
+                  type: 'reads_from',
+                  label: 'reads from',
+                  description: `Query "${query.name}" reads from DE "${de.name}" using ${identifier === deName ? 'name' : 'key'}`
+                });
+                console.log(`✅ [Relationship] Found READ in SQL: ${query.name} reads from ${de.name} (via ${identifier})`);
+                foundRead = true;
+              }
+            } else if (index < 20) { // INTO, INSERT INTO, UPDATE patterns (writes)
+              if (!foundWrite) {
+                const relationshipId = `${query.id}-${de.id}-write`;
+                relationships.push({
+                  id: relationshipId,
+                  source: query.id,
+                  target: de.id,
+                  type: 'writes_to',
+                  label: 'writes to',
+                  description: `Query "${query.name}" writes to DE "${de.name}" using ${identifier === deName ? 'name' : 'key'}`
+                });
+                console.log(`✅ [Relationship] Found WRITE in SQL: ${query.name} writes to ${de.name} (via ${identifier})`);
+                foundWrite = true;
+              }
+            } else { // Simple name match - determine context with enhanced heuristics
+              if (!foundRead && !foundWrite) {
+                // Use enhanced heuristics to determine if it's read or write
+                const beforeMatch = sqlText.substring(0, sqlText.indexOf(identifier));
+                const isWrite = /\b(into|insert|update|delete|create|drop|truncate|merge|upsert)\b.*$/i.test(beforeMatch);
+                
+                if (isWrite) {
+                  const relationshipId = `${query.id}-${de.id}-inferred-write`;
+                  relationships.push({
+                    id: relationshipId,
+                    source: query.id,
+                    target: de.id,
+                    type: 'writes_to',
+                    label: 'writes to',
+                    description: `Query "${query.name}" writes to DE "${de.name}" (inferred from ${identifier})`
+                  });
+                  console.log(`✅ [Relationship] Found INFERRED WRITE: ${query.name} → ${de.name} (via ${identifier})`);
+                } else {
+                  const relationshipId = `${de.id}-${query.id}-inferred-read`;
+                  relationships.push({
+                    id: relationshipId,
+                    source: de.id,
+                    target: query.id,
+                    type: 'reads_from',
+                    label: 'reads from',
+                    description: `Query "${query.name}" reads from DE "${de.name}" (inferred from ${identifier})`
+                  });
+                  console.log(`✅ [Relationship] Found INFERRED READ: ${query.name} reads from ${de.name} (via ${identifier})`);
+                }
+              }
+            }
+          }
         });
-        console.log(`✅ [Relationship] Found TARGET DE: ${query.name} → ${targetDe.name}`);
-      }
-    }
-    
-    // Fallback: For queries that don't match standard patterns, try name-based matching
-    if (query.name && query.name.toLowerCase().includes('bu unsub')) {
-      console.log(`🔍 [BU Unsubs Query Debug] Attempting name-based fallback for query: ${query.name}`);
-      const matchingDe = deMap.get(query.name.toLowerCase()) || deKeyMap.get(query.name.toLowerCase());
-      if (matchingDe) {
-        // Check if we already have a relationship to this DE
-        const existingRelationship = relationships.find(rel => 
-          rel.source === query.id && rel.target === matchingDe.id && rel.type === 'writes_to'
-        );
-        if (!existingRelationship) {
-          const relationshipId = `${query.id}-${matchingDe.id}`;
-          relationships.push({
-            id: relationshipId,
-            source: query.id,
-            target: matchingDe.id,
-            type: 'writes_to',
-            label: 'writes to',
-            description: `Query "${query.name}" writes to DE "${matchingDe.name}" (inferred by name matching)`
-          });
-          console.log(`🔗 [BU Unsubs Query Fallback] Found DE by name matching: ${query.name} → ${matchingDe.name}`);
-        }
-      } else {
-        console.log(`❌ [BU Unsubs Query Debug] No matching DE found for query: ${query.name}`);
-      }
-    }
+      });
+    });
   });
   
   console.log(`📈 [Relationship] SQL Query analysis complete: ${relationships.length} relationships found`);
