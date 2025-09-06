@@ -8240,58 +8240,80 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
           if (relevantAutomations.size === 0) {
             console.log(`  📊 [DE Logic] No automations found via relationships, searching automation metadata...`);
             
-            allAutomations.forEach(automation => {
-              const steps = automation.steps || automation.activities || [];
-              let foundInAutomation = false;
-              
-              steps.forEach(step => {
-                const activities = step.activities || [];
-                activities.forEach(activity => {
-                  // Check if this activity targets our DE
-                  if (activity.targetDataExtensions && activity.targetDataExtensions.length > 0) {
-                    const targetsThisDE = activity.targetDataExtensions.some(targetDE => 
-                      targetDE.id === nodeData.object.id ||
-                      targetDE.name === nodeData.object.name ||
-                      targetDE.key === nodeData.object.externalKey ||
-                      (nodeData.object.id && nodeData.object.id.includes(targetDE.id)) ||
-                      (nodeData.object.id && targetDE.id && targetDE.id.includes(nodeData.object.id.replace('de_', '')))
-                    );
-                    
-                    if (targetsThisDE) {
-                      relevantAutomations.add(automation.id);
-                      foundInAutomation = true;
-                      console.log(`    🔍 Found automation via metadata: ${automation.name} (activity: ${activity.name} targets DE)`);
-                      
-                      // Also create the activity node for this step
-                      const stepNumber = step.step || steps.indexOf(step) + 1;
-                      const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
-                      relevantActivities.add(activityId);
-                      console.log(`    🎯 Adding corresponding activity: ${activityId}`);
-                    }
-                  }
+            try {
+              allAutomations.forEach(automation => {
+                if (!automation || !automation.id) {
+                  console.log(`    ⚠️ Skipping invalid automation:`, automation);
+                  return;
+                }
+                
+                const steps = automation.steps || automation.activities || [];
+                let foundInAutomation = false;
+                
+                steps.forEach(step => {
+                  if (!step) return;
                   
-                  // Also check if the activity's query is one of our relevant queries
-                  if (activity.activityObjectId) {
-                    const queryId = `query_${activity.activityObjectId}`;
-                    if (relevantQueries.has(queryId)) {
-                      relevantAutomations.add(automation.id);
-                      foundInAutomation = true;
-                      console.log(`    🔍 Found automation via query reference: ${automation.name} (activity executes query ${activity.activityObjectId})`);
+                  const activities = step.activities || [];
+                  activities.forEach(activity => {
+                    if (!activity) return;
+                    
+                    try {
+                      // Check if this activity targets our DE
+                      if (activity.targetDataExtensions && Array.isArray(activity.targetDataExtensions) && activity.targetDataExtensions.length > 0) {
+                        const targetsThisDE = activity.targetDataExtensions.some(targetDE => {
+                          if (!targetDE) return false;
+                          
+                          return (
+                            (targetDE.id && nodeData.object.id && targetDE.id === nodeData.object.id) ||
+                            (targetDE.name && nodeData.object.name && targetDE.name === nodeData.object.name) ||
+                            (targetDE.key && nodeData.object.externalKey && targetDE.key === nodeData.object.externalKey) ||
+                            (nodeData.object.id && targetDE.id && nodeData.object.id.includes(targetDE.id)) ||
+                            (nodeData.object.id && targetDE.id && targetDE.id.includes(nodeData.object.id.replace('de_', '')))
+                          );
+                        });
+                        
+                        if (targetsThisDE) {
+                          relevantAutomations.add(automation.id);
+                          foundInAutomation = true;
+                          console.log(`    🔍 Found automation via metadata: ${automation.name} (activity: ${activity.name || 'unnamed'} targets DE)`);
+                          
+                          // Also create the activity node for this step
+                          const stepNumber = step.step || steps.indexOf(step) + 1;
+                          const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
+                          relevantActivities.add(activityId);
+                          console.log(`    🎯 Adding corresponding activity: ${activityId}`);
+                        }
+                      }
                       
-                      // Also create the activity node for this step
-                      const stepNumber = step.step || steps.indexOf(step) + 1;
-                      const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
-                      relevantActivities.add(activityId);
-                      console.log(`    🎯 Adding corresponding activity: ${activityId}`);
+                      // Also check if the activity's query is one of our relevant queries
+                      if (activity.activityObjectId) {
+                        const queryId = `query_${activity.activityObjectId}`;
+                        if (relevantQueries.has(queryId)) {
+                          relevantAutomations.add(automation.id);
+                          foundInAutomation = true;
+                          console.log(`    🔍 Found automation via query reference: ${automation.name} (activity executes query ${activity.activityObjectId})`);
+                          
+                          // Also create the activity node for this step
+                          const stepNumber = step.step || steps.indexOf(step) + 1;
+                          const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
+                          relevantActivities.add(activityId);
+                          console.log(`    🎯 Adding corresponding activity: ${activityId}`);
+                        }
+                      }
+                    } catch (activityError) {
+                      console.log(`    ⚠️ Error processing activity in automation "${automation.name}":`, activityError.message);
                     }
-                  }
+                  });
                 });
+                
+                if (foundInAutomation) {
+                  console.log(`    ✅ Automation "${automation.name}" references DE "${nodeData.object.name}"`);
+                }
               });
-              
-              if (foundInAutomation) {
-                console.log(`    ✅ Automation "${automation.name}" references DE "${nodeData.object.name}"`);
-              }
-            });
+            } catch (metadataError) {
+              console.log(`  ⚠️ Error in automation metadata search:`, metadataError.message);
+              console.log(`  📊 [DE Logic] Continuing with existing relationships...`);
+            }
           }
           
           // 4. Add only the relevant objects to the final set
@@ -8385,28 +8407,46 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
           if (relevantActivities.size === 0) {
             console.log(`  📝 [Query Logic] No direct activity relationships found, searching automation metadata...`);
             
-            // Search through all automations to find ones that reference this query
-            allAutomations.forEach(automation => {
-              const steps = automation.steps || automation.activities || [];
-              steps.forEach(step => {
-                const activities = step.activities || [];
-                activities.forEach(activity => {
-                  // Check if this activity references our query
-                  if (activity.activityObjectId === nodeData.object.objectId || 
-                      activity.activityObjectId === nodeData.object.id?.replace('query_', '') ||
-                      activity.name === nodeData.object.name) {
-                    relevantAutomations.add(automation.id);
-                    console.log(`    🔍 Found automation via metadata search: ${automation.name} (activity: ${activity.name})`);
+            try {
+              // Search through all automations to find ones that reference this query
+              allAutomations.forEach(automation => {
+                if (!automation || !automation.id) {
+                  console.log(`    ⚠️ Skipping invalid automation:`, automation);
+                  return;
+                }
+                
+                const steps = automation.steps || automation.activities || [];
+                steps.forEach(step => {
+                  if (!step) return;
+                  
+                  const activities = step.activities || [];
+                  activities.forEach(activity => {
+                    if (!activity) return;
                     
-                    // Also create the activity node for this step
-                    const stepNumber = step.step || steps.indexOf(step) + 1;
-                    const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
-                    relevantActivities.add(activityId);
-                    console.log(`    🎯 Adding corresponding activity: ${activityId}`);
-                  }
+                    try {
+                      // Check if this activity references our query
+                      if (activity.activityObjectId === nodeData.object.objectId || 
+                          activity.activityObjectId === nodeData.object.id?.replace('query_', '') ||
+                          (activity.name && nodeData.object.name && activity.name === nodeData.object.name)) {
+                        relevantAutomations.add(automation.id);
+                        console.log(`    🔍 Found automation via metadata search: ${automation.name} (activity: ${activity.name || 'unnamed'})`);
+                        
+                        // Also create the activity node for this step
+                        const stepNumber = step.step || steps.indexOf(step) + 1;
+                        const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
+                        relevantActivities.add(activityId);
+                        console.log(`    🎯 Adding corresponding activity: ${activityId}`);
+                      }
+                    } catch (activityError) {
+                      console.log(`    ⚠️ Error processing activity in automation "${automation.name}":`, activityError.message);
+                    }
+                  });
                 });
               });
-            });
+            } catch (metadataError) {
+              console.log(`  ⚠️ Error in query metadata search:`, metadataError.message);
+              console.log(`  📝 [Query Logic] Continuing with existing relationships...`);
+            }
           }
           
           // Add all found activities
@@ -9099,7 +9139,17 @@ app.get('/graph', async (req, res) => {
       }
       
     } catch (error) {
-      console.error('❌ [Graph API] Error with live data, falling back to mock:', error.message);
+      console.error('❌ [Graph API] Error with live data, falling back to mock:');
+      console.error('❌ [Graph API] Error message:', error.message);
+      console.error('❌ [Graph API] Error stack:', error.stack);
+      
+      // 🆕 ENHANCED DEBUG: Log context around the error
+      if (parsedSelectedObjects && parsedSelectedObjects['Data Extensions']) {
+        const selectedDEs = Object.keys(parsedSelectedObjects['Data Extensions']).filter(key => 
+          parsedSelectedObjects['Data Extensions'][key] === true
+        );
+        console.error('❌ [Graph API] Error occurred while processing selected DEs:', selectedDEs);
+      }
       
       // Fall back to mock graph data when live generation fails
       const mockGraphData = {
