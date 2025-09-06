@@ -7780,6 +7780,17 @@ function generateGraphFromSchemaData(schemaData, types = [], keys = [], selected
                   if (secondHopEdge.source === edge.target) {
                     relatedNodeIds.add(secondHopEdge.target);
                     console.log(`    ➡️➡️ Activity target: ${edge.target} -> ${secondHopEdge.target} (${secondHopEdge.type})`);
+                    
+                    // For query activities, also find the DEs that the queries target (3-hop)
+                    const queryNode = filteredNodes.find(n => n.id === secondHopEdge.target);
+                    if (queryNode && queryNode.type === 'SQL Queries') {
+                      filteredEdges.forEach(thirdHopEdge => {
+                        if (thirdHopEdge.source === secondHopEdge.target && thirdHopEdge.type === 'writes_to') {
+                          relatedNodeIds.add(thirdHopEdge.target);
+                          console.log(`      ➡️➡️➡️ Query target DE: ${secondHopEdge.target} -> ${thirdHopEdge.target} (${thirdHopEdge.type})`);
+                        }
+                      });
+                    }
                   }
                 });
               }
@@ -8234,6 +8245,7 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
         } else if (nodeData.category === 'Automations') {
           // For Automations, show only the activities and DEs that are directly involved
           console.log(`  🤖 [Automation Logic] Finding objects related to Automation: ${nodeData.object.name}`);
+          console.log(`  🤖 [Automation Logic] Automation has ${nodeData.outbound.length} outbound relationships`);
           
           // Add all activities in this automation
           nodeData.outbound.forEach(rel => {
@@ -8245,9 +8257,11 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                 console.log(`    ✅ Adding automation activity: ${targetNode.object.name}`);
                 
                 // For each activity, add its target DEs and queries
+                console.log(`    🔍 Activity "${targetNode.object.name}" has ${targetNode.outbound.length} outbound relationships`);
                 targetNode.outbound.forEach(activityRel => {
                   const activityTargetNode = relationshipMap.get(activityRel.target);
                   if (activityTargetNode) {
+                    console.log(`      🎯 Activity targets: ${activityTargetNode.category} - ${activityTargetNode.object.name} (${activityRel.type})`);
                     if (activityTargetNode.category === 'Data Extensions') {
                       if (!finalObjectIds.has(activityRel.target)) {
                         finalObjectIds.add(activityRel.target);
@@ -8261,9 +8275,11 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                         console.log(`    ✅ Adding activity target query: ${activityTargetNode.object.name}`);
                         
                         // Also add DEs that this query targets
+                        console.log(`      🔍 Query "${activityTargetNode.object.name}" has ${activityTargetNode.outbound.length} outbound relationships`);
                         activityTargetNode.outbound.forEach(queryRel => {
                           const queryTargetNode = relationshipMap.get(queryRel.target);
                           if (queryTargetNode && queryTargetNode.category === 'Data Extensions') {
+                            console.log(`        🎯 Query targets DE: ${queryTargetNode.object.name} (${queryRel.type})`);
                             if (!finalObjectIds.has(queryRel.target)) {
                               finalObjectIds.add(queryRel.target);
                               debugStats.nodes.related++;
@@ -8273,11 +8289,61 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                         });
                       }
                     }
+                  } else {
+                    console.log(`      ❌ Activity target node not found in relationship map: ${activityRel.target}`);
                   }
                 });
               }
             }
           });
+          
+          // Also check if this automation has embedded activity data with target DEs (as seen in your response)
+          if (nodeData.object.steps || nodeData.object.activities) {
+            const steps = nodeData.object.steps || nodeData.object.activities || [];
+            console.log(`  🔍 [Automation Logic] Found ${steps.length} embedded steps/activities in automation metadata`);
+            
+            steps.forEach((step, stepIndex) => {
+              const activities = step.activities || [];
+              console.log(`    📋 Step ${stepIndex + 1}: "${step.name}" has ${activities.length} activities`);
+              
+              activities.forEach((activity, activityIndex) => {
+                // Add target DEs from embedded activity data
+                if (activity.targetDataExtensions && activity.targetDataExtensions.length > 0) {
+                  console.log(`      🎯 Activity "${activity.name}" has ${activity.targetDataExtensions.length} target DEs in metadata`);
+                  activity.targetDataExtensions.forEach(targetDE => {
+                    // Try to find the DE in our data and add it
+                    const matchingDE = allDataExtensions.find(de => 
+                      de.id === targetDE.id || 
+                      de.name === targetDE.name || 
+                      de.externalKey === targetDE.key
+                    );
+                    if (matchingDE && !finalObjectIds.has(matchingDE.id)) {
+                      finalObjectIds.add(matchingDE.id);
+                      debugStats.nodes.related++;
+                      console.log(`    ✅ Adding embedded target DE: ${matchingDE.name} (${matchingDE.id})`);
+                    } else if (!matchingDE) {
+                      console.log(`      ❌ Target DE not found in available data: ${targetDE.name} (${targetDE.id})`);
+                    }
+                  });
+                }
+                
+                // Add queries from embedded activity data
+                if (activity.activityObjectId) {
+                  const matchingQuery = allSqlQueries.find(q => 
+                    q.id === activity.activityObjectId || 
+                    q.id === `query_${activity.activityObjectId}`
+                  );
+                  if (matchingQuery && !finalObjectIds.has(matchingQuery.id)) {
+                    finalObjectIds.add(matchingQuery.id);
+                    debugStats.nodes.related++;
+                    console.log(`    ✅ Adding embedded query: ${matchingQuery.name} (${matchingQuery.id})`);
+                  } else if (!matchingQuery) {
+                    console.log(`      ❌ Query not found in available data: ${activity.activityObjectId}`);
+                  }
+                }
+              });
+            });
+          }
           
         } else {
           // For other object types (Journeys, Triggered Sends, Filters, File Transfers, Data Extracts, etc.)
