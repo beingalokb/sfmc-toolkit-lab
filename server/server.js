@@ -6118,9 +6118,25 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
   
   console.log('🔍 [Relationship] Analyzing Activity-Aware Automation relationships...');
   console.log(`📊 [Relationship] Processing ${automations.length} automations`);
+  console.log(`📊 [Relationship] Available Data Extensions (first 10):`, dataExtensions.slice(0, 10).map(de => ({ id: de.id, name: de.name, key: de.externalKey })));
+  
+  // Debug: Check if PF_Preference exists in the data
+  const pfPrefDE = dataExtensions.find(de => de.name === 'PF_Preference' || de.externalKey === 'AF866D96-40F8-454D-8947-46FE02EA96D7');
+  if (pfPrefDE) {
+    console.log(`🎯 [Relationship] Found PF_Preference DE in available data:`, pfPrefDE);
+  } else {
+    console.log(`❌ [Relationship] PF_Preference DE not found in available data`);
+    console.log(`📊 [Relationship] Available DE names:`, dataExtensions.map(de => de.name));
+  }
   
   automations.forEach(automation => {
     console.log(`🔍 [Relationship] Analyzing automation "${automation.name}" (ID: ${automation.id})`);
+    
+    // Debug: Enhanced logging for PF_Preference automation
+    if (automation.name.includes('FSP') || automation.name.includes('Preference')) {
+      console.log(`🎯 [PF_Preference Debug] Found FSP/Preference automation: "${automation.name}"`);
+      console.log(`🎯 [PF_Preference Debug] Full automation structure:`, JSON.stringify(automation, null, 2));
+    }
     
     // Debug: Full structure dump for BU Unsubs automation
     if (automation.name === 'BU Unsubs') {
@@ -6434,12 +6450,21 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
     if (activity.targetDataExtensions && Array.isArray(activity.targetDataExtensions)) {
       console.log(`🔍 [Activity Debug] Processing targetDataExtensions for activity ${activityId}:`, activity.targetDataExtensions);
       
-      activity.targetDataExtensions.forEach(targetDE => {
+      activity.targetDataExtensions.forEach((targetDE, index) => {
         const targetDeName = targetDE.name?.toLowerCase();
         const targetDeKey = targetDE.key?.toLowerCase();
         const targetDeId = targetDE.id;
         
-        console.log(`🔍 [Activity Debug] Processing target DE:`, { id: targetDeId, name: targetDeName, key: targetDeKey });
+        console.log(`🔍 [Activity Debug] Processing target DE ${index + 1}:`, { id: targetDeId, name: targetDeName, key: targetDeKey, originalDE: targetDE });
+        
+        // Enhanced debugging for PF_Preference specifically
+        if (targetDE.name === 'PF_Preference' || targetDE.key === 'AF866D96-40F8-454D-8947-46FE02EA96D7') {
+          console.log(`🎯 [PF_Preference Debug] Found PF_Preference in activity targetDataExtensions!`);
+          console.log(`🎯 [PF_Preference Debug] Target DE details:`, targetDE);
+          console.log(`🎯 [PF_Preference Debug] Available DEs count:`, dataExtensions.length);
+          console.log(`🎯 [PF_Preference Debug] DE name map has key "${targetDeName}":`, deMap.has(targetDeName));
+          console.log(`🎯 [PF_Preference Debug] DE key map has key "${targetDeKey}":`, deKeyMap.has(targetDeKey));
+        }
         
         let targetDe = null;
         if (targetDeName) {
