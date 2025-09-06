@@ -6451,8 +6451,23 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
           console.log(`🔍 [Activity Debug] DE lookup by key "${targetDeKey}":`, targetDe ? `Found ${targetDe.name}` : 'Not found');
         }
         if (!targetDe && targetDeId) {
-          targetDe = dataExtensions.find(de => de.id === targetDeId);
-          console.log(`🔍 [Activity Debug] DE lookup by ID "${targetDeId}":`, targetDe ? `Found ${targetDe.name}` : 'Not found');
+          // Try multiple ID formats
+          targetDe = dataExtensions.find(de => 
+            de.id === targetDeId || 
+            de.id === `de_${targetDeId}` ||
+            de.objectId === targetDeId ||
+            de.customerKey === targetDeId
+          );
+          console.log(`🔍 [Activity Debug] DE lookup by ID "${targetDeId}":`, targetDe ? `Found ${targetDe.name} (${targetDe.id})` : 'Not found');
+        }
+        if (!targetDe && targetDeKey) {
+          // Try key-based ID formats
+          targetDe = dataExtensions.find(de => 
+            de.id === `de_${targetDeKey}` ||
+            de.externalKey === targetDeKey ||
+            de.customerKey === targetDeKey
+          );
+          console.log(`🔍 [Activity Debug] DE lookup by key-based ID "${targetDeKey}":`, targetDe ? `Found ${targetDe.name} (${targetDe.id})` : 'Not found');
         }
         
         if (targetDe) {
@@ -6469,10 +6484,14 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
           // 🆕 Create a stub DE entry for relationship tracking even if the full DE wasn't fetched
           console.log(`📊 [Activity Debug] DE not found in fetched data, creating stub for relationship tracking: ${targetDE.name || targetDE.key || targetDeId}`);
           
+          // Use the same ID format as SFMC Data Extensions (de_KEY format)
+          const stubDeId = targetDE.key ? `de_${targetDE.key}` : (targetDeId ? `de_${targetDeId}` : `de_${targetDE.name?.replace(/\s+/g, '-').toLowerCase()}`);
+          
           const stubDe = {
-            id: targetDeId || `de_${targetDE.key}` || `de_${targetDE.name?.replace(/\s+/g, '-').toLowerCase()}`,
+            id: stubDeId,
             name: targetDE.name || targetDE.key || 'Unknown DE',
-            key: targetDE.key,
+            externalKey: targetDE.key,
+            customerKey: targetDE.key,
             description: targetDE.description || `Referenced by ${activity.name || activityType}`,
             isStub: true // Mark as stub for later processing
           };
@@ -6484,19 +6503,19 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
           if (stubDe.name) {
             deMap.set(stubDe.name.toLowerCase(), stubDe);
           }
-          if (stubDe.key) {
-            deKeyMap.set(stubDe.key.toLowerCase(), stubDe);
+          if (stubDe.externalKey) {
+            deKeyMap.set(stubDe.externalKey.toLowerCase(), stubDe);
           }
           
           relationships.push({
-            id: `${activityId}-${stubDe.id}`,
+            id: `${activityId}-${stubDeId}`,
             source: activityId,
-            target: stubDe.id,
+            target: stubDeId,
             type: 'writes_to',
             label: 'writes to',
             description: `Query activity writes to DE "${stubDe.name}"`
           });
-          console.log(`🔗 [Activity Relationship] Created stub relationship: ${activityId} → ${stubDe.id} (${stubDe.name}) [STUB]`);
+          console.log(`🔗 [Activity Relationship] Created stub relationship: ${activityId} → ${stubDeId} (${stubDe.name}) [STUB]`);
         }
       });
     } else {
