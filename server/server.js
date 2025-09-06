@@ -6446,11 +6446,13 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
       }
     });
     
-    // ENHANCED: Handle targetDataExtensions array (common in automation activities)
-    if (activity.targetDataExtensions && Array.isArray(activity.targetDataExtensions)) {
-      console.log(`🔍 [Activity Debug] Processing targetDataExtensions for activity ${activityId}:`, activity.targetDataExtensions);
+    // ENHANCED: Use recursive search to find all targetDataExtensions (even nested ones)
+    const allTargetDataExtensions = findTargetDataExtensionsRecursive(activity, `activity_${activityId}`);
+    
+    if (allTargetDataExtensions.length > 0) {
+      console.log(`🔍 [Activity Debug] Found ${allTargetDataExtensions.length} targetDataExtensions for activity ${activityId} (including nested ones)`);
       
-      activity.targetDataExtensions.forEach((targetDE, index) => {
+      allTargetDataExtensions.forEach((targetDE, index) => {
         const targetDeName = targetDE.name?.toLowerCase();
         const targetDeKey = targetDE.key?.toLowerCase();
         const targetDeId = targetDE.id;
@@ -6466,33 +6468,13 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
           console.log(`🎯 [PF_Preference Debug] DE key map has key "${targetDeKey}":`, deKeyMap.has(targetDeKey));
         }
         
-        let targetDe = null;
-        if (targetDeName) {
-          targetDe = deMap.get(targetDeName);
-          console.log(`🔍 [Activity Debug] DE lookup by name "${targetDeName}":`, targetDe ? `Found ${targetDe.name}` : 'Not found');
+        // Use the enhanced DE lookup function
+        let targetDe = findDataExtensionByIdentifier(targetDE.name, dataExtensions);
+        if (!targetDe) {
+          targetDe = findDataExtensionByIdentifier(targetDE.key, dataExtensions);
         }
-        if (!targetDe && targetDeKey) {
-          targetDe = deKeyMap.get(targetDeKey);
-          console.log(`🔍 [Activity Debug] DE lookup by key "${targetDeKey}":`, targetDe ? `Found ${targetDe.name}` : 'Not found');
-        }
-        if (!targetDe && targetDeId) {
-          // Try multiple ID formats
-          targetDe = dataExtensions.find(de => 
-            de.id === targetDeId || 
-            de.id === `de_${targetDeId}` ||
-            de.objectId === targetDeId ||
-            de.customerKey === targetDeId
-          );
-          console.log(`🔍 [Activity Debug] DE lookup by ID "${targetDeId}":`, targetDe ? `Found ${targetDe.name} (${targetDe.id})` : 'Not found');
-        }
-        if (!targetDe && targetDeKey) {
-          // Try key-based ID formats
-          targetDe = dataExtensions.find(de => 
-            de.id === `de_${targetDeKey}` ||
-            de.externalKey === targetDeKey ||
-            de.customerKey === targetDeKey
-          );
-          console.log(`🔍 [Activity Debug] DE lookup by key-based ID "${targetDeKey}":`, targetDe ? `Found ${targetDe.name} (${targetDe.id})` : 'Not found');
+        if (!targetDe) {
+          targetDe = findDataExtensionByIdentifier(targetDE.id, dataExtensions);
         }
         
         if (targetDe) {
@@ -6507,10 +6489,10 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
           console.log(`🔗 [Activity Relationship] Found targetDataExtensions: ${activityId} → ${targetDe.id} (${targetDe.name})`);
         } else {
           // 🆕 Create a stub DE entry for relationship tracking even if the full DE wasn't fetched
-          console.log(`📊 [Activity Debug] DE not found in fetched data, creating stub for relationship tracking: ${targetDE.name || targetDE.key || targetDeId}`);
+          console.log(`📊 [Activity Debug] DE not found in fetched data, creating stub for relationship tracking: ${targetDE.name || targetDE.key || targetDE.id}`);
           
           // Use the same ID format as SFMC Data Extensions (de_KEY format)
-          const stubDeId = targetDE.key ? `de_${targetDE.key}` : (targetDeId ? `de_${targetDeId}` : `de_${targetDE.name?.replace(/\s+/g, '-').toLowerCase()}`);
+          const stubDeId = targetDE.key ? `de_${targetDE.key}` : (targetDE.id ? `de_${targetDE.id}` : `de_${targetDE.name?.replace(/\s+/g, '-').toLowerCase()}`);
           
           const stubDe = {
             id: stubDeId,
@@ -6545,7 +6527,7 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
       });
     } else {
       // Try to find DE references in other common activity fields
-      console.log(`🔍 [Activity Debug] No targetDataExtensions array for ${activityId}, checking other patterns...`);
+      console.log(`🔍 [Activity Debug] No targetDataExtensions found for ${activityId}, checking other patterns...`);
       
       // Common field names that might contain DE references
       const possibleDeFields = [
@@ -6572,8 +6554,7 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
       
       possibleDeFields.forEach(fieldName => {
         if (activity[fieldName] && typeof activity[fieldName] === 'string') {
-          const deName = activity[fieldName].toLowerCase();
-          let targetDe = deMap.get(deName) || deKeyMap.get(deName);
+          const targetDe = findDataExtensionByIdentifier(activity[fieldName], dataExtensions);
           
           if (targetDe) {
             foundDeReference = true;
