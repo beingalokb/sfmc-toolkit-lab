@@ -8033,26 +8033,26 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
           // For SQL Queries, show only the directly connected DEs and parent activities
           console.log(`  📝 [Query Logic] Finding objects related to Query: ${nodeData.object.name}`);
           
-          // Add source DEs (query reads from these DEs)
+          // Add target DEs (query writes to these DEs)
           nodeData.outbound.forEach(rel => {
             const targetNode = relationshipMap.get(rel.target);
-            if (targetNode && targetNode.category === 'Data Extensions' && rel.type === 'reads_from') {
+            if (targetNode && targetNode.category === 'Data Extensions' && rel.type === 'writes_to') {
               if (!finalObjectIds.has(rel.target)) {
                 finalObjectIds.add(rel.target);
                 debugStats.nodes.related++;
-                console.log(`    ✅ Query reads from DE: ${targetNode.object.name}`);
+                console.log(`    ✅ Query writes to DE: ${targetNode.object.name}`);
               }
             }
           });
           
-          // Add target DEs (query writes to these DEs)
+          // Add source DEs (query reads from these DEs)
           nodeData.inbound.forEach(rel => {
             const sourceNode = relationshipMap.get(rel.source);
-            if (sourceNode && sourceNode.category === 'Data Extensions' && rel.type === 'writes_to') {
+            if (sourceNode && sourceNode.category === 'Data Extensions' && rel.type === 'reads_from') {
               if (!finalObjectIds.has(rel.source)) {
                 finalObjectIds.add(rel.source);
                 debugStats.nodes.related++;
-                console.log(`    ✅ Query writes to DE: ${sourceNode.object.name}`);
+                console.log(`    ✅ Query reads from DE: ${sourceNode.object.name}`);
               }
             }
           });

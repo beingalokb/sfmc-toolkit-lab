@@ -93,9 +93,6 @@ const SchemaBuilder = () => {
   const [filteredObjectData, setFilteredObjectData] = useState({});
   
   // Debug and filtering controls
-  const [showOrphans, setShowOrphans] = useState(false);
-  const [showIndirect, setShowIndirect] = useState(false);
-  const [debugMode, setDebugMode] = useState(false);
   const [debugInfo, setDebugInfo] = useState({});
   const [relationshipStats, setRelationshipStats] = useState({});
   const [selectedNodeId, setSelectedNodeId] = useState(null);
@@ -564,7 +561,8 @@ const extractTargetAsset = (nodeData = {}) => {
       // Apply filtering based on user preferences
       let includeEdge = true;
       
-      if (!showIndirect && relationshipLevel === 'indirect') {
+      // Always show indirect relationships for complete view
+      if (false && relationshipLevel === 'indirect') {
         includeEdge = false;
         debugData.filteredEdges++;
         console.log(`🚫 [Graph] Filtered indirect edge: ${edge.data.type} (${edge.data.source} -> ${edge.data.target})`);
@@ -673,7 +671,8 @@ const extractTargetAsset = (nodeData = {}) => {
     // Filter nodes based on user preferences
     let finalNodes = connectedNodes;
     
-    if (showOrphans) {
+    // Always show orphan nodes for better visibility
+    if (true) {
       // Include orphan nodes with special styling
       const styledOrphanNodes = orphanNodes.map(node => ({
         ...node,
@@ -834,8 +833,8 @@ const extractTargetAsset = (nodeData = {}) => {
       filteredEdges: debugData.filteredEdges,
       highlightedNodes: highlightedNodes.size,
       highlightedEdges: highlightedEdges.size,
-      showOrphans,
-      showIndirect,
+      showOrphans: true, // always true
+      showIndirect: true, // always true
       selectedNodeId
     };
     
@@ -850,15 +849,15 @@ const extractTargetAsset = (nodeData = {}) => {
       directRelationships: debugData.relationshipLevels.direct,
       indirectRelationships: debugData.relationshipLevels.indirect,
       metadataRelationships: debugData.relationshipLevels.metadata,
-      showingOrphans: showOrphans,
-      showingIndirect: showIndirect
+      showingOrphans: true, // always show orphans
+      showingIndirect: true // always show indirect
     });
 
     console.log('📊 [Graph Final] Final graph stats:', debugData.finalStats);
 
     setGraphElements([...styledNodes, ...styledEdges]);
     setHighlightedElements(new Set([...highlightedNodes, ...highlightedEdges]));
-  }, [selectedObjects, loadGraphData, showOrphans, showIndirect, selectedNodeId, extraGraph, showAllObjects]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedObjects, loadGraphData, selectedNodeId, extraGraph, showAllObjects]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Enhanced node click handler with automation steps tracking
   const handleNodeClick = useCallback(async (event) => {
@@ -1313,78 +1312,43 @@ const extractTargetAsset = (nodeData = {}) => {
             )}
           </div>
           
-          {/* Debug and Filter Controls */}
-          <div className="mt-4 space-y-2 p-3 bg-gray-50 rounded-lg">
-            <h3 className="text-sm font-semibold text-gray-700">Graph Controls</h3>
-            
-            <label className="flex items-center space-x-2 text-sm">
-              <input
-                type="checkbox"
-                checked={showOrphans}
-                onChange={(e) => setShowOrphans(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-gray-700">Show orphan nodes (no relationships)</span>
-            </label>
-            
-            <label className="flex items-center space-x-2 text-sm">
-              <input
-                type="checkbox"
-                checked={showIndirect}
-                onChange={(e) => setShowIndirect(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-gray-700">Show indirect relationships</span>
-            </label>
-            
-            <label className="flex items-center space-x-2 text-sm">
-              <input
-                type="checkbox"
-                checked={debugMode}
-                onChange={(e) => setDebugMode(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-gray-700">Show debug information</span>
-            </label>
-            
-            {/* Enhanced Relationship Stats */}
-            {Object.keys(relationshipStats).length > 0 && (
-              <div className="mt-3 p-2 bg-white rounded border text-xs">
-                <div className="font-semibold text-gray-700 mb-1">Graph Statistics</div>
-                <div className="space-y-1 text-gray-600">
-                  <div>Total Objects: {relationshipStats.totalObjects}</div>
-                  <div>Connected: {relationshipStats.connectedObjects}</div>
-                  <div>Orphans: {relationshipStats.orphanObjects}</div>
-                  <div>Total Relationships: {relationshipStats.totalRelationships}</div>
-                  <div>Displayed: {relationshipStats.displayedRelationships}</div>
-                  {relationshipStats.filteredRelationships > 0 && (
-                    <div className="text-orange-600">Filtered: {relationshipStats.filteredRelationships}</div>
-                  )}
-                  <div className="pt-1 border-t">
-                    <div>Direct: {relationshipStats.directRelationships || 0}</div>
-                    <div>Indirect: {relationshipStats.indirectRelationships || 0}</div>
-                    <div>Metadata: {relationshipStats.metadataRelationships || 0}</div>
-                  </div>
-                  {relationshipStats.showingOrphans && (
-                    <div className="text-orange-600">Including orphan nodes</div>
-                  )}
-                  {relationshipStats.showingIndirect && (
-                    <div className="text-blue-600">Including indirect links</div>
-                  )}
+          {/* Enhanced Relationship Stats */}
+          {Object.keys(relationshipStats).length > 0 && (
+            <div className="mt-3 p-2 bg-white rounded border text-xs">
+              <div className="font-semibold text-gray-700 mb-1">Graph Statistics</div>
+              <div className="space-y-1 text-gray-600">
+                <div>Total Objects: {relationshipStats.totalObjects}</div>
+                <div>Connected: {relationshipStats.connectedObjects}</div>
+                <div>Orphans: {relationshipStats.orphanObjects}</div>
+                <div>Total Relationships: {relationshipStats.totalRelationships}</div>
+                <div>Displayed: {relationshipStats.displayedRelationships}</div>
+                {relationshipStats.filteredRelationships > 0 && (
+                  <div className="text-orange-600">Filtered: {relationshipStats.filteredRelationships}</div>
+                )}
+                <div className="pt-1 border-t">
+                  <div>Direct: {relationshipStats.directRelationships || 0}</div>
+                  <div>Indirect: {relationshipStats.indirectRelationships || 0}</div>
+                  <div>Metadata: {relationshipStats.metadataRelationships || 0}</div>
                 </div>
+                {relationshipStats.showingOrphans && (
+                  <div className="text-orange-600">Including orphan nodes</div>
+                )}
+                {relationshipStats.showingIndirect && (
+                  <div className="text-blue-600">Including indirect links</div>
+                )}
               </div>
-            )}
-            
-            {/* Node Interaction Help */}
-            <div className="mt-3 p-2 bg-blue-50 rounded text-xs">
-              <div className="font-semibold text-blue-900 mb-1">Interaction Guide</div>
-              <div className="text-blue-700 space-y-1">
-                <div>• Click node to highlight connections</div>
-                <div>• Click again to deselect</div>
-                <div>• Solid lines = direct data flow</div>
-                <div>• Dashed lines = indirect/workflow</div>
-                <div>• Dotted lines = metadata/filters</div>
-              </div>
+            </div>
+          )}
+          
+          {/* Node Interaction Help */}
+          <div className="mt-3 p-2 bg-blue-50 rounded text-xs">
+            <div className="font-semibold text-blue-900 mb-1">Interaction Guide</div>
+            <div className="text-blue-700 space-y-1">
+              <div>• Click node to highlight connections</div>
+              <div>• Click again to deselect</div>
+              <div>• Solid lines = direct data flow</div>
+              <div>• Dashed lines = indirect/workflow</div>
+              <div>• Dotted lines = metadata/filters</div>
             </div>
           </div>
         </div>
@@ -1605,164 +1569,7 @@ const extractTargetAsset = (nodeData = {}) => {
           )}
         </div>
         
-        {/* Debug Panel */}
-        {debugMode && Object.keys(debugInfo).length > 0 && (
-          <div className="absolute top-4 right-4 w-80 bg-white border border-gray-300 rounded-lg shadow-lg p-4 max-h-96 overflow-y-auto z-10">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-semibold text-gray-900">Debug Information</h4>
-              <div className="flex space-x-1">
-                {selectedNodeId && (
-                  <button
-                    onClick={() => setSelectedNodeId(null)}
-                    className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200"
-                    title="Clear highlighting"
-                  >
-                    Clear
-                  </button>
-                )}
-                <button
-                  onClick={() => setDebugMode(false)}
-                  className="p-1 hover:bg-gray-100 rounded"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            
-            <div className="space-y-3 text-xs">
-              {/* Overall Stats */}
-              <div className="p-2 bg-blue-50 rounded">
-                <div className="font-semibold text-blue-900">Graph Overview</div>
-                <div className="text-blue-700 mt-1">
-                  <div>Total Nodes: {debugInfo.totalNodes}</div>
-                  <div>Total Edges: {debugInfo.totalEdges}</div>
-                  <div>Connected: {debugInfo.connectedNodes?.length || 0}</div>
-                  <div>Orphans: {debugInfo.orphanNodes?.length || 0}</div>
-                  <div>Filtered: {debugInfo.filteredEdges || 0}</div>
-                  {debugInfo.finalStats?.selectedNodeId && (
-                    <div className="text-yellow-700">Highlighting: {debugInfo.finalStats.highlightedNodes} nodes, {debugInfo.finalStats.highlightedEdges} edges</div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Relationship Levels */}
-              {debugInfo.relationshipLevels && (
-                <div className="p-2 bg-indigo-50 rounded">
-                  <div className="font-semibold text-indigo-900">Relationship Levels</div>
-                  <div className="text-indigo-700 mt-1">
-                    <div>Direct: {debugInfo.relationshipLevels.direct} (solid lines)</div>
-                    <div>Indirect: {debugInfo.relationshipLevels.indirect} (dashed lines)</div>
-                    <div>Metadata: {debugInfo.relationshipLevels.metadata} (dotted lines)</div>
-                    <div>Unknown: {debugInfo.relationshipLevels.unknown}</div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Node Types */}
-              {Object.keys(debugInfo.nodeTypes || {}).length > 0 && (
-                <div className="p-2 bg-green-50 rounded">
-                  <div className="font-semibold text-green-900">Node Types</div>
-                  <div className="text-green-700 mt-1">
-                    {Object.entries(debugInfo.nodeTypes).map(([type, count]) => (
-                      <div key={type}>{type}: {count}</div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Edge Types */}
-              {Object.keys(debugInfo.edgeTypes || {}).length > 0 && (
-                <div className="p-2 bg-purple-50 rounded">
-                  <div className="font-semibold text-purple-900">Relationship Types</div>
-                  <div className="text-purple-700 mt-1">
-                    {Object.entries(debugInfo.edgeTypes).map(([type, count]) => (
-                      <div key={type}>{type}: {count}</div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Connected Nodes */}
-              {debugInfo.connectedNodes && debugInfo.connectedNodes.length > 0 && (
-                <div className="p-2 bg-green-50 rounded">
-                  <div className="font-semibold text-green-900">Connected Objects ({debugInfo.connectedNodes.length})</div>
-                  <div className="text-green-700 mt-1 max-h-20 overflow-y-auto">
-                    {debugInfo.connectedNodes.map((node, idx) => (
-                      <div key={idx} className="truncate">
-                        {node.type}: {node.label} ({node.inboundCount}↓ {node.outboundCount}↑)
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Orphan Nodes */}
-              {debugInfo.orphanNodes && debugInfo.orphanNodes.length > 0 && (
-                <div className="p-2 bg-orange-50 rounded">
-                  <div className="font-semibold text-orange-900">Orphan Objects ({debugInfo.orphanNodes.length})</div>
-                  <div className="text-orange-700 mt-1 max-h-20 overflow-y-auto">
-                    {debugInfo.orphanNodes.map((node, idx) => (
-                      <div key={idx} className="truncate">
-                        {node.type}: {node.label}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Recent Relationships */}
-              {debugInfo.relationships && debugInfo.relationships.length > 0 && (
-                <div className="p-2 bg-indigo-50 rounded">
-                  <div className="font-semibold text-indigo-900">Relationships ({debugInfo.relationships.length})</div>
-                  <div className="text-indigo-700 mt-1 max-h-24 overflow-y-auto">
-                    {debugInfo.relationships.slice(0, 10).map((rel, idx) => (
-                      <div key={idx} className="truncate">
-                        {rel.type}: {rel.label}
-                      </div>
-                    ))}
-                    {debugInfo.relationships.length > 10 && (
-                      <div className="text-indigo-500">...and {debugInfo.relationships.length - 10} more</div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {/* Automation Steps (Activity-Aware) */}
-              {automationSteps.length > 0 && (
-                <div className="p-2 bg-orange-50 rounded">
-                  <div className="font-semibold text-orange-900">
-                    Automation Steps ({automationSteps.length})
-                    {selectedNodeId && <span className="text-orange-700 ml-1">[Click step to highlight]</span>}
-                  </div>
-                  <div className="text-orange-700 mt-1 max-h-32 overflow-y-auto space-y-1">
-                    {automationSteps.map((step, idx) => (
-                      <div 
-                        key={idx} 
-                        className={`cursor-pointer p-1 rounded text-xs ${
-                          hoveredStepIndex === idx 
-                            ? 'bg-orange-200 text-orange-900' 
-                            : 'hover:bg-orange-100'
-                        }`}
-                        onMouseEnter={() => setHoveredStepIndex(idx)}
-                        onMouseLeave={() => setHoveredStepIndex(null)}
-                        onClick={() => highlightAutomationStep(step)}
-                      >
-                        <div className="font-medium">
-                          Step {step.stepNumber}: {step.activityType}
-                        </div>
-                        <div className="text-orange-600 truncate">
-                          {step.targetAsset && `→ ${step.targetAsset}`}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Debug Panel removed as per requirements */}
         
         {/* Enhanced Activity-Aware Relationship Legend */}
         {hasSelectedObjects && viewMode === 'graph' && (
