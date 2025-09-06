@@ -7800,8 +7800,33 @@ function generateGraphFromSchemaData(schemaData, types = [], keys = [], selected
               console.log(`  ⬅️ Direct inbound: ${edge.source} -> ${nodeId} (${edge.type})`);
             }
           });
+        } else if (node && node.type === 'SQL Queries') {
+          console.log(`📝 [Schema Graph] Finding SQL Query workflow for: ${node.label}`);
+          
+          // For SQL Queries, find activities that execute them and automations that contain those activities
+          filteredEdges.forEach(edge => {
+            if (edge.source === nodeId) {
+              relatedNodeIds.add(edge.target);
+              console.log(`  ➡️ Query target: ${nodeId} -> ${edge.target} (${edge.type})`);
+            }
+            if (edge.target === nodeId) {
+              relatedNodeIds.add(edge.source);
+              console.log(`  ⬅️ Query source: ${edge.source} -> ${nodeId} (${edge.type})`);
+              
+              // If source is an activity, also find its parent automation
+              const sourceNode = filteredNodes.find(n => n.id === edge.source);
+              if (sourceNode && (sourceNode.type === 'Activity' || sourceNode.type.includes('Activity'))) {
+                filteredEdges.forEach(activityEdge => {
+                  if (activityEdge.target === edge.source && activityEdge.type === 'executes_activity') {
+                    relatedNodeIds.add(activityEdge.source);
+                    console.log(`    ⬅️⬅️ Parent automation: ${activityEdge.source} -> ${edge.source} (${activityEdge.type})`);
+                  }
+                });
+              }
+            }
+          });
         } else {
-          // For non-automation nodes, use standard 1-hop connection
+          // For non-automation/non-query nodes, use standard 1-hop connection
           filteredEdges.forEach(edge => {
             if (edge.source === nodeId) {
               relatedNodeIds.add(edge.target);
@@ -8191,8 +8216,9 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
           });
           
         } else if (nodeData.category === 'SQL Queries') {
-          // For SQL Queries, show only the directly connected DEs and parent activities
+          // For SQL Queries, show the complete workflow: parent automations, activities, and target DEs
           console.log(`  📝 [Query Logic] Finding objects related to Query: ${nodeData.object.name}`);
+          console.log(`  📝 [Query Logic] Query has ${nodeData.inbound.length} inbound and ${nodeData.outbound.length} outbound relationships`);
           
           // Add target DEs (query writes to these DEs)
           nodeData.outbound.forEach(rel => {
@@ -8219,26 +8245,71 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
           });
           
           // Add parent activities that execute this query
+          const relevantActivities = new Set();
+          const relevantAutomations = new Set();
+          
           nodeData.inbound.forEach(rel => {
             const sourceNode = relationshipMap.get(rel.source);
             if (sourceNode && sourceNode.category === 'Activity' && rel.type === 'executes_query') {
-              if (!finalObjectIds.has(rel.source)) {
-                finalObjectIds.add(rel.source);
-                debugStats.nodes.related++;
-                console.log(`    ✅ Query executed by activity: ${sourceNode.object.name}`);
-                
-                // Also add the automation that contains this activity
-                sourceNode.inbound.forEach(activityRel => {
-                  const automationNode = relationshipMap.get(activityRel.source);
-                  if (automationNode && automationNode.category === 'Automations' && activityRel.type === 'executes_activity') {
-                    if (!finalObjectIds.has(activityRel.source)) {
-                      finalObjectIds.add(activityRel.source);
-                      debugStats.nodes.related++;
-                      console.log(`    ✅ Parent automation: ${automationNode.object.name}`);
-                    }
+              relevantActivities.add(rel.source);
+              console.log(`    🎯 Found activity that executes query: ${sourceNode.object.name}`);
+              
+              // Find the automation that contains this activity
+              sourceNode.inbound.forEach(activityRel => {
+                const automationNode = relationshipMap.get(activityRel.source);
+                if (automationNode && automationNode.category === 'Automations' && activityRel.type === 'executes_activity') {
+                  relevantAutomations.add(activityRel.source);
+                  console.log(`    🤖 Found parent automation: ${automationNode.object.name}`);
+                }
+              });
+            }
+          });
+          
+          // If no direct activity relationships found, search by query name/ID in automation metadata
+          if (relevantActivities.size === 0) {
+            console.log(`  📝 [Query Logic] No direct activity relationships found, searching automation metadata...`);
+            
+            // Search through all automations to find ones that reference this query
+            allAutomations.forEach(automation => {
+              const steps = automation.steps || automation.activities || [];
+              steps.forEach(step => {
+                const activities = step.activities || [];
+                activities.forEach(activity => {
+                  // Check if this activity references our query
+                  if (activity.activityObjectId === nodeData.object.objectId || 
+                      activity.activityObjectId === nodeData.object.id?.replace('query_', '') ||
+                      activity.name === nodeData.object.name) {
+                    relevantAutomations.add(automation.id);
+                    console.log(`    🔍 Found automation via metadata search: ${automation.name} (activity: ${activity.name})`);
+                    
+                    // Also create the activity node for this step
+                    const stepNumber = step.step || steps.indexOf(step) + 1;
+                    const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
+                    relevantActivities.add(activityId);
+                    console.log(`    🎯 Adding corresponding activity: ${activityId}`);
                   }
                 });
-              }
+              });
+            });
+          }
+          
+          // Add all found activities
+          relevantActivities.forEach(activityId => {
+            if (!finalObjectIds.has(activityId)) {
+              finalObjectIds.add(activityId);
+              debugStats.nodes.related++;
+              const activityNode = relationshipMap.get(activityId);
+              console.log(`    ✅ Adding query parent activity: ${activityNode ? activityNode.object.name : activityId}`);
+            }
+          });
+          
+          // Add all found automations
+          relevantAutomations.forEach(automationId => {
+            if (!finalObjectIds.has(automationId)) {
+              finalObjectIds.add(automationId);
+              debugStats.nodes.related++;
+              const automationNode = relationshipMap.get(automationId);
+              console.log(`    ✅ Adding parent automation: ${automationNode ? automationNode.object.name : automationId}`);
             }
           });
           
