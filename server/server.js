@@ -8283,11 +8283,26 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                           foundInAutomation = true;
                           console.log(`    🔍 Found automation via metadata: ${automation.name} (activity: ${activity.name || 'unnamed'} targets DE)`);
                           
-                          // Also create the activity node for this step
+                          // Find the actual activity node that was created for this step
                           const stepNumber = step.step || steps.indexOf(step) + 1;
-                          const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
-                          relevantActivities.add(activityId);
-                          console.log(`    🎯 Adding corresponding activity: ${activityId}`);
+                          const possibleActivityIds = [
+                            `${automation.id}_activity_${stepNumber}_QueryActivity`,
+                            `${automation.id}_activity_${stepNumber}_GenericActivity`,
+                            `${automation.id}_activity_${stepNumber}_DataExtractActivity`,
+                            `${automation.id}_activity_${stepNumber}_EmailActivity`,
+                            `${automation.id}_activity_${stepNumber}_ImportActivity`,
+                            `${automation.id}_activity_${stepNumber}_ExportActivity`
+                          ];
+                          
+                          // Find which activity ID actually exists in the relationshipMap
+                          const actualActivityId = possibleActivityIds.find(id => relationshipMap.has(id));
+                          if (actualActivityId) {
+                            relevantActivities.add(actualActivityId);
+                            console.log(`    🎯 Adding corresponding activity: ${actualActivityId}`);
+                          } else {
+                            console.log(`    ⚠️ Could not find activity node for step ${stepNumber} in relationshipMap`);
+                            console.log(`    📋 Tried IDs:`, possibleActivityIds);
+                          }
                         }
                       }
                       
@@ -8299,11 +8314,26 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                           foundInAutomation = true;
                           console.log(`    🔍 Found automation via query reference: ${automation.name} (activity executes query ${activity.activityObjectId})`);
                           
-                          // Also create the activity node for this step
+                          // Find the actual activity node that was created for this step
                           const stepNumber = step.step || steps.indexOf(step) + 1;
-                          const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
-                          relevantActivities.add(activityId);
-                          console.log(`    🎯 Adding corresponding activity: ${activityId}`);
+                          const possibleActivityIds = [
+                            `${automation.id}_activity_${stepNumber}_QueryActivity`,
+                            `${automation.id}_activity_${stepNumber}_GenericActivity`,
+                            `${automation.id}_activity_${stepNumber}_DataExtractActivity`,
+                            `${automation.id}_activity_${stepNumber}_EmailActivity`,
+                            `${automation.id}_activity_${stepNumber}_ImportActivity`,
+                            `${automation.id}_activity_${stepNumber}_ExportActivity`
+                          ];
+                          
+                          // Find which activity ID actually exists in the relationshipMap
+                          const actualActivityId = possibleActivityIds.find(id => relationshipMap.has(id));
+                          if (actualActivityId) {
+                            relevantActivities.add(actualActivityId);
+                            console.log(`    🎯 Adding corresponding activity: ${actualActivityId}`);
+                          } else {
+                            console.log(`    ⚠️ Could not find activity node for step ${stepNumber} in relationshipMap`);
+                            console.log(`    📋 Tried IDs:`, possibleActivityIds);
+                          }
                         }
                       }
                     } catch (activityError) {
@@ -8337,7 +8367,12 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
               finalObjectIds.add(automationId);
               debugStats.nodes.related++;
               const automationNode = relationshipMap.get(automationId);
-              console.log(`    ✅ Adding relevant automation: ${automationNode.object.name}`);
+              if (automationNode && automationNode.object) {
+                console.log(`    ✅ Adding relevant automation: ${automationNode.object.name}`);
+              } else {
+                console.log(`    ⚠️ Automation node not found in relationshipMap: ${automationId}`);
+                console.log(`    📋 Available automation nodes in relationshipMap:`, Array.from(relationshipMap.keys()).filter(key => key.includes('auto_')).slice(0, 5));
+              }
             }
           });
           
@@ -8346,7 +8381,12 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
               finalObjectIds.add(activityId);
               debugStats.nodes.related++;
               const activityNode = relationshipMap.get(activityId);
-              console.log(`    ✅ Adding relevant activity: ${activityNode.object.name}`);
+              if (activityNode && activityNode.object) {
+                console.log(`    ✅ Adding relevant activity: ${activityNode.object.name}`);
+              } else {
+                console.log(`    ⚠️ Activity node not found in relationshipMap: ${activityId}`);
+                console.log(`    📋 Available activity nodes in relationshipMap:`, Array.from(relationshipMap.keys()).filter(key => key.includes('activity')).slice(0, 5));
+              }
             }
           });
           
@@ -8355,7 +8395,12 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
               finalObjectIds.add(queryId);
               debugStats.nodes.related++;
               const queryNode = relationshipMap.get(queryId);
-              console.log(`    ✅ Adding relevant query: ${queryNode.object.name}`);
+              if (queryNode && queryNode.object) {
+                console.log(`    ✅ Adding relevant query: ${queryNode.object.name}`);
+              } else {
+                console.log(`    ⚠️ Query node not found in relationshipMap: ${queryId}`);
+                console.log(`    📋 Available query nodes in relationshipMap:`, Array.from(relationshipMap.keys()).filter(key => key.includes('query')).slice(0, 5));
+              }
             }
           });
           
@@ -8437,11 +8482,26 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                         relevantAutomations.add(automation.id);
                         console.log(`    🔍 Found automation via metadata search: ${automation.name} (activity: ${activity.name || 'unnamed'})`);
                         
-                        // Also create the activity node for this step
+                        // Find the actual activity node that was created for this step
                         const stepNumber = step.step || steps.indexOf(step) + 1;
-                        const activityId = `${automation.id}_activity_${stepNumber}_QueryActivity`;
-                        relevantActivities.add(activityId);
-                        console.log(`    🎯 Adding corresponding activity: ${activityId}`);
+                        const possibleActivityIds = [
+                          `${automation.id}_activity_${stepNumber}_QueryActivity`,
+                          `${automation.id}_activity_${stepNumber}_GenericActivity`,
+                          `${automation.id}_activity_${stepNumber}_DataExtractActivity`,
+                          `${automation.id}_activity_${stepNumber}_EmailActivity`,
+                          `${automation.id}_activity_${stepNumber}_ImportActivity`,
+                          `${automation.id}_activity_${stepNumber}_ExportActivity`
+                        ];
+                        
+                        // Find which activity ID actually exists in the relationshipMap
+                        const actualActivityId = possibleActivityIds.find(id => relationshipMap.has(id));
+                        if (actualActivityId) {
+                          relevantActivities.add(actualActivityId);
+                          console.log(`    🎯 Adding corresponding activity: ${actualActivityId}`);
+                        } else {
+                          console.log(`    ⚠️ Could not find activity node for step ${stepNumber} in relationshipMap`);
+                          console.log(`    📋 Tried IDs:`, possibleActivityIds);
+                        }
                       }
                     } catch (activityError) {
                       console.log(`    ⚠️ Error processing activity in automation "${automation.name}":`, activityError.message);
@@ -8461,7 +8521,11 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
               finalObjectIds.add(activityId);
               debugStats.nodes.related++;
               const activityNode = relationshipMap.get(activityId);
-              console.log(`    ✅ Adding query parent activity: ${activityNode ? activityNode.object.name : activityId}`);
+              if (activityNode && activityNode.object) {
+                console.log(`    ✅ Adding query parent activity: ${activityNode.object.name}`);
+              } else {
+                console.log(`    ✅ Adding query parent activity: ${activityId} (node not found in map)`);
+              }
             }
           });
           
@@ -8471,7 +8535,11 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
               finalObjectIds.add(automationId);
               debugStats.nodes.related++;
               const automationNode = relationshipMap.get(automationId);
-              console.log(`    ✅ Adding parent automation: ${automationNode ? automationNode.object.name : automationId}`);
+              if (automationNode && automationNode.object) {
+                console.log(`    ✅ Adding parent automation: ${automationNode.object.name}`);
+              } else {
+                console.log(`    ✅ Adding parent automation: ${automationId} (node not found in map)`);
+              }
             }
           });
           
