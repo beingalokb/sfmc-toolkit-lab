@@ -8369,6 +8369,19 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
               const automationNode = relationshipMap.get(automationId);
               if (automationNode && automationNode.object) {
                 console.log(`    ✅ Adding relevant automation: ${automationNode.object.name}`);
+                
+                // When adding an automation, also add its activities
+                console.log(`    🔍 [DE Logic] Checking automation "${automationNode.object.name}" for activities...`);
+                automationNode.outbound.forEach(rel => {
+                  const targetNode = relationshipMap.get(rel.target);
+                  if (targetNode && targetNode.category === 'Activity' && rel.type === 'executes_activity') {
+                    if (!finalObjectIds.has(rel.target)) {
+                      finalObjectIds.add(rel.target);
+                      debugStats.nodes.related++;
+                      console.log(`    ✅ [DE Logic] Adding automation activity: ${targetNode.object.name}`);
+                    }
+                  }
+                });
               } else {
                 console.log(`    ⚠️ Automation node not found in relationshipMap: ${automationId}`);
                 console.log(`    📋 Available automation nodes in relationshipMap:`, Array.from(relationshipMap.keys()).filter(key => key.includes('auto_')).slice(0, 5));
@@ -8494,6 +8507,13 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                         ];
                         
                         // Find which activity ID actually exists in the relationshipMap
+                        console.log(`    🔍 [Query Activity Search] Looking for activity in step ${stepNumber} for automation ${automation.id}`);
+                        console.log(`    🔍 [Query Activity Search] Trying possible activity IDs:`, possibleActivityIds);
+                        
+                        // Also log what activity IDs are actually available for this automation
+                        const availableActivityIds = Array.from(relationshipMap.keys()).filter(id => id.startsWith(`${automation.id}_activity_`));
+                        console.log(`    🔍 [Query Activity Search] Available activity IDs for this automation:`, availableActivityIds);
+                        
                         const actualActivityId = possibleActivityIds.find(id => relationshipMap.has(id));
                         if (actualActivityId) {
                           relevantActivities.add(actualActivityId);
@@ -8501,6 +8521,7 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                         } else {
                           console.log(`    ⚠️ Could not find activity node for step ${stepNumber} in relationshipMap`);
                           console.log(`    📋 Tried IDs:`, possibleActivityIds);
+                          console.log(`    📋 Available IDs:`, availableActivityIds);
                         }
                       }
                     } catch (activityError) {
@@ -8537,6 +8558,19 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
               const automationNode = relationshipMap.get(automationId);
               if (automationNode && automationNode.object) {
                 console.log(`    ✅ Adding parent automation: ${automationNode.object.name}`);
+                
+                // When adding an automation, also add its activities
+                console.log(`    🔍 [Query Logic] Checking automation "${automationNode.object.name}" for activities...`);
+                automationNode.outbound.forEach(rel => {
+                  const targetNode = relationshipMap.get(rel.target);
+                  if (targetNode && targetNode.category === 'Activity' && rel.type === 'executes_activity') {
+                    if (!finalObjectIds.has(rel.target)) {
+                      finalObjectIds.add(rel.target);
+                      debugStats.nodes.related++;
+                      console.log(`    ✅ [Query Logic] Adding automation activity: ${targetNode.object.name}`);
+                    }
+                  }
+                });
               } else {
                 console.log(`    ✅ Adding parent automation: ${automationId} (node not found in map)`);
               }
