@@ -8678,6 +8678,15 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
   
   // Step 4: Create final nodes (including activity nodes)
   console.log('📦 [Graph] === STEP 4: CREATING FINAL NODES (INCLUDING ACTIVITIES) ===');
+  console.log(`🔍 [Graph Debug] finalObjectIds contains ${finalObjectIds.size} objects:`);
+  finalObjectIds.forEach(objectId => {
+    const nodeData = relationshipMap.get(objectId);
+    if (nodeData) {
+      console.log(`  - ${objectId}: ${nodeData.category} - ${nodeData.object.name}`);
+    } else {
+      console.log(`  - ${objectId}: NO NODE DATA FOUND`);
+    }
+  });
   
   const nodes = [];
   
@@ -8824,6 +8833,15 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
   }
   
   console.log(`📦 [Graph] Created ${nodes.length} final nodes (including activities)`);
+  console.log(`🔍 [Graph Debug] Final nodes created:`);
+  nodes.forEach((node, index) => {
+    if (index < 10) { // Log first 10 for brevity
+      console.log(`  ${index + 1}. ${node.data.id}: ${node.data.category} - ${node.data.label}`);
+    }
+  });
+  if (nodes.length > 10) {
+    console.log(`  ... and ${nodes.length - 10} more nodes`);
+  }
   
   // Step 5: Create final edges (only between final nodes, including activities)
   console.log('🔗 [Graph] === STEP 5: CREATING FINAL EDGES (INCLUDING ACTIVITY EDGES) ===');
@@ -8853,6 +8871,15 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
   });
   
   console.log(`🔗 [Graph] Created ${edges.length} final edges (filtered out ${debugStats.relationships.filtered})`);
+  console.log(`🔍 [Graph Debug] Final edges created:`);
+  edges.forEach((edge, index) => {
+    if (index < 10) { // Log first 10 for brevity
+      console.log(`  ${index + 1}. ${edge.data.source} --${edge.data.type}--> ${edge.data.target}`);
+    }
+  });
+  if (edges.length > 10) {
+    console.log(`  ... and ${edges.length - 10} more edges`);
+  }
   
   // Clear global activity nodes after use
   global.activityNodes = new Map();
