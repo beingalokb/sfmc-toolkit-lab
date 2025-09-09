@@ -6574,11 +6574,37 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
 function getActivityType(activity, automationName = null, queries = []) {
   const type = activity.type || activity.activityType || activity.objectType || '';
   const name = (activity.name || activity.displayName || '').toLowerCase();
+  const objectTypeId = activity.objectTypeId;
   
   // Debug: log activity properties for BU Unsubs activities
   if (name.includes('bu unsub') || (activity.name && activity.name.includes('BU Unsub')) || 
       (activity.automation && activity.automation.name === 'BU Unsubs')) {
     console.log(`🔍 [Activity Debug] BU Unsubs activity full structure:`, JSON.stringify(activity, null, 2));
+  }
+  
+  // Check objectTypeId first (most reliable)
+  if (objectTypeId) {
+    const objectTypeMapping = {
+      // FilterActivity/DataFilter
+      303: 'FilterActivity',
+      // QueryActivity/SQL Query
+      300: 'QueryActivity',
+      // Email Send Activity
+      42: 'EmailActivity',
+      // Data Extract Activity  
+      73: 'DataExtractActivity',
+      // File Transfer Activity
+      53: 'FileTransferActivity',
+      // Import Activity
+      43: 'ImportActivity',
+      // Wait Activity
+      467: 'WaitActivity'
+    };
+    
+    if (objectTypeMapping[objectTypeId]) {
+      console.log(`🔍 [Activity Type] Determined by objectTypeId ${objectTypeId} → ${objectTypeMapping[objectTypeId]}`);
+      return objectTypeMapping[objectTypeId];
+    }
   }
   
   // Map various activity types to standardized names
