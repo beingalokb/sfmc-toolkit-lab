@@ -584,6 +584,18 @@ const extractTargetAsset = (nodeData = {}) => {
         validEdges.push(edgeInfo);
         edgeMap.set(edge.data.id, edgeInfo);
         
+        // Debug FilterActivity relationships specifically
+        if (edge.data.source.includes('FilterActivity') || edge.data.target.includes('FilterActivity')) {
+          console.log(`🎯 [FilterActivity Edge Debug] Found FilterActivity edge:`, {
+            id: edge.data.id,
+            source: edge.data.source,
+            target: edge.data.target,
+            type: edge.data.type,
+            relationshipLevel: relationshipLevel,
+            included: includeEdge
+          });
+        }
+        
         // Update connection tracking
         sourceConn.outbound.push({
           edgeId: edge.data.id,
@@ -666,6 +678,19 @@ const extractTargetAsset = (nodeData = {}) => {
       
       if (hasAnyConnections) {
         console.log(`  ✅ Including in graph (has ${connection.totalConnections} relationships)`);
+        
+        // Debug FilterActivity inclusion specifically
+        if (nodeType === 'Activity' || node.data.category === 'Activity') {
+          console.log(`🎯 [FilterActivity Include] Activity node being included:`, {
+            id: nodeId,
+            label: node.data.label,
+            activityType: node.data.activityType,
+            connections: connection.totalConnections,
+            inbound: connection.inbound.map(i => i.type),
+            outbound: connection.outbound.map(o => o.type)
+          });
+        }
+        
         connectedNodes.push(node);
         debugData.connectedNodes.push({
           id: nodeId,
