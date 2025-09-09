@@ -9421,10 +9421,10 @@ app.get('/graph', async (req, res) => {
       if (hasFilterSelection) {
         console.log('🎯 [Mock] Providing realistic filter workflow mock data');
         
-        // Return enhanced mock data focused on filter relationships
+        // Return enhanced mock data focused on filter relationships - matching successful automation pattern
         const mockGraphData = {
           nodes: [
-            // Selected Filter
+            // Selected Filter - this is what the user selected
             { 
               data: { 
                 id: "filter_FD5C3EFC-45D2-421C-8E2F-DCF0AB3B9FBC", 
@@ -9435,48 +9435,44 @@ app.get('/graph', async (req, res) => {
                 metadata: {
                   isSelected: true,
                   isRelated: false,
-                  connectionCount: 3,
-                  description: "Filters for customers who purchased in the last 30 days with promo"
+                  connectionCount: 2
                 }
               } 
             },
-            // Target Data Extension (filtered by this filter)
+            // Target Data Extension that gets filtered
             { 
               data: { 
                 id: "de_E44D13CA-9F6E-4A18-B642-B6255FB07429", 
-                label: "Purchased Last 30 Days Promo True", 
+                label: "Customer Data", 
                 type: "Data Extensions",
                 category: "Data Extensions",
                 metadata: {
                   isSelected: false,
                   isRelated: true,
-                  connectionCount: 2,
-                  description: "Customer data for recent promo purchases",
-                  rowCount: 1523
+                  connectionCount: 1
                 }
               } 
             },
-            // Automation that executes this filter
+            // Parent Automation that contains this filter
             { 
               data: { 
                 id: "auto_2d6920fc-fcf8-46cd-b7bd-693ac533f4ad", 
-                label: "Purchased Last 30 Days Promo True", 
+                label: "Promo Customer Processing", 
                 type: "Automations",
                 category: "Automations",
                 metadata: {
                   isSelected: false,
                   isRelated: true,
-                  connectionCount: 2,
-                  description: "Automation that processes promo customer data"
+                  connectionCount: 1
                 }
               } 
             }
           ],
           edges: [
-            // Filter targets the Data Extension
-            { data: { source: "filter_FD5C3EFC-45D2-421C-8E2F-DCF0AB3B9FBC", target: "de_E44D13CA-9F6E-4A18-B642-B6255FB07429", type: "filters_to", label: "filters to" } },
-            // Automation executes the filter
-            { data: { source: "auto_2d6920fc-fcf8-46cd-b7bd-693ac533f4ad", target: "filter_FD5C3EFC-45D2-421C-8E2F-DCF0AB3B9FBC", type: "executes_activity", label: "Step 1" } }
+            // Automation executes the filter (like automation executes activity)
+            { data: { source: "auto_2d6920fc-fcf8-46cd-b7bd-693ac533f4ad", target: "filter_FD5C3EFC-45D2-421C-8E2F-DCF0AB3B9FBC", type: "executes_activity", label: "Step 1" } },
+            // Filter processes the Data Extension
+            { data: { source: "filter_FD5C3EFC-45D2-421C-8E2F-DCF0AB3B9FBC", target: "de_E44D13CA-9F6E-4A18-B642-B6255FB07429", type: "filters_to", label: "filters" } }
           ],
           metadata: {
             totalNodes: 3,
