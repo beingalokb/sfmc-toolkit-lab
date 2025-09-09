@@ -815,10 +815,31 @@ const extractTargetAsset = (nodeData = {}) => {
       // Create activity-aware label
       let displayLabel = node.data.label;
       if (isActivity && stepNumber) {
-        displayLabel = `${stepNumber}. ${activityType.replace('Activity', '')}`;
+        const safeActivityType = activityType || node.data.metadata?.activityType || 'Activity';
+        displayLabel = `${stepNumber}. ${safeActivityType.replace('Activity', '')}`;
         if (node.data.label && !node.data.label.startsWith(stepNumber)) {
           displayLabel += `\n${node.data.label}`;
         }
+      }
+      
+      const position = {
+        x: (index % 6) * 180 + Math.random() * 40, // Horizontal spread with some randomness
+        y: baseY + Math.random() * 60 // Vertical grouping with some randomness
+      };
+      
+      // Debug Activity node positioning
+      if (isActivity) {
+        console.log(`🎯 [Activity Position Debug] FilterActivity positioning:`, {
+          id: node.data.id,
+          label: displayLabel,
+          activityType: activityType,
+          safeActivityType: activityType || node.data.metadata?.activityType || 'Activity',
+          stepNumber: stepNumber,
+          typeIndex: typeIndex,
+          baseY: baseY,
+          finalPosition: position,
+          isActivity: isActivity
+        });
       }
       
       return {
@@ -827,11 +848,8 @@ const extractTargetAsset = (nodeData = {}) => {
           ...node.data,
           label: displayLabel
         },
-        position: {
-          x: (index % 6) * 180 + Math.random() * 40, // Horizontal spread with some randomness
-          y: baseY + Math.random() * 60 // Vertical grouping with some randomness
-        },
-        style: getNodeStyle(nodeType, activityType, isSelected, isRelated, isOrphan, isHighlighted, isFaded, isActivity)
+        position: position,
+        style: getNodeStyle(nodeType, activityType || node.data.metadata?.activityType, isSelected, isRelated, isOrphan, isHighlighted, isFaded, isActivity)
       };
     });
 
