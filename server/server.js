@@ -8937,6 +8937,98 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
             });
           }
           
+        } else if (nodeData.category === 'Filters') {
+          // For Filters, show Data Extensions that are filtered and Automations that use this filter
+          console.log(`  🔍 [Filter Logic] Finding objects related to Filter: ${nodeData.object.name}`);
+          console.log(`  🔍 [Filter Logic] Filter "${nodeData.object.name}" has:`);
+          console.log(`    - ${nodeData.inbound.length} inbound relationships`);
+          console.log(`    - ${nodeData.outbound.length} outbound relationships`);
+          
+          // Debug: log all relationships for this Filter
+          if (nodeData.inbound.length > 0) {
+            console.log(`  🔍 [Filter Logic] Inbound relationships for "${nodeData.object.name}":`);
+            nodeData.inbound.forEach((rel, idx) => {
+              const sourceNode = relationshipMap.get(rel.source);
+              console.log(`    ${idx + 1}. ${sourceNode ? sourceNode.category + ' - ' + sourceNode.object.name : 'Unknown'} --${rel.type}--> ${nodeData.object.name}`);
+            });
+          }
+          
+          if (nodeData.outbound.length > 0) {
+            console.log(`  🔍 [Filter Logic] Outbound relationships for "${nodeData.object.name}":`);
+            nodeData.outbound.forEach((rel, idx) => {
+              const targetNode = relationshipMap.get(rel.target);
+              console.log(`    ${idx + 1}. ${nodeData.object.name} --${rel.type}--> ${targetNode ? targetNode.category + ' - ' + targetNode.object.name : 'Unknown'}`);
+            });
+          }
+          
+          // Track relevant automations and data extensions
+          const relevantAutomations = new Set();
+          const relevantDataExtensions = new Set();
+          
+          // 1. Find Data Extensions that this filter targets (filters_to)
+          nodeData.outbound.forEach(rel => {
+            const targetNode = relationshipMap.get(rel.target);
+            if (targetNode && targetNode.category === 'Data Extensions' && rel.type === 'filters_to') {
+              relevantDataExtensions.add(rel.target);
+              console.log(`    🎯 Found target DE: ${nodeData.object.name} → ${targetNode.object.name} (${rel.type})`);
+            }
+          });
+          
+          // 2. Find Data Extensions that this filter reads from (filters_from - inbound)
+          nodeData.inbound.forEach(rel => {
+            const sourceNode = relationshipMap.get(rel.source);
+            if (sourceNode && sourceNode.category === 'Data Extensions' && rel.type === 'filters_from') {
+              relevantDataExtensions.add(rel.source);
+              console.log(`    🎯 Found source DE: ${sourceNode.object.name} → ${nodeData.object.name} (${rel.type})`);
+            }
+          });
+          
+          // 3. Find Automations that execute this filter
+          nodeData.inbound.forEach(rel => {
+            const sourceNode = relationshipMap.get(rel.source);
+            if (sourceNode && sourceNode.category === 'Automations' && rel.type === 'executes_activity') {
+              relevantAutomations.add(rel.source);
+              console.log(`    🤖 Found executing automation: ${sourceNode.object.name} → ${nodeData.object.name} (${rel.type})`);
+            }
+          });
+          
+          // Add all found Data Extensions
+          relevantDataExtensions.forEach(deId => {
+            if (!finalObjectIds.has(deId)) {
+              finalObjectIds.add(deId);
+              debugStats.nodes.related++;
+              const deNode = relationshipMap.get(deId);
+              if (deNode && deNode.object) {
+                console.log(`    ✅ Adding related DE: ${deNode.object.name}`);
+              }
+            }
+          });
+          
+          // Add all found Automations
+          relevantAutomations.forEach(automationId => {
+            if (!finalObjectIds.has(automationId)) {
+              finalObjectIds.add(automationId);
+              debugStats.nodes.related++;
+              const automationNode = relationshipMap.get(automationId);
+              if (automationNode && automationNode.object) {
+                console.log(`    ✅ Adding executing automation: ${automationNode.object.name}`);
+                
+                // When adding an automation, also add its other activities
+                console.log(`    🔍 [Filter Logic] Checking automation "${automationNode.object.name}" for other activities...`);
+                automationNode.outbound.forEach(rel => {
+                  const targetNode = relationshipMap.get(rel.target);
+                  if (targetNode && (targetNode.category === 'Activity' || targetNode.category === 'Filters') && rel.type === 'executes_activity') {
+                    if (!finalObjectIds.has(rel.target)) {
+                      finalObjectIds.add(rel.target);
+                      debugStats.nodes.related++;
+                      console.log(`    ✅ [Filter Logic] Adding automation activity: ${targetNode.object.name}`);
+                    }
+                  }
+                });
+              }
+            }
+          });
+          
         } else {
           // For other object types (Journeys, Triggered Sends, Filters, File Transfers, Data Extracts, etc.)
           // Add all immediate neighbors to show complete workflow context
