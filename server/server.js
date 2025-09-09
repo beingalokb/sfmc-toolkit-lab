@@ -6576,6 +6576,15 @@ function getActivityType(activity, automationName = null, queries = []) {
   const name = (activity.name || activity.displayName || '').toLowerCase();
   const objectTypeId = activity.objectTypeId;
   
+  // Debug: log activity properties for troubleshooting
+  console.log(`🔍 [getActivityType] Processing activity:`, {
+    name: activity.name,
+    objectTypeId: activity.objectTypeId,
+    type: activity.type,
+    activityType: activity.activityType,
+    objectType: activity.objectType
+  });
+  
   // Debug: log activity properties for BU Unsubs activities
   if (name.includes('bu unsub') || (activity.name && activity.name.includes('BU Unsub')) || 
       (activity.automation && activity.automation.name === 'BU Unsubs')) {
