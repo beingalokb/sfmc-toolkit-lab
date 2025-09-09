@@ -458,8 +458,8 @@ const extractTargetAsset = (nodeData = {}) => {
 
   // Enhanced relationship classification
   const classifyRelationship = (relationshipType) => {
-    const directTypes = ['writes_to', 'reads_from', 'imports_to_de', 'updates_de', 'journey_entry_source'];
-    const indirectTypes = ['contains_query', 'executes_query', 'triggers_automation'];
+    const directTypes = ['writes_to', 'reads_from', 'imports_to_de', 'updates_de', 'journey_entry_source', 'filters_to', 'filters_from'];
+    const indirectTypes = ['contains_query', 'executes_query', 'triggers_automation', 'executes_activity', 'next_step'];
     const metadataTypes = ['filters_de', 'uses_in_decision', 'provides_data_to'];
     
     if (directTypes.includes(relationshipType)) return 'direct';
