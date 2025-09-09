@@ -734,6 +734,13 @@ const extractTargetAsset = (nodeData = {}) => {
       }
     }
     
+    console.log(`📋 [Graph Summary] Final node counts:`, {
+      connectedNodes: connectedNodes.length,
+      orphanNodes: orphanNodes.length,
+      finalNodes: finalNodes.length,
+      activityNodesInFinal: finalNodes.filter(n => n.data.category === 'Activity' || n.data.type === 'Activity').length
+    });
+    
     // Apply enhanced styling to nodes with vertical grouping by type (including activities)
     const styledNodes = finalNodes.map((node, index) => {
       const isSelected = node.data.metadata?.isRelated !== true;
@@ -877,6 +884,16 @@ const extractTargetAsset = (nodeData = {}) => {
     });
 
     console.log('📊 [Graph Final] Final graph stats:', debugData.finalStats);
+    
+    // Debug final styled nodes for Activity nodes
+    const activityNodes = styledNodes.filter(n => n.data.category === 'Activity' || n.data.type === 'Activity');
+    console.log(`🎯 [Final Styled Nodes] Found ${activityNodes.length} Activity nodes:`, activityNodes.map(n => ({
+      id: n.data.id,
+      label: n.data.label,
+      type: n.data.type,
+      category: n.data.category,
+      activityType: n.data.activityType
+    })));
 
     setGraphElements([...styledNodes, ...styledEdges]);
     setHighlightedElements(new Set([...highlightedNodes, ...highlightedEdges]));
