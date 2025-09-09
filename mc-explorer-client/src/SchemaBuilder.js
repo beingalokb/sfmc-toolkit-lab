@@ -238,12 +238,12 @@ const getNodeStyle = (nodeType, nodeSubType = null, isSelected = false, isRelate
   
   // Activity nodes styling - smaller and circular
   if (isActivity) {
-    width = '100px'; // TEMPORARY: Make larger for visibility
-    height = '40px';  // TEMPORARY: Make larger for visibility
+    width = '80px';
+    height = '30px';
     shape = 'ellipse';
-    fontSize = '12px'; // TEMPORARY: Make text larger
+    fontSize = '10px';
     backgroundColor = getActivityColor(nodeSubType);
-    borderWidth = '3px'; // TEMPORARY: Make border thicker for visibility
+    borderWidth = '1px';
   }
   
   if (isOrphan) {

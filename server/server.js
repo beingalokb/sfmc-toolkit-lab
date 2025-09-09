@@ -8300,9 +8300,15 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
     console.log(`🔗 [Graph] Adding ${global.activityNodes.size} activity nodes to relationship map`);
     global.activityNodes.forEach((activityNode, activityId) => {
       if (!relationshipMap.has(activityId)) {
+        // Determine category based on activityType for FilterActivity nodes
+        const isFilterActivity = activityNode.activityType === 'FilterActivity';
+        const nodeCategory = isFilterActivity ? 'Filters' : 'Activity';
+        
+        console.log(`🎯 [Graph Init] Activity node ${activityId}: activityType=${activityNode.activityType}, category=${nodeCategory}`);
+        
         relationshipMap.set(activityId, {
           object: activityNode,
-          category: 'Activity',
+          category: nodeCategory,
           inbound: [],
           outbound: [],
           hasConnections: false
@@ -9093,18 +9099,23 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
       if (shouldIncludeActivity && !alreadyAdded) {
         finalObjectIds.add(activityId); // Ensure activity ID is in final set for edge filtering
         
+        // Determine the correct category based on activity type
+        const category = activityNode.activityType === 'FilterActivity' ? 'Filters' : 'Activity';
+        const type = activityNode.activityType === 'FilterActivity' ? 'Filters' : 'Activity';
+        
         nodes.push({
           data: {
             id: activityId,
             label: activityNode.name,
-            category: 'Activity',
-            type: 'Activity',
+            category: category,
+            type: type,
             activityType: activityNode.activityType,
             stepNumber: activityNode.stepNumber,
             metadata: {
               ...activityNode,
-              category: 'Activity',
-              isActivity: true,
+              category: category,
+              isActivity: activityNode.activityType !== 'FilterActivity',
+              isFilter: activityNode.activityType === 'FilterActivity',
               executionOrder: activityNode.stepNumber,
               parentAutomation: activityNode.automationName
             }
@@ -9426,6 +9437,37 @@ app.get('/graph', async (req, res) => {
                   rowCount: 3
                 }
               } 
+            },
+            // FilterActivity nodes - these should appear in the Filters column
+            { 
+              data: { 
+                id: "filter_12345", 
+                label: "Active Subscribers Filter", 
+                type: "Filters",
+                category: "Filters",
+                activityType: "FilterActivity",
+                metadata: {
+                  isSelected: false,
+                  isRelated: true,
+                  connectionCount: 2,
+                  description: "Filters for active subscribers only"
+                }
+              } 
+            },
+            { 
+              data: { 
+                id: "filter_67890", 
+                label: "Email Preference Filter", 
+                type: "Filters",
+                category: "Filters", 
+                activityType: "FilterActivity",
+                metadata: {
+                  isSelected: false,
+                  isRelated: true,
+                  connectionCount: 3,
+                  description: "Filters based on email preferences"
+                }
+              } 
             }
           ],
           edges: [
@@ -9445,11 +9487,15 @@ app.get('/graph', async (req, res) => {
             { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_2_QueryActivity", target: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", type: "writes_to", label: "writes to PF_Preference" } },
             { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_3_QueryActivity", target: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", type: "writes_to", label: "writes to PF_Preference" } },
             { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_4_QueryActivity", target: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", type: "writes_to", label: "writes to PF_Preference" } },
-            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_5_QueryActivity", target: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", type: "writes_to", label: "writes to PF_Preference" } }
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061_activity_5_QueryActivity", target: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", type: "writes_to", label: "writes to PF_Preference" } },
+            // FilterActivity relationships
+            { data: { source: "filter_12345", target: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", type: "filters_to", label: "filters PF_Preference" } },
+            { data: { source: "de_2df49ec2-2f48-ef11-a5b4-5cba2c6f7278", target: "filter_67890", type: "filters_from", label: "filtered by Email Preference Filter" } },
+            { data: { source: "auto_9fe4e098-4560-4601-b320-cc269a8c9061", target: "filter_12345", type: "executes_activity", label: "uses Active Subscribers Filter" } }
           ],
           metadata: {
-            totalNodes: 7,
-            totalEdges: 14,
+            totalNodes: 9,
+            totalEdges: 17,
             format: 'cytoscape',
             source: 'enhanced-mock-automation-workflow',
             generatedAt: new Date().toISOString()
