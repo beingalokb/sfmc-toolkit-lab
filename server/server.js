@@ -6473,6 +6473,12 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
     
     // Process each activity/step with execution order
     activities.forEach((activity, stepIndex) => {
+      console.log(`🔍 [Activity Debug] Processing activity ${stepIndex + 1}/${activities.length}:`, activity ? 'activity exists' : 'activity is null/undefined');
+      if (!activity) {
+        console.log(`⚠️ [Activity Debug] Skipping null/undefined activity at index ${stepIndex}`);
+        return;
+      }
+      
       try {
         const stepNumber = stepIndex + 1;
         const activityType = getActivityType(activity, automation.name, queries);
@@ -6548,6 +6554,8 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
         
       } catch (error) {
         console.error(`❌ [Relationship] Error processing activity ${stepIndex + 1} in automation "${automation.name}":`, error);
+        console.error(`❌ [Relationship] Error stack:`, error.stack);
+        console.error(`❌ [Relationship] Activity that caused error:`, JSON.stringify(activity, null, 2));
       }
     });
   });
@@ -8447,14 +8455,28 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                 
                 // When adding an automation, also add its activities
                 console.log(`    🔍 [DE Logic] Checking automation "${automationNode.object.name}" for activities...`);
-                automationNode.outbound.forEach(rel => {
+                console.log(`    🔍 [DE Logic] Automation has ${automationNode.outbound.length} outbound relationships`);
+                
+                if (automationNode.outbound.length === 0) {
+                  console.log(`    ⚠️ [DE Logic] No outbound relationships found for automation ${automationId}`);
+                  console.log(`    🔍 [DE Logic] Automation node structure:`, JSON.stringify(automationNode, null, 2));
+                }
+                
+                automationNode.outbound.forEach((rel, index) => {
+                  console.log(`    🔍 [DE Logic] Outbound relationship ${index + 1}: ${rel.source} → ${rel.target} (${rel.type})`);
                   const targetNode = relationshipMap.get(rel.target);
                   if (targetNode && targetNode.category === 'Activity' && rel.type === 'executes_activity') {
                     if (!finalObjectIds.has(rel.target)) {
                       finalObjectIds.add(rel.target);
                       debugStats.nodes.related++;
                       console.log(`    ✅ [DE Logic] Adding automation activity: ${targetNode.object.name}`);
+                    } else {
+                      console.log(`    ℹ️ [DE Logic] Activity already in finalObjectIds: ${targetNode.object.name}`);
                     }
+                  } else if (targetNode) {
+                    console.log(`    ⚠️ [DE Logic] Found outbound target but not an activity: ${targetNode.category} - ${rel.type}`);
+                  } else {
+                    console.log(`    ⚠️ [DE Logic] Target node not found in relationshipMap: ${rel.target}`);
                   }
                 });
               } else {
@@ -8636,7 +8658,14 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                 
                 // When adding an automation, also add its activities
                 console.log(`    🔍 [Query Logic] Checking automation "${automationNode.object.name}" for activities...`);
-                automationNode.outbound.forEach(rel => {
+                console.log(`    🔍 [Query Logic] Automation has ${automationNode.outbound.length} outbound relationships`);
+                
+                if (automationNode.outbound.length === 0) {
+                  console.log(`    ⚠️ [Query Logic] No outbound relationships found for automation ${automationId}`);
+                }
+                
+                automationNode.outbound.forEach((rel, index) => {
+                  console.log(`    🔍 [Query Logic] Outbound relationship ${index + 1}: ${rel.source} → ${rel.target} (${rel.type})`);
                   const targetNode = relationshipMap.get(rel.target);
                   if (targetNode && targetNode.category === 'Activity' && rel.type === 'executes_activity') {
                     if (!finalObjectIds.has(rel.target)) {
