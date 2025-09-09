@@ -8957,6 +8957,9 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
   if (global.activityNodes && global.activityNodes.size > 0) {
     console.log(`📦 [Graph] Adding ${global.activityNodes.size} activity nodes to graph`);
     
+    // Keep track of nodes already added to prevent duplicates
+    const addedNodeIds = new Set(nodes.map(node => node.data.id));
+    
     global.activityNodes.forEach((activityNode, activityId) => {
       // Include activity nodes if either:
       // 1. They are in finalObjectIds (selected through filtering logic)
@@ -8966,7 +8969,10 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                                    finalObjectIds.has(activityId) || 
                                    finalObjectIds.has(activityNode.automationId);
       
-      if (shouldIncludeActivity) {
+      // Check if this activity node was already added in the main loop
+      const alreadyAdded = addedNodeIds.has(activityId);
+      
+      if (shouldIncludeActivity && !alreadyAdded) {
         finalObjectIds.add(activityId); // Ensure activity ID is in final set for edge filtering
         
         nodes.push({
@@ -9063,6 +9069,8 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
             }
           });
         }
+      } else if (shouldIncludeActivity && alreadyAdded) {
+        console.log(`  ⚠️ Skipping duplicate activity: ${activityNode.name} (already added in main loop)`);
       }
     });
   }
