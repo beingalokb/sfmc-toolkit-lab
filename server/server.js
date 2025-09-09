@@ -6455,7 +6455,48 @@ function detectAutomationToDataExtensionRelationships(automations, dataExtension
     }
     
     // Check multiple possible activity containers
-    const activities = automation.steps || automation.activities || automation.program?.activities || [];
+    let activities = [];
+    
+    // Handle different automation structures
+    if (automation.steps && Array.isArray(automation.steps)) {
+      // Steps-based structure: extract activities from each step
+      automation.steps.forEach((step, stepIndex) => {
+        if (step.activities && Array.isArray(step.activities)) {
+          step.activities.forEach((activity, activityIndex) => {
+            // Add step context to activity for proper processing
+            activities.push({
+              ...activity,
+              stepNumber: step.step || stepIndex + 1,
+              stepIndex: stepIndex,
+              activityIndex: activityIndex,
+              automationName: automation.name
+            });
+          });
+        } else {
+          // Handle case where step itself might be an activity
+          activities.push({
+            ...step,
+            stepNumber: step.step || stepIndex + 1,
+            stepIndex: stepIndex,
+            automationName: automation.name
+          });
+        }
+      });
+    } else if (automation.activities && Array.isArray(automation.activities)) {
+      // Direct activities array
+      activities = automation.activities.map((activity, index) => ({
+        ...activity,
+        stepNumber: index + 1,
+        automationName: automation.name
+      }));
+    } else if (automation.program?.activities && Array.isArray(automation.program.activities)) {
+      // Program-based activities
+      activities = automation.program.activities.map((activity, index) => ({
+        ...activity,
+        stepNumber: index + 1,
+        automationName: automation.name
+      }));
+    }
     
     console.log(`📋 [Relationship] Automation structure:`, {
       steps: automation.steps?.length || 0,
@@ -6951,106 +6992,170 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
     console.log(`🔍 [FilterActivity] Processing filter activity: ${activityId}`);
     console.log(`🔍 [FilterActivity] Activity data:`, JSON.stringify(activity, null, 2));
     
-    // Method 1: Check for direct data extension references in activity properties
-    let sourceDE = null;
-    let targetDE = null;
+    // Method 1: Use the same recursive search as QueryActivity for targetDataExtensions
+    const filterTargetDataExtensions = findTargetDataExtensionsRecursive(activity, `filter_${activityId}`);
     
-    // Look for source DE in various possible fields
-    const sourceFields = [
-      'sourceDataExtension', 'sourceDataExtensionName', 'sourceDE', 
-      'inputDataExtension', 'fromDataExtension', 'dataSource'
-    ];
-    
-    const targetFields = [
-      'targetDataExtension', 'targetDataExtensionName', 'targetDE',
-      'destinationDataExtension', 'outputDataExtension', 'toDataExtension'
-    ];
-    
-    // Try to find source DE
-    for (const field of sourceFields) {
-      if (activity[field]) {
-        const sourceDeName = activity[field].toLowerCase();
-        sourceDE = deMap.get(sourceDeName) || deKeyMap.get(sourceDeName);
-        if (sourceDE) {
-          console.log(`🎯 [FilterActivity] Found source DE via ${field}: ${sourceDE.name}`);
-          break;
+    if (filterTargetDataExtensions.length > 0) {
+      console.log(`🎯 [FilterActivity] Found ${filterTargetDataExtensions.length} targetDataExtensions via recursive search`);
+      
+      filterTargetDataExtensions.forEach((targetDE, index) => {
+        console.log(`🔍 [FilterActivity] Processing target DE ${index + 1}:`, { 
+          id: targetDE.id, 
+          name: targetDE.name, 
+          key: targetDE.key, 
+          originalDE: targetDE 
+        });
+        
+        // Use the enhanced DE lookup function
+        let targetDe = findDataExtensionByIdentifier(targetDE.name, dataExtensions);
+        if (!targetDe) {
+          targetDe = findDataExtensionByIdentifier(targetDE.key, dataExtensions);
+        }
+        if (!targetDe) {
+          targetDe = findDataExtensionByIdentifier(targetDE.id, dataExtensions);
+        }
+        
+        if (targetDe) {
+          relationships.push({
+            id: `${activityId}-${targetDe.id}`,
+            source: activityId,
+            target: targetDe.id,
+            type: 'filters_to',
+            label: 'filters to',
+            description: `Filter activity creates filtered DE "${targetDe.name}"`
+          });
+          console.log(`✅ [FilterActivity] Created target relationship: ${activityId} → ${targetDe.id} (${targetDe.name})`);
+        } else {
+          // Create a stub DE entry for relationship tracking even if the full DE wasn't fetched
+          console.log(`📊 [FilterActivity] DE not found in fetched data, creating stub for relationship tracking: ${targetDE.name || targetDE.key || targetDE.id}`);
+          
+          const stubDeId = targetDE.key ? `de_${targetDE.key}` : (targetDE.id ? `de_${targetDE.id}` : `de_${targetDE.name?.replace(/\s+/g, '-').toLowerCase()}`);
+          
+          const stubDe = {
+            id: stubDeId,
+            name: targetDE.name || targetDE.key || 'Unknown DE',
+            externalKey: targetDE.key,
+            customerKey: targetDE.key,
+            description: targetDE.description || `Referenced by ${activity.name || activityType}`,
+            isStub: true
+          };
+          
+          // Add stub DE to dataExtensions array so it can be found in graph generation
+          dataExtensions.push(stubDe);
+          
+          // Update maps to include the stub DE
+          if (stubDe.name) {
+            deMap.set(stubDe.name.toLowerCase(), stubDe);
+          }
+          if (stubDe.externalKey) {
+            deKeyMap.set(stubDe.externalKey.toLowerCase(), stubDe);
+          }
+          
+          relationships.push({
+            id: `${activityId}-${stubDeId}`,
+            source: activityId,
+            target: stubDeId,
+            type: 'filters_to',
+            label: 'filters to',
+            description: `Filter activity creates filtered DE "${stubDe.name}"`
+          });
+          console.log(`✅ [FilterActivity] Created stub target relationship: ${activityId} → ${stubDeId} (${stubDe.name}) [STUB]`);
+        }
+      });
+    } else {
+      // Method 2: Fallback to direct property search
+      console.log(`🔍 [FilterActivity] No targetDataExtensions found via recursive search, trying direct properties...`);
+      
+      let sourceDE = null;
+      let targetDE = null;
+      
+      // Look for source DE in various possible fields
+      const sourceFields = [
+        'sourceDataExtension', 'sourceDataExtensionName', 'sourceDE', 
+        'inputDataExtension', 'fromDataExtension', 'dataSource'
+      ];
+      
+      const targetFields = [
+        'targetDataExtension', 'targetDataExtensionName', 'targetDE',
+        'destinationDataExtension', 'outputDataExtension', 'toDataExtension'
+      ];
+      
+      // Try to find source DE
+      for (const field of sourceFields) {
+        if (activity[field]) {
+          const sourceDeName = activity[field].toLowerCase();
+          sourceDE = deMap.get(sourceDeName) || deKeyMap.get(sourceDeName);
+          if (sourceDE) {
+            console.log(`🎯 [FilterActivity] Found source DE via ${field}: ${sourceDE.name}`);
+            break;
+          }
         }
       }
-    }
-    
-    // Try to find target DE
-    for (const field of targetFields) {
-      if (activity[field]) {
-        const targetDeName = activity[field].toLowerCase();
-        targetDE = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
-        if (targetDE) {
-          console.log(`🎯 [FilterActivity] Found target DE via ${field}: ${targetDE.name}`);
-          break;
+      
+      // Try to find target DE
+      for (const field of targetFields) {
+        if (activity[field]) {
+          const targetDeName = activity[field].toLowerCase();
+          targetDE = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
+          if (targetDE) {
+            console.log(`🎯 [FilterActivity] Found target DE via ${field}: ${targetDE.name}`);
+            break;
+          }
         }
       }
-    }
-    
-    // Method 2: Check for targetDataExtensions array (like in other activities)
-    if (!targetDE && activity.targetDataExtensions && activity.targetDataExtensions.length > 0) {
-      const targetDEData = activity.targetDataExtensions[0];
-      const targetDeName = (targetDEData.name || targetDEData.customerKey || '').toLowerCase();
-      targetDE = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
+      
+      // Method 3: Smart name-based matching - if the activity/automation name matches a DE name,
+      // assume this is a filter that creates that DE
+      if (!targetDE) {
+        const activityName = (activity.name || activity.displayName || '').toLowerCase();
+        const automationName = (activity.automationName || '').toLowerCase();
+        
+        // Try activity name first
+        if (activityName) {
+          targetDE = deMap.get(activityName) || deKeyMap.get(activityName);
+          if (targetDE) {
+            console.log(`🎯 [FilterActivity] Found target DE via activity name match: ${targetDE.name}`);
+          }
+        }
+        
+        // Try automation name if activity name didn't work
+        if (!targetDE && automationName) {
+          targetDE = deMap.get(automationName) || deKeyMap.get(automationName);
+          if (targetDE) {
+            console.log(`🎯 [FilterActivity] Found target DE via automation name match: ${targetDE.name}`);
+          }
+        }
+      }
+      
+      // Create relationships if we found DEs
+      if (sourceDE) {
+        relationships.push({
+          id: `${sourceDE.id}-${activityId}`,
+          source: sourceDE.id,
+          target: activityId,
+          type: 'filters_from',
+          label: 'filters from',
+          description: `Filter activity processes DE "${sourceDE.name}"`
+        });
+        console.log(`✅ [FilterActivity] Created source relationship: ${sourceDE.name} → ${activityId}`);
+      }
+      
       if (targetDE) {
-        console.log(`🎯 [FilterActivity] Found target DE via targetDataExtensions: ${targetDE.name}`);
-      }
-    }
-    
-    // Method 3: Smart name-based matching - if the activity/automation name matches a DE name,
-    // assume this is a filter that creates that DE
-    if (!targetDE) {
-      const activityName = (activity.name || activity.displayName || '').toLowerCase();
-      const automationName = (activity.automationName || '').toLowerCase();
-      
-      // Try activity name first
-      if (activityName) {
-        targetDE = deMap.get(activityName) || deKeyMap.get(activityName);
-        if (targetDE) {
-          console.log(`🎯 [FilterActivity] Found target DE via activity name match: ${targetDE.name}`);
-        }
+        relationships.push({
+          id: `${activityId}-${targetDE.id}`,
+          source: activityId,
+          target: targetDE.id,
+          type: 'filters_to',
+          label: 'filters to',
+          description: `Filter activity creates filtered DE "${targetDE.name}"`
+        });
+        console.log(`✅ [FilterActivity] Created target relationship: ${activityId} → ${targetDE.name}`);
       }
       
-      // Try automation name if activity name didn't work
-      if (!targetDE && automationName) {
-        targetDE = deMap.get(automationName) || deKeyMap.get(automationName);
-        if (targetDE) {
-          console.log(`🎯 [FilterActivity] Found target DE via automation name match: ${targetDE.name}`);
-        }
+      if (!sourceDE && !targetDE) {
+        console.log(`⚠️ [FilterActivity] No DE relationships found for filter activity ${activityId}`);
+        console.log(`⚠️ [FilterActivity] Consider implementing SOAP FilterActivity lookup for activityObjectId: ${activity.activityObjectId}`);
       }
-    }
-    
-    // Create relationships if we found DEs
-    if (sourceDE) {
-      relationships.push({
-        id: `${sourceDE.id}-${activityId}`,
-        source: sourceDE.id,
-        target: activityId,
-        type: 'filters_from',
-        label: 'filters from',
-        description: `Filter activity processes DE "${sourceDE.name}"`
-      });
-      console.log(`✅ [FilterActivity] Created source relationship: ${sourceDE.name} → ${activityId}`);
-    }
-    
-    if (targetDE) {
-      relationships.push({
-        id: `${activityId}-${targetDE.id}`,
-        source: activityId,
-        target: targetDE.id,
-        type: 'filters_to',
-        label: 'filters to',
-        description: `Filter activity creates filtered DE "${targetDE.name}"`
-      });
-      console.log(`✅ [FilterActivity] Created target relationship: ${activityId} → ${targetDE.name}`);
-    }
-    
-    if (!sourceDE && !targetDE) {
-      console.log(`⚠️ [FilterActivity] No DE relationships found for filter activity ${activityId}`);
-      console.log(`⚠️ [FilterActivity] Consider implementing SOAP FilterActivity lookup for activityObjectId: ${activity.activityObjectId}`);
     }
   }
   
