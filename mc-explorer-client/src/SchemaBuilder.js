@@ -238,12 +238,12 @@ const getNodeStyle = (nodeType, nodeSubType = null, isSelected = false, isRelate
   
   // Activity nodes styling - smaller and circular
   if (isActivity) {
-    width = '80px';
-    height = '30px';
+    width = '100px'; // TEMPORARY: Make larger for visibility
+    height = '40px';  // TEMPORARY: Make larger for visibility
     shape = 'ellipse';
-    fontSize = '10px';
+    fontSize = '12px'; // TEMPORARY: Make text larger
     backgroundColor = getActivityColor(nodeSubType);
-    borderWidth = '1px';
+    borderWidth = '3px'; // TEMPORARY: Make border thicker for visibility
   }
   
   if (isOrphan) {
@@ -810,6 +810,9 @@ const extractTargetAsset = (nodeData = {}) => {
         const automationIndex = node.data.metadata?.automationId ? 
           hashCode(node.data.metadata.automationId) % 5 : 0; // Simple hash for automation grouping
         baseY += (automationIndex * 40) + (stepNumber * 15); // Sub-grouping within activity layer
+      } else if (isActivity) {
+        // TEMPORARY FIX: If no stepNumber, position Activity nodes at a fixed, visible location
+        baseY = 200; // Put them between Automations (0*180=0) and SQL Queries (2*180=360)
       }
       
       // Create activity-aware label
