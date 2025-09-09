@@ -6372,8 +6372,16 @@ function detectFilterToDataExtensionRelationships(filters, dataExtensions) {
   const deMap = new Map(dataExtensions.map(de => [de.name.toLowerCase(), de]));
   const deKeyMap = new Map(dataExtensions.map(de => [de.externalKey?.toLowerCase(), de]));
   
+  console.log(`🔍 [Filter Relationships] Processing ${filters.length} filters against ${dataExtensions.length} data extensions`);
+  
+  // Log the filter names and DE names for debugging
+  console.log(`🔍 [Filter Relationships] Filter names:`, filters.map(f => f.name));
+  console.log(`🔍 [Filter Relationships] DE names (first 20):`, dataExtensions.slice(0, 20).map(de => de.name));
+  
   filters.forEach(filter => {
-    // Source DE relationship
+    console.log(`🔍 [Filter Relationships] Analyzing filter: "${filter.name}" (${filter.id})`);
+    
+    // Method 1: Source DE relationship from API properties
     if (filter.dataSource) {
       const sourceDeName = filter.dataSource.toLowerCase();
       const sourceDe = deMap.get(sourceDeName) || deKeyMap.get(sourceDeName);
@@ -6386,10 +6394,11 @@ function detectFilterToDataExtensionRelationships(filters, dataExtensions) {
           label: 'filters from',
           description: `Filter "${filter.name}" uses source DE "${sourceDe.name}"`
         });
+        console.log(`✅ [Filter Relationships] API-based source relationship: ${sourceDe.name} → ${filter.name}`);
       }
     }
     
-    // Target DE relationship (if filter creates a new DE)
+    // Method 2: Target DE relationship from API properties
     if (filter.targetDataExtension) {
       const targetDeName = filter.targetDataExtension.toLowerCase();
       const targetDe = deMap.get(targetDeName) || deKeyMap.get(targetDeName);
@@ -6398,14 +6407,114 @@ function detectFilterToDataExtensionRelationships(filters, dataExtensions) {
           id: `${filter.id}-${targetDe.id}`,
           source: filter.id,
           target: targetDe.id,
-          type: 'creates_filtered_de',
-          label: 'creates filtered DE',
+          type: 'filters_to',
+          label: 'filters to',
           description: `Filter "${filter.name}" creates filtered DE "${targetDe.name}"`
         });
+        console.log(`✅ [Filter Relationships] API-based target relationship: ${filter.name} → ${targetDe.name}`);
+      }
+    }
+    
+    // Method 3: Name-based relationship detection (fallback when API properties are missing)
+    if (!filter.dataSource && !filter.targetDataExtension) {
+      console.log(`🔍 [Filter Relationships] No API properties found, trying name-based detection for filter: "${filter.name}"`);
+      
+      // Look for Data Extensions with similar names
+      const filterNameLower = filter.name.toLowerCase();
+      
+      // Enhanced name-based matching with multiple strategies
+      const potentialMatches = dataExtensions.filter(de => {
+        const deNameLower = de.name.toLowerCase();
+        
+        // Strategy 1: Direct substring matching
+        if (filterNameLower.includes(deNameLower) || deNameLower.includes(filterNameLower)) {
+          return true;
+        }
+        
+        // Strategy 2: Remove common suffixes/prefixes and compare
+        const cleanFilterName = filterNameLower
+          .replace(/\s+(filter|segment|audience|list)$/i, '')
+          .replace(/^(filter|segment|audience|list)\s+/i, '');
+        const cleanDeName = deNameLower
+          .replace(/\s+(data|extension|de|table)$/i, '')
+          .replace(/^(data|extension|de|table)\s+/i, '');
+        
+        if (cleanFilterName === cleanDeName) {
+          return true;
+        }
+        
+        // Strategy 3: Word-based matching (check if they share significant words)
+        const filterWords = cleanFilterName.split(/\s+/).filter(w => w.length > 2);
+        const deWords = cleanDeName.split(/\s+/).filter(w => w.length > 2);
+        
+        if (filterWords.length > 0 && deWords.length > 0) {
+          const commonWords = filterWords.filter(word => deWords.includes(word));
+          // If they share at least half of the words from the shorter name
+          const minWords = Math.min(filterWords.length, deWords.length);
+          if (commonWords.length >= Math.max(1, Math.floor(minWords / 2))) {
+            return true;
+          }
+        }
+        
+        return false;
+      });
+      
+      if (potentialMatches.length > 0) {
+        console.log(`🎯 [Filter Relationships] Found ${potentialMatches.length} potential DE matches for filter "${filter.name}":`, 
+          potentialMatches.map(de => de.name));
+        
+        // Create relationships with the best matches
+        potentialMatches.forEach(targetDe => {
+          relationships.push({
+            id: `${filter.id}-${targetDe.id}`,
+            source: filter.id,
+            target: targetDe.id,
+            type: 'filters_to',
+            label: 'filters to',
+            description: `Filter "${filter.name}" likely targets DE "${targetDe.name}" (name-based match)`
+          });
+          console.log(`✅ [Filter Relationships] Name-based relationship: ${filter.name} → ${targetDe.name}`);
+        });
+      } else {
+        console.log(`❌ [Filter Relationships] No matching Data Extensions found for filter: "${filter.name}"`);
+        console.log(`📋 [Filter Relationships] Available DE names (first 10):`, dataExtensions.map(de => de.name).slice(0, 10));
+        
+        // More aggressive fallback: look for any DE that contains key terms from the filter name
+        const keyTerms = filterNameLower
+          .replace(/[^a-z0-9\s]/g, '')
+          .split(/\s+/)
+          .filter(term => term.length > 3 && !['filter', 'segment', 'audience', 'list', 'data', 'extension'].includes(term));
+        
+        if (keyTerms.length > 0) {
+          console.log(`🔍 [Filter Relationships] Trying fallback with key terms:`, keyTerms);
+          
+          const fallbackMatches = dataExtensions.filter(de => {
+            const deNameLower = de.name.toLowerCase();
+            return keyTerms.some(term => deNameLower.includes(term));
+          });
+          
+          if (fallbackMatches.length > 0 && fallbackMatches.length <= 5) { // Limit to avoid too many false positives
+            console.log(`🎯 [Filter Relationships] Found ${fallbackMatches.length} fallback matches:`, 
+              fallbackMatches.map(de => de.name));
+            
+            fallbackMatches.forEach(targetDe => {
+              relationships.push({
+                id: `${filter.id}-${targetDe.id}`,
+                source: filter.id,
+                target: targetDe.id,
+                type: 'filters_to',
+                label: 'possibly filters to',
+                description: `Filter "${filter.name}" possibly targets DE "${targetDe.name}" (keyword match)`
+              });
+              console.log(`✅ [Filter Relationships] Fallback relationship: ${filter.name} → ${targetDe.name}`);
+            });
+          }
+        }
       }
     }
   });
   
+  console.log(`✅ [Filter Relationships] Created ${relationships.length} filter relationships`);
   return relationships;
 }
 
@@ -8107,6 +8216,27 @@ function generateGraphFromSchemaData(schemaData, types = [], keys = [], selected
                     }
                   }
                 });
+              }
+            }
+          });
+        } else if (node && (node.type === 'Filters' || node.type === 'FilterActivity')) {
+          console.log(`🔍 [Schema Graph] Finding Filter workflow for: ${node.label}`);
+          
+          // For Filters, find related Data Extensions and executing Automations
+          filteredEdges.forEach(edge => {
+            if (edge.source === nodeId) {
+              relatedNodeIds.add(edge.target);
+              console.log(`  ➡️ Filter target: ${nodeId} -> ${edge.target} (${edge.type})`);
+            }
+            if (edge.target === nodeId) {
+              relatedNodeIds.add(edge.source);
+              console.log(`  ⬅️ Filter source: ${edge.source} -> ${nodeId} (${edge.type})`);
+              
+              // If source is an automation or activity, also include it
+              const sourceNode = filteredNodes.find(n => n.id === edge.source);
+              if (sourceNode && (sourceNode.type === 'Automation' || sourceNode.type.includes('Activity'))) {
+                relatedNodeIds.add(edge.source);
+                console.log(`    ⬅️ Filter executed by: ${edge.source}`);
               }
             }
           });
