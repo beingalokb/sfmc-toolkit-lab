@@ -9414,7 +9414,86 @@ app.get('/graph', async (req, res) => {
       const hasAutomationSelection = parsedSelectedObjects.Automations && 
         Object.keys(parsedSelectedObjects.Automations).some(key => parsedSelectedObjects.Automations[key]);
       
-      if (hasAutomationSelection) {
+      // Check if a specific filter is selected
+      const hasFilterSelection = parsedSelectedObjects.Filters && 
+        Object.keys(parsedSelectedObjects.Filters).some(key => parsedSelectedObjects.Filters[key]);
+      
+      if (hasFilterSelection) {
+        console.log('🎯 [Mock] Providing realistic filter workflow mock data');
+        
+        // Return enhanced mock data focused on filter relationships
+        const mockGraphData = {
+          nodes: [
+            // Selected Filter
+            { 
+              data: { 
+                id: "filter_FD5C3EFC-45D2-421C-8E2F-DCF0AB3B9FBC", 
+                label: "Purchased Last 30 Days Promo True", 
+                type: "Filters",
+                category: "Filters",
+                activityType: "FilterActivity",
+                metadata: {
+                  isSelected: true,
+                  isRelated: false,
+                  connectionCount: 3,
+                  description: "Filters for customers who purchased in the last 30 days with promo"
+                }
+              } 
+            },
+            // Target Data Extension (filtered by this filter)
+            { 
+              data: { 
+                id: "de_E44D13CA-9F6E-4A18-B642-B6255FB07429", 
+                label: "Purchased Last 30 Days Promo True", 
+                type: "Data Extensions",
+                category: "Data Extensions",
+                metadata: {
+                  isSelected: false,
+                  isRelated: true,
+                  connectionCount: 2,
+                  description: "Customer data for recent promo purchases",
+                  rowCount: 1523
+                }
+              } 
+            },
+            // Automation that executes this filter
+            { 
+              data: { 
+                id: "auto_2d6920fc-fcf8-46cd-b7bd-693ac533f4ad", 
+                label: "Purchased Last 30 Days Promo True", 
+                type: "Automations",
+                category: "Automations",
+                metadata: {
+                  isSelected: false,
+                  isRelated: true,
+                  connectionCount: 2,
+                  description: "Automation that processes promo customer data"
+                }
+              } 
+            }
+          ],
+          edges: [
+            // Filter targets the Data Extension
+            { data: { source: "filter_FD5C3EFC-45D2-421C-8E2F-DCF0AB3B9FBC", target: "de_E44D13CA-9F6E-4A18-B642-B6255FB07429", type: "filters_to", label: "filters to" } },
+            // Automation executes the filter
+            { data: { source: "auto_2d6920fc-fcf8-46cd-b7bd-693ac533f4ad", target: "filter_FD5C3EFC-45D2-421C-8E2F-DCF0AB3B9FBC", type: "executes_activity", label: "Step 1" } }
+          ],
+          metadata: {
+            totalNodes: 3,
+            totalEdges: 2,
+            format: 'cytoscape',
+            source: 'enhanced-mock-filter-workflow',
+            generatedAt: new Date().toISOString()
+          }
+        };
+        
+        console.log('✅ [Mock] Providing enhanced filter workflow mock data:', {
+          nodeCount: mockGraphData.nodes.length,
+          edgeCount: mockGraphData.edges.length
+        });
+        
+        return res.json(mockGraphData);
+      } else if (hasAutomationSelection) {
         console.log('🎯 [Mock] Providing realistic automation workflow mock data');
         
         // Return enhanced mock data that matches the real structure you showed in the console
