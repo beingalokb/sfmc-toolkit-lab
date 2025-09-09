@@ -6654,7 +6654,11 @@ function getActivityType(activity, automationName = null, queries = []) {
     if (objectTypeMapping[objectTypeId]) {
       console.log(`🔍 [Activity Type] Determined by objectTypeId ${objectTypeId} → ${objectTypeMapping[objectTypeId]}`);
       return objectTypeMapping[objectTypeId];
+    } else {
+      console.log(`⚠️ [Activity Type] Unknown objectTypeId: ${objectTypeId} - using fallback logic`);
     }
+  } else {
+    console.log(`⚠️ [Activity Type] No objectTypeId provided - using fallback logic`);
   }
   
   // Map various activity types to standardized names
