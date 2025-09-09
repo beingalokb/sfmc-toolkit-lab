@@ -532,6 +532,18 @@ const extractTargetAsset = (nodeData = {}) => {
       
       const nodeType = node.data.type || node.data.category || 'unknown';
       debugData.nodeTypes[nodeType] = (debugData.nodeTypes[nodeType] || 0) + 1;
+      
+      // Debug Activity nodes specifically
+      if (nodeType === 'Activity' || node.data.category === 'Activity') {
+        console.log(`🎯 [Activity Node Debug] Found Activity node:`, {
+          id: node.data.id,
+          label: node.data.label,
+          category: node.data.category,
+          type: node.data.type,
+          activityType: node.data.metadata?.activityType,
+          connectionCount: node.data.metadata?.connectionCount
+        });
+      }
     });
     
     // Process edges and classify relationships
@@ -638,6 +650,17 @@ const extractTargetAsset = (nodeData = {}) => {
       console.log(`  - Total connections: ${connection.totalConnections}`);
       console.log(`  - Inbound: ${connection.inbound.length} [${connection.inbound.map(i => i.label).join(', ')}]`);
       console.log(`  - Outbound: ${connection.outbound.length} [${connection.outbound.map(o => o.label).join(', ')}]`);
+      
+      // Extra debug for Activity nodes
+      if (nodeType === 'Activity' || node.data.category === 'Activity') {
+        console.log(`🎯 [Activity Debug] ${nodeId}:`, {
+          inboundCount: connection.inbound.length,
+          outboundCount: connection.outbound.length,
+          totalConnections: connection.totalConnections,
+          hasAnyConnections: connection.totalConnections > 0,
+          willBeIncluded: connection.totalConnections > 0
+        });
+      }
       
       const hasAnyConnections = connection.totalConnections > 0;
       
