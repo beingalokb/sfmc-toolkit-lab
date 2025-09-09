@@ -8374,7 +8374,8 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                             `${automation.id}_activity_${stepNumber}_DataExtractActivity`,
                             `${automation.id}_activity_${stepNumber}_EmailActivity`,
                             `${automation.id}_activity_${stepNumber}_ImportActivity`,
-                            `${automation.id}_activity_${stepNumber}_ExportActivity`
+                            `${automation.id}_activity_${stepNumber}_ExportActivity`,
+                            `${automation.id}_activity_${stepNumber}_FilterActivity`
                           ];
                           
                           // Find which activity ID actually exists in the relationshipMap
@@ -8405,7 +8406,8 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                             `${automation.id}_activity_${stepNumber}_DataExtractActivity`,
                             `${automation.id}_activity_${stepNumber}_EmailActivity`,
                             `${automation.id}_activity_${stepNumber}_ImportActivity`,
-                            `${automation.id}_activity_${stepNumber}_ExportActivity`
+                            `${automation.id}_activity_${stepNumber}_ExportActivity`,
+                            `${automation.id}_activity_${stepNumber}_FilterActivity`
                           ];
                           
                           // Find which activity ID actually exists in the relationshipMap
@@ -8600,7 +8602,8 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
                           `${automation.id}_activity_${stepNumber}_DataExtractActivity`,
                           `${automation.id}_activity_${stepNumber}_EmailActivity`,
                           `${automation.id}_activity_${stepNumber}_ImportActivity`,
-                          `${automation.id}_activity_${stepNumber}_ExportActivity`
+                          `${automation.id}_activity_${stepNumber}_ExportActivity`,
+                          `${automation.id}_activity_${stepNumber}_FilterActivity`
                         ];
                         
                         // Find which activity ID actually exists in the relationshipMap
