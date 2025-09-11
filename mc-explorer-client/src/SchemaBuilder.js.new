@@ -24,27 +24,12 @@ const SchemaBuilder = ({
   // --- Call backend to process SFMC relationships ---
   const loadFromSFMC = async () => {
     try {
-      const storedSubdomain = localStorage.getItem('subdomain');
-      const headers = {
-        'Content-Type': 'application/json'
-      };
-      
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
-      
-      if (storedSubdomain) {
-        headers['x-mc-subdomain'] = storedSubdomain;
-      }
-      
-      console.log('🔄 [Frontend] Calling schema/process with headers:', { 
-        hasToken: !!accessToken, 
-        subdomain: storedSubdomain || 'not found' 
-      });
-
       const response = await fetch('/api/schema/process', {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
         body: JSON.stringify({ schema: { nodes: [], edges: [] } })
       });
 
@@ -52,10 +37,6 @@ const SchemaBuilder = ({
       const data = await response.json();
 
       if (data.success) {
-        console.log('✅ [Frontend] Schema loaded successfully:', { 
-          nodes: data.schema.nodes.length, 
-          edges: data.schema.edges.length 
-        });
         handleSchemaChange(data.schema);
       } else {
         alert(`Error: ${data.error}`);

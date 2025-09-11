@@ -10417,35 +10417,67 @@ function validateSchema(schema) {
  */
 function processSchemaForSFMC(schema, sfmcObjects) {
   console.log('🔄 [Schema] Processing schema for SFMC integration');
+  console.log('📊 [Schema] Input schema:', { nodes: schema?.nodes?.length || 0, edges: schema?.edges?.length || 0 });
+  console.log('📊 [Schema] SFMC objects available:', Object.keys(sfmcObjects || {}).map(key => `${key}: ${sfmcObjects[key]?.length || 0}`));
 
   const processedSchema = {
     nodes: [],
     edges: []
   };
 
-  // --- Step 1: Enrich nodes ---
-  schema.nodes.forEach(node => {
-    const processedNode = { ...node };
+  // --- Step 1: Enrich existing nodes OR create nodes from SFMC if schema is empty ---
+  if (schema.nodes && schema.nodes.length > 0) {
+    // Enrich existing nodes
+    schema.nodes.forEach(node => {
+      const processedNode = { ...node };
 
-    if (sfmcObjects && sfmcObjects[node.category]) {
-      const matchingObject = sfmcObjects[node.category].find(obj =>
-        obj.id === node.id ||
-        obj.customerKey === node.id ||
-        obj.name === node.label
-      );
+      if (sfmcObjects && sfmcObjects[node.category]) {
+        const matchingObject = sfmcObjects[node.category].find(obj =>
+          obj.id === node.id ||
+          obj.customerKey === node.id ||
+          obj.name === node.label
+        );
 
-      if (matchingObject) {
-        processedNode.metadata = {
-          ...processedNode.metadata,
-          ...matchingObject,
-          sfmcLinked: true
-        };
-        console.log(`🔗 [Schema] Linked node ${node.id} to SFMC object`);
+        if (matchingObject) {
+          processedNode.metadata = {
+            ...processedNode.metadata,
+            ...matchingObject,
+            sfmcLinked: true
+          };
+          console.log(`🔗 [Schema] Linked node ${node.id} to SFMC object`);
+        }
       }
-    }
 
-    processedSchema.nodes.push(processedNode);
-  });
+      processedSchema.nodes.push(processedNode);
+    });
+    console.log(`✅ [Schema] Enriched ${processedSchema.nodes.length} existing nodes`);
+  } else if (sfmcObjects && Object.keys(sfmcObjects).length > 0) {
+    // Create nodes from SFMC objects when schema is empty
+    console.log('🆕 [Schema] Creating nodes from SFMC objects (empty schema)');
+    
+    Object.entries(sfmcObjects).forEach(([category, objects]) => {
+      if (objects && Array.isArray(objects)) {
+        objects.slice(0, 20).forEach((obj, index) => { // Limit to 20 per category to avoid overwhelming
+          const nodeId = `${category.toLowerCase().replace(/\s+/g, '_')}_${obj.id || obj.customerKey || index}`;
+          const node = {
+            id: nodeId,
+            type: category,
+            label: obj.name || obj.label || `${category} ${index + 1}`,
+            category: category,
+            x: 100 + (index % 5) * 150, // Arrange in grid
+            y: 100 + Math.floor(index / 5) * 100,
+            metadata: {
+              ...obj,
+              sfmcLinked: true,
+              createdFromSFMC: true
+            }
+          };
+          processedSchema.nodes.push(node);
+        });
+        console.log(`🆕 [Schema] Created ${Math.min(objects.length, 20)} nodes from ${category}`);
+      }
+    });
+  }
 
   // --- Step 2: Copy edges ---
   schema.edges.forEach(edge => {
@@ -10628,10 +10660,16 @@ app.post('/api/schema/process', async (req, res) => {
     console.log('🔄 [Schema API] Processing schema with SFMC integration');
     
     const { schema } = req.body;
+    console.log('📊 [Schema API] Input schema:', { nodes: schema?.nodes?.length || 0, edges: schema?.edges?.length || 0 });
     
     // Get access token and subdomain from session or headers
     const accessToken = getAccessTokenFromRequest(req);
     const subdomain = getSubdomainFromRequest(req);
+    console.log('🔑 [Schema API] Authentication:', { 
+      hasToken: !!accessToken, 
+      tokenLength: accessToken ? accessToken.length : 0,
+      subdomain: subdomain || 'not provided' 
+    });
     
     // Validate schema first
     const validation = validateSchema(schema);
@@ -10649,8 +10687,20 @@ app.post('/api/schema/process', async (req, res) => {
       
       if (accessToken && subdomain) {
         const restEndpoint = req.session?.mcCreds?.restEndpoint || `https://${subdomain}.rest.marketingcloudapis.com`;
+        console.log('🌐 [Schema API] Using REST endpoint:', restEndpoint);
+        
         sfmcObjects = await fetchAllSFMCObjects(accessToken, subdomain, restEndpoint);
-        console.log('✅ [Schema API] SFMC objects fetched for schema processing');
+        
+        console.log('✅ [Schema API] SFMC objects fetched:', {
+          dataExtensions: sfmcObjects['Data Extensions']?.length || 0,
+          automations: sfmcObjects['Automations']?.length || 0,
+          journeys: sfmcObjects['Journeys']?.length || 0,
+          triggeredSends: sfmcObjects['Triggered Sends']?.length || 0,
+          queries: sfmcObjects['SQL Queries']?.length || 0,
+          filters: sfmcObjects['Filters']?.length || 0,
+          fileTransfers: sfmcObjects['File Transfers']?.length || 0,
+          dataExtracts: sfmcObjects['Data Extracts']?.length || 0
+        });
       } else {
         console.log('⚠️ [Schema API] No authentication available, processing schema without SFMC linking');
       }
