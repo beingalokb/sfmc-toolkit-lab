@@ -7617,12 +7617,27 @@ function detectAutomationToFilterRelationships(automations, filters) {
   console.log('🔍 [Filter Relationships] Analyzing Automation-to-Filter relationships...');
   console.log(`📊 [Filter Relationships] Processing ${automations.length} automations against ${filters.length} filters`);
   
-  automations.forEach(automation => {
+  // Enhanced debugging - log all automation activity types
+  let totalActivities = 0;
+  let filterActivitiesFound = 0;
+  
+  automations.forEach((automation, autoIndex) => {
     if (automation.activities && Array.isArray(automation.activities)) {
-      automation.activities.forEach((activity, index) => {
+      totalActivities += automation.activities.length;
+      console.log(`🔍 [Filter Relationships] Automation ${autoIndex + 1}/${automations.length}: "${automation.name}" has ${automation.activities.length} activities`);
+      
+      automation.activities.forEach((activity, activityIndex) => {
+        // Log all activity types for debugging
+        if (activityIndex < 3) { // Log first 3 activities of each automation
+          console.log(`  Activity ${activityIndex + 1}: type="${activity.activityType || activity.type}", name="${activity.name}"`);
+        }
+        
         // Check if this activity is a FilterActivity
         if (activity.activityType === 'FilterActivity' || activity.type === 'FilterActivity') {
-          console.log(`🔍 [Filter Relationships] Found FilterActivity in automation "${automation.name}": ${activity.name}`);
+        // Check if this activity is a FilterActivity
+        if (activity.activityType === 'FilterActivity' || activity.type === 'FilterActivity') {
+          filterActivitiesFound++;
+          console.log(`🎯 [Filter Relationships] Found FilterActivity in automation "${automation.name}": ${activity.name}`);
           
           // Method 1: Try to match by filter name or key
           let matchedFilter = null;
@@ -7667,7 +7682,7 @@ function detectAutomationToFilterRelationships(automations, filters) {
               source: automation.id,
               target: matchedFilter.id,
               type: 'executes_filter',
-              label: `Step ${index + 1}`,
+              label: `Step ${activityIndex + 1}`,
               description: `Automation "${automation.name}" executes Filter "${matchedFilter.name}"`
             });
             console.log(`✅ [Filter Relationships] Automation-Filter relationship: ${automation.name} → ${matchedFilter.name}`);
@@ -7675,10 +7690,14 @@ function detectAutomationToFilterRelationships(automations, filters) {
             console.log(`❌ [Filter Relationships] No matching filter found for FilterActivity: ${activity.name}`);
           }
         }
+        }
       });
+    } else {
+      console.log(`⚠️ [Filter Relationships] Automation "${automation.name}" has no activities array`);
     }
   });
   
+  console.log(`📊 [Filter Relationships] Summary: ${totalActivities} total activities processed, ${filterActivitiesFound} FilterActivities found`);
   console.log(`✅ [Filter Relationships] Created ${relationships.length} automation-filter relationships`);
   return relationships;
 }
