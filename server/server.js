@@ -7601,8 +7601,18 @@ function detectAutomationToFilterRelationships(automations, filters) {
     return relationships;
   }
   
-  const filterMap = new Map(filters.map(filter => [filter.name?.toLowerCase(), filter].filter(([key]) => key)));
-  const filterKeyMap = new Map(filters.map(filter => [filter.customerKey?.toLowerCase(), filter].filter(([key]) => key)));
+  const filterMap = new Map();
+  const filterKeyMap = new Map();
+  
+  // Build maps safely
+  filters.forEach(filter => {
+    if (filter.name) {
+      filterMap.set(filter.name.toLowerCase(), filter);
+    }
+    if (filter.customerKey) {
+      filterKeyMap.set(filter.customerKey.toLowerCase(), filter);
+    }
+  });
   
   console.log('🔍 [Filter Relationships] Analyzing Automation-to-Filter relationships...');
   console.log(`📊 [Filter Relationships] Processing ${automations.length} automations against ${filters.length} filters`);
