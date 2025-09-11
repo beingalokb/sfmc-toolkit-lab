@@ -6372,6 +6372,67 @@ async function fetchSFMCDataExtracts(accessToken, restEndpoint) {
 // ==================== RELATIONSHIP DETECTION FUNCTIONS ====================
 
 /**
+ * Helper function to get activity type from SFMC activity object
+ * Handles different possible field names in real SFMC API responses
+ * @param {Object} activity - SFMC activity object
+ * @returns {string} Activity type or 'unknown'
+ */
+function getActivityType(activity) {
+  if (!activity || typeof activity !== 'object') {
+    return 'unknown';
+  }
+  
+  // Try different possible field names for activity type
+  return (
+    activity.activityType || 
+    activity.type || 
+    activity.ActivityType || 
+    activity.Type ||
+    activity.objectType ||
+    activity.ObjectType ||
+    (activity.objectTypeId === 303 || activity.objectTypeId === '303' ? 'FilterActivity' : null) ||
+    (activity.objectTypeId === 300 || activity.objectTypeId === '300' ? 'QueryActivity' : null) ||
+    (activity.objectTypeId === 42 || activity.objectTypeId === '42' ? 'EmailSendActivity' : null) ||
+    'unknown'
+  );
+}
+
+/**
+ * Helper function to detect if an activity is a FilterActivity
+ * Uses multiple detection methods for robustness
+ * @param {Object} activity - SFMC activity object
+ * @returns {boolean} True if this is a FilterActivity
+ */
+function isFilterActivity(activity) {
+  if (!activity || typeof activity !== 'object') {
+    return false;
+  }
+  
+  // Primary detection: objectTypeId 303 = FilterActivity
+  const isFilterByObjectType = (
+    activity.objectTypeId === 303 || 
+    activity.objectTypeId === '303'
+  );
+  
+  // Secondary detection: activity type field
+  const activityType = getActivityType(activity);
+  const isFilterByType = (
+    activityType === 'FilterActivity' ||
+    activityType === 'Filter' ||
+    activityType === 'filter'
+  );
+  
+  // Tertiary detection: name patterns (as fallback)
+  const isFilterByName = activity.name && (
+    activity.name.toLowerCase().includes('filter') ||
+    activity.name.toLowerCase().includes('audience') ||
+    activity.name.toLowerCase().includes('segment')
+  );
+  
+  return isFilterByObjectType || isFilterByType || isFilterByName;
+}
+
+/**
  * Analyze relationships between SFMC assets
  * Returns edges for the graph visualization
  */
@@ -7821,37 +7882,44 @@ function detectAutomationToFilterRelationships(automations, filters) {
           console.log(`  Full activity object:`, JSON.stringify(activity, null, 2));
         }
         
-        // 🆕 CORRECT FilterActivity detection based on SFMC API structure
-        // According to the API documentation: objectTypeId 303 = FilterActivity
-        const isFilterActivity = (
-          activity.objectTypeId === 303 || 
-          activity.objectTypeId === '303'
-        );
+        // 🆕 Enhanced activity type detection
+        const detectedActivityType = getActivityType(activity);
+        const isFilterActivityDetected = isFilterActivity(activity);
+        
+        // Enhanced debugging for activity type detection
+        console.log(`🔍 [Activity Type Debug] Activity "${activity.name || 'Unnamed'}":`, {
+          detectedType: detectedActivityType,
+          isFilterActivity: isFilterActivityDetected,
+          objectTypeId: activity.objectTypeId,
+          activityObjectId: activity.activityObjectId,
+          rawActivityType: activity.activityType,
+          rawType: activity.type
+        });
         
         // Also log when we find activities that might be filters but don't match our detection
-        if (!isFilterActivity && activity.name && (
+        if (!isFilterActivityDetected && activity.name && (
           activity.name.toLowerCase().includes('purchased') ||
           activity.name.toLowerCase().includes('promo') ||
           activity.name.toLowerCase().includes('30 days')
         )) {
           console.log(`🤔 [Potential Filter Activity] Found activity that might be filter-related:`, {
             name: activity.name,
-            activityType: activity.activityType,
-            type: activity.type,
+            detectedType: detectedActivityType,
             objectTypeId: activity.objectTypeId,
             activityObjectId: activity.activityObjectId,
             allKeys: Object.keys(activity)
           });
         }
         
-        if (isFilterActivity) {
+        if (isFilterActivityDetected) {
           filterActivitiesFound++;
           console.log(`🎯 [Filter Relationships] Found FilterActivity in automation "${automation.name}": ${activity.name}`);
           console.log(`  🔍 Activity details:`, {
             name: activity.name,
             id: activity.id,
             activityObjectId: activity.activityObjectId,
-            objectTypeId: activity.objectTypeId
+            objectTypeId: activity.objectTypeId,
+            detectedType: detectedActivityType
           });
           
           // 🆕 TODO: Implement proper SFMC API chain to resolve filter relationships
