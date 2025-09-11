@@ -1,0 +1,187 @@
+/* Schema Builder CSS */
+.schema-builder {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.schema-toolbar {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-wrap: wrap;
+}
+
+.schema-toolbar button {
+  padding: 8px 16px;
+  background-color: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.schema-toolbar button:hover {
+  background-color: #1976d2;
+}
+
+.schema-toolbar button:active {
+  background-color: #0d47a1;
+}
+
+.schema-canvas-container {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  background-color: #ffffff;
+}
+
+.schema-canvas {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #fafafa;
+  cursor: crosshair;
+}
+
+.schema-canvas rect {
+  cursor: pointer;
+  transition: fill 0.2s, stroke 0.2s;
+}
+
+.schema-canvas rect:hover {
+  fill: #e3f2fd !important;
+  stroke: #2196f3 !important;
+}
+
+.schema-canvas text {
+  pointer-events: none;
+  user-select: none;
+}
+
+.schema-canvas line {
+  pointer-events: none;
+}
+
+.schema-canvas circle {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.schema-canvas circle:hover {
+  opacity: 1 !important;
+}
+
+.node-properties {
+  position: fixed;
+  top: 100px;
+  right: 20px;
+  width: 250px;
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.node-properties h3 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.node-properties p {
+  margin: 5px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.node-properties button {
+  margin-top: 10px;
+  padding: 8px 16px;
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.node-properties button:hover {
+  background-color: #d32f2f;
+}
+
+.schema-stats {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.schema-stats p {
+  margin: 5px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .schema-toolbar {
+    flex-direction: column;
+    gap: 5px;
+  }
+  
+  .node-properties {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: 100%;
+    margin: 10px 0;
+  }
+  
+  .schema-stats {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    margin: 10px 0;
+  }
+}
+
+/* Loading and status indicators */
+.schema-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #666;
+  font-size: 16px;
+}
+
+.schema-error {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px;
+  border: 1px solid #ffcdd2;
+}
+
+.schema-success {
+  background-color: #e8f5e8;
+  color: #2e7d32;
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px;
+  border: 1px solid #c8e6c9;
+}
