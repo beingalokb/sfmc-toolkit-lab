@@ -7627,15 +7627,10 @@ function detectAutomationToFilterRelationships(automations, filters) {
       console.log(`🔍 [Filter Relationships] Automation ${autoIndex + 1}/${automations.length}: "${automation.name}" has ${automation.activities.length} activities`);
       
       automation.activities.forEach((activity, activityIndex) => {
-        // Log all activity types for debugging
-        if (activityIndex < 3) { // Log first 3 activities of each automation
-          console.log(`  Activity ${activityIndex + 1}:`, {
-            activityType: activity.activityType,
-            type: activity.type,
-            objectTypeId: activity.objectTypeId,
-            name: activity.name,
-            definitionKey: activity.definitionKey
-          });
+        // Enhanced debugging - log ALL properties for first few activities to understand real SFMC structure
+        if (activityIndex < 2) { // Log first 2 activities of each automation with FULL details
+          console.log(`🔍 [FULL Activity Debug] Automation "${automation.name}" Activity ${activityIndex + 1}:`);
+          console.log(`  Full activity object:`, JSON.stringify(activity, null, 2));
         }
         
         // Enhanced FilterActivity detection - check multiple properties
@@ -7645,8 +7640,36 @@ function detectAutomationToFilterRelationships(automations, filters) {
           activity.objectTypeId === 303 || // FilterActivity object type ID
           activity.objectTypeId === '303' ||
           (activity.name && activity.name.toLowerCase().includes('filter')) ||
-          (activity.definitionKey && activity.definitionKey.toLowerCase().includes('filter'))
+          (activity.definitionKey && activity.definitionKey.toLowerCase().includes('filter')) ||
+          // Additional broad patterns for real SFMC data
+          (activity.name && (
+            activity.name.toLowerCase().includes('datafilter') ||
+            activity.name.toLowerCase().includes('data filter') ||
+            activity.name.toLowerCase().includes('segment')
+          )) ||
+          // Check configuration objects that might indicate filter activities
+          (activity.configuration && (
+            JSON.stringify(activity.configuration).toLowerCase().includes('filter') ||
+            JSON.stringify(activity.configuration).toLowerCase().includes('segment')
+          )) ||
+          // Check if activity references a filter by ID
+          (activity.filterKey || activity.filterId || activity.segmentId)
         );
+        
+        // Also log when we find activities that might be filters but don't match our detection
+        if (!isFilterActivity && activity.name && (
+          activity.name.toLowerCase().includes('purchased') ||
+          activity.name.toLowerCase().includes('promo') ||
+          activity.name.toLowerCase().includes('30 days')
+        )) {
+          console.log(`🤔 [Potential Filter Activity] Found activity that might be filter-related:`, {
+            name: activity.name,
+            activityType: activity.activityType,
+            type: activity.type,
+            objectTypeId: activity.objectTypeId,
+            allKeys: Object.keys(activity)
+          });
+        }
         
         if (isFilterActivity) {
           filterActivitiesFound++;
