@@ -10350,6 +10350,623 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
 
 // ==================== GRAPH API ENDPOINTS ====================
 
+// =============================================================================
+// SCHEMA BUILDER FUNCTIONALITY
+// =============================================================================
+
+/**
+ * Comprehensive schema validation function
+ * @param {Object} schema - Schema object with nodes and edges
+ * @returns {Object} Validation result with valid flag and error message
+ */
+function validateSchema(schema) {
+  console.log('🔍 [Schema] Validating schema structure');
+  
+  if (!schema || typeof schema !== 'object') {
+    return { valid: false, error: 'Schema must be an object' };
+  }
+  
+  if (!Array.isArray(schema.nodes)) {
+    return { valid: false, error: 'Schema must have a nodes array' };
+  }
+  
+  if (!Array.isArray(schema.edges)) {
+    return { valid: false, error: 'Schema must have an edges array' };
+  }
+  
+  // Validate nodes
+  for (let i = 0; i < schema.nodes.length; i++) {
+    const node = schema.nodes[i];
+    if (!node.id || !node.type || !node.label) {
+      return { valid: false, error: `Node ${i} missing required fields (id, type, label)` };
+    }
+    if (typeof node.x !== 'number' || typeof node.y !== 'number') {
+      return { valid: false, error: `Node ${i} missing valid coordinates` };
+    }
+  }
+  
+  // Validate edges
+  for (let i = 0; i < schema.edges.length; i++) {
+    const edge = schema.edges[i];
+    if (!edge.id || !edge.source || !edge.target) {
+      return { valid: false, error: `Edge ${i} missing required fields (id, source, target)` };
+    }
+    
+    // Check if source and target nodes exist
+    const sourceExists = schema.nodes.some(n => n.id === edge.source);
+    const targetExists = schema.nodes.some(n => n.id === edge.target);
+    
+    if (!sourceExists) {
+      return { valid: false, error: `Edge ${i} references non-existent source node: ${edge.source}` };
+    }
+    if (!targetExists) {
+      return { valid: false, error: `Edge ${i} references non-existent target node: ${edge.target}` };
+    }
+  }
+  
+  console.log('✅ [Schema] Schema validation passed');
+  return { valid: true };
+}
+
+/**
+ * Comprehensive SFMC schema processing function
+ * Enriches nodes and builds relationships for all SFMC object types
+ * @param {Object} schema - Input schema with nodes and edges
+ * @param {Object} sfmcObjects - SFMC objects organized by category
+ * @returns {Object} Processed schema with enriched nodes and relationships
+ */
+function processSchemaForSFMC(schema, sfmcObjects) {
+  console.log('🔄 [Schema] Processing schema for SFMC integration');
+
+  const processedSchema = {
+    nodes: [],
+    edges: []
+  };
+
+  // --- Step 1: Enrich nodes ---
+  schema.nodes.forEach(node => {
+    const processedNode = { ...node };
+
+    if (sfmcObjects && sfmcObjects[node.category]) {
+      const matchingObject = sfmcObjects[node.category].find(obj =>
+        obj.id === node.id ||
+        obj.customerKey === node.id ||
+        obj.name === node.label
+      );
+
+      if (matchingObject) {
+        processedNode.metadata = {
+          ...processedNode.metadata,
+          ...matchingObject,
+          sfmcLinked: true
+        };
+        console.log(`🔗 [Schema] Linked node ${node.id} to SFMC object`);
+      }
+    }
+
+    processedSchema.nodes.push(processedNode);
+  });
+
+  // --- Step 2: Copy edges ---
+  schema.edges.forEach(edge => {
+    const processedEdge = { ...edge };
+    processedEdge.metadata = {
+      ...processedEdge.metadata,
+      schemaGenerated: true,
+      processedAt: new Date().toISOString()
+    };
+    processedSchema.edges.push(processedEdge);
+  });
+
+  // --- Step 3: Build relationships ---
+  try {
+    const nodes = processedSchema.nodes;
+    const edges = processedSchema.edges;
+    const nodeIndex = new Map(nodes.map(n => [n.id, n]));
+
+    const pushNode = (node) => {
+      if (!nodeIndex.has(node.id)) {
+        nodes.push(node);
+        nodeIndex.set(node.id, node);
+      }
+    };
+
+    const pushEdge = (source, target, type, label) => {
+      if (!nodeIndex.has(source) || !nodeIndex.has(target)) return;
+      const id = `${source}__${type}__${target}`;
+      if (edges.some(e => e.id === id)) return;
+      edges.push({
+        id,
+        source,
+        target,
+        type,
+        label: label || type,
+        metadata: { createdAt: new Date().toISOString() }
+      });
+    };
+
+    // --- Automations + Activities ---
+    (sfmcObjects['Automations'] || []).forEach(auto => {
+      const autoNodeId = `auto_${auto.id}`;
+      pushNode({ id: autoNodeId, type: 'Automations', label: auto.name, category: 'Automations', metadata: auto });
+
+      (auto.steps || []).forEach((step, stepIdx) => {
+        (step.activities || []).forEach((act, actIdx) => {
+          const typeMap = {
+            300: 'QueryActivity',
+            303: 'FilterActivity',
+            312: 'ImportActivity',
+            43:  'FileTransferActivity',
+            42:  'DataExtractActivity'
+          };
+          const actType = typeMap[act.objectTypeId] || 'GenericActivity';
+          const actNodeId = `${autoNodeId}_act_${stepIdx}_${actType}`;
+
+          pushNode({
+            id: actNodeId,
+            type: 'Activity',
+            label: actType,
+            category: 'Activity',
+            metadata: act
+          });
+
+          pushEdge(autoNodeId, actNodeId, 'executes_activity', `Step ${step.step}`);
+
+          // DE links from REST (if present)
+          (act.targetDataExtensions || []).forEach(tde => {
+            const deNodeId = `de_${tde.key || tde.id}`;
+            pushNode({
+              id: deNodeId,
+              type: 'Data Extensions',
+              label: tde.name || 'Data Extension',
+              category: 'Data Extensions',
+              metadata: tde
+            });
+            const rel = actType === 'FilterActivity' ? 'filtersInto'
+                      : actType === 'QueryActivity'  ? 'targets'
+                      : actType === 'ImportActivity' ? 'importsInto'
+                      : 'uses';
+            pushEdge(actNodeId, deNodeId, rel, rel);
+          });
+        });
+      });
+    });
+
+    // --- Journeys ---
+    (sfmcObjects['Journeys'] || []).forEach(j => {
+      const jNodeId = `journey_${j.id}`;
+      pushNode({ id: jNodeId, type: 'Journeys', label: j.name, category: 'Journeys', metadata: j });
+
+      if (j.entrySource?.dataExtensionId) {
+        const deNodeId = `de_${j.entrySource.dataExtensionId}`;
+        pushEdge(jNodeId, deNodeId, 'entersFrom', 'entry source');
+      }
+
+      (j.activities || []).forEach(act => {
+        if (act.type === 'EMAIL' && act.arguments?.triggeredSendDefinitionId) {
+          const tsNodeId = `ts_${act.arguments.triggeredSendDefinitionId}`;
+          pushEdge(jNodeId, tsNodeId, 'sends', 'sends email');
+        }
+      });
+    });
+
+    // --- Triggered Sends ---
+    (sfmcObjects['Triggered Sends'] || []).forEach(ts => {
+      const tsNodeId = `ts_${ts.id}`;
+      pushNode({ id: tsNodeId, type: 'Triggered Sends', label: ts.name, category: 'Triggered Sends', metadata: ts });
+
+      if (ts.dataExtensionId) {
+        const deNodeId = `de_${ts.dataExtensionId}`;
+        pushEdge(tsNodeId, deNodeId, 'usesDE', 'subscriber DE');
+      }
+    });
+
+    // --- File Transfers ---
+    (sfmcObjects['File Transfers'] || []).forEach(ft => {
+      const ftNodeId = `ft_${ft.id}`;
+      pushNode({ id: ftNodeId, type: 'File Transfers', label: ft.name, category: 'File Transfers', metadata: ft });
+      // Linking to Automation activities handled above
+    });
+
+    // --- Data Extracts ---
+    (sfmcObjects['Data Extracts'] || []).forEach(dx => {
+      const dxNodeId = `dex_${dx.id}`;
+      pushNode({ id: dxNodeId, type: 'Data Extracts', label: dx.name, category: 'Data Extracts', metadata: dx });
+    });
+
+    console.log(`✅ [Schema] Processed ${nodes.length} nodes and ${edges.length} edges`);
+  } catch (err) {
+    console.warn('⚠️ [Schema] Relationship builder failed:', err.message);
+  }
+
+  return processedSchema;
+}
+
+// =============================================================================
+// SCHEMA BUILDER API ENDPOINTS
+// =============================================================================
+
+/**
+ * Schema validation endpoint
+ */
+app.post('/api/schema/validate', (req, res) => {
+  try {
+    console.log('📋 [Schema API] Validating schema');
+    
+    const { schema } = req.body;
+    const validation = validateSchema(schema);
+    
+    if (validation.valid) {
+      res.json({
+        success: true,
+        message: 'Schema is valid',
+        stats: {
+          nodes: schema.nodes.length,
+          edges: schema.edges.length
+        }
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+  } catch (error) {
+    console.error('❌ [Schema API] Validation error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error during validation'
+    });
+  }
+});
+
+/**
+ * Schema processing with SFMC integration endpoint
+ */
+app.post('/api/schema/process', async (req, res) => {
+  try {
+    console.log('🔄 [Schema API] Processing schema with SFMC integration');
+    
+    const { schema } = req.body;
+    
+    // Get access token and subdomain from session or headers
+    const accessToken = getAccessTokenFromRequest(req);
+    const subdomain = getSubdomainFromRequest(req);
+    
+    // Validate schema first
+    const validation = validateSchema(schema);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+    
+    // Get current SFMC objects for linking
+    let sfmcObjects = {};
+    try {
+      console.log('📥 [Schema API] Fetching SFMC objects for schema processing');
+      
+      if (accessToken && subdomain) {
+        const restEndpoint = req.session?.mcCreds?.restEndpoint || `https://${subdomain}.rest.marketingcloudapis.com`;
+        sfmcObjects = await fetchAllSFMCObjects(accessToken, subdomain, restEndpoint);
+        console.log('✅ [Schema API] SFMC objects fetched for schema processing');
+      } else {
+        console.log('⚠️ [Schema API] No authentication available, processing schema without SFMC linking');
+      }
+    } catch (error) {
+      console.warn('⚠️ [Schema API] Could not fetch SFMC objects, processing without linking:', error.message);
+    }
+    
+    // Process schema with SFMC integration
+    const processedSchema = processSchemaForSFMC(schema, sfmcObjects);
+    
+    res.json({
+      success: true,
+      schema: processedSchema,
+      stats: {
+        nodes: processedSchema.nodes.length,
+        edges: processedSchema.edges.length,
+        sfmcLinked: processedSchema.nodes.filter(n => n.metadata?.sfmcLinked).length,
+        relationshipsBuilt: processedSchema.edges.filter(e => !e.metadata?.schemaGenerated).length
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ [Schema API] Processing error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error during schema processing'
+    });
+  }
+});
+
+/**
+ * Schema export endpoint
+ */
+app.post('/api/schema/export', (req, res) => {
+  try {
+    console.log('📤 [Schema API] Exporting schema');
+    
+    const { schema, format = 'json' } = req.body;
+    
+    // Validate schema
+    const validation = validateSchema(schema);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+    
+    let exportData;
+    let contentType;
+    let filename;
+    
+    switch (format.toLowerCase()) {
+      case 'json':
+        exportData = JSON.stringify(schema, null, 2);
+        contentType = 'application/json';
+        filename = 'schema.json';
+        break;
+        
+      case 'cytoscape':
+        // Convert to Cytoscape.js format
+        const cytoscapeData = {
+          elements: [
+            ...schema.nodes.map(node => ({
+              data: {
+                id: node.id,
+                label: node.label,
+                type: node.type,
+                category: node.category
+              },
+              position: { x: node.x, y: node.y }
+            })),
+            ...schema.edges.map(edge => ({
+              data: {
+                id: edge.id,
+                source: edge.source,
+                target: edge.target,
+                label: edge.label
+              }
+            }))
+          ]
+        };
+        exportData = JSON.stringify(cytoscapeData, null, 2);
+        contentType = 'application/json';
+        filename = 'schema_cytoscape.json';
+        break;
+        
+      default:
+        return res.status(400).json({
+          success: false,
+          error: 'Unsupported export format'
+        });
+    }
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(exportData);
+    
+  } catch (error) {
+    console.error('❌ [Schema API] Export error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error during export'
+    });
+  }
+});
+
+/**
+ * Schema templates endpoint
+ */
+app.get('/api/schema/templates', (req, res) => {
+  try {
+    console.log('📋 [Schema API] Fetching schema templates');
+    
+    const templates = [
+      {
+        id: 'basic_automation',
+        name: 'Basic Automation Flow',
+        description: 'Simple automation with data extension and email send',
+        schema: {
+          nodes: [
+            {
+              id: 'de1',
+              type: 'Data Extensions',
+              label: 'Source Data',
+              x: 50,
+              y: 100,
+              category: 'Data Extensions'
+            },
+            {
+              id: 'auto1',
+              type: 'Automations',
+              label: 'Process Data',
+              x: 200,
+              y: 100,
+              category: 'Automations'
+            },
+            {
+              id: 'ts1',
+              type: 'Triggered Sends',
+              label: 'Send Email',
+              x: 350,
+              y: 100,
+              category: 'Triggered Sends'
+            }
+          ],
+          edges: [
+            {
+              id: 'edge1',
+              source: 'de1',
+              target: 'auto1',
+              label: 'processes'
+            },
+            {
+              id: 'edge2',
+              source: 'auto1',
+              target: 'ts1',
+              label: 'triggers'
+            }
+          ]
+        }
+      },
+      {
+        id: 'journey_flow',
+        name: 'Customer Journey Flow',
+        description: 'Journey with entry event and multiple paths',
+        schema: {
+          nodes: [
+            {
+              id: 'de_entry',
+              type: 'Data Extensions',
+              label: 'Entry Event',
+              x: 50,
+              y: 100,
+              category: 'Data Extensions'
+            },
+            {
+              id: 'journey1',
+              type: 'Journeys',
+              label: 'Customer Journey',
+              x: 200,
+              y: 100,
+              category: 'Journeys'
+            },
+            {
+              id: 'filter1',
+              type: 'Filters',
+              label: 'Segment Filter',
+              x: 200,
+              y: 200,
+              category: 'Filters'
+            },
+            {
+              id: 'ts_welcome',
+              type: 'Triggered Sends',
+              label: 'Welcome Email',
+              x: 350,
+              y: 50,
+              category: 'Triggered Sends'
+            },
+            {
+              id: 'ts_followup',
+              type: 'Triggered Sends',
+              label: 'Follow-up Email',
+              x: 350,
+              y: 150,
+              category: 'Triggered Sends'
+            }
+          ],
+          edges: [
+            {
+              id: 'edge1',
+              source: 'de_entry',
+              target: 'journey1',
+              label: 'entry event'
+            },
+            {
+              id: 'edge2',
+              source: 'journey1',
+              target: 'filter1',
+              label: 'uses filter'
+            },
+            {
+              id: 'edge3',
+              source: 'journey1',
+              target: 'ts_welcome',
+              label: 'sends'
+            },
+            {
+              id: 'edge4',
+              source: 'journey1',
+              target: 'ts_followup',
+              label: 'sends'
+            }
+          ]
+        }
+      },
+      {
+        id: 'filter_automation',
+        name: 'Filter-based Automation',
+        description: 'Automation that uses filters to segment data',
+        schema: {
+          nodes: [
+            {
+              id: 'de_source',
+              type: 'Data Extensions',
+              label: 'Source Data',
+              x: 50,
+              y: 100,
+              category: 'Data Extensions'
+            },
+            {
+              id: 'filter1',
+              type: 'Filters',
+              label: 'Customer Segment',
+              x: 200,
+              y: 100,
+              category: 'Filters'
+            },
+            {
+              id: 'auto1',
+              type: 'Automations',
+              label: 'Segment Automation',
+              x: 350,
+              y: 100,
+              category: 'Automations'
+            },
+            {
+              id: 'de_target',
+              type: 'Data Extensions',
+              label: 'Segmented Data',
+              x: 500,
+              y: 100,
+              category: 'Data Extensions'
+            }
+          ],
+          edges: [
+            {
+              id: 'edge1',
+              source: 'de_source',
+              target: 'filter1',
+              label: 'filters'
+            },
+            {
+              id: 'edge2',
+              source: 'filter1',
+              target: 'auto1',
+              label: 'executes'
+            },
+            {
+              id: 'edge3',
+              source: 'auto1',
+              target: 'de_target',
+              label: 'outputs to'
+            }
+          ]
+        }
+      }
+    ];
+    
+    res.json({
+      success: true,
+      templates: templates
+    });
+    
+  } catch (error) {
+    console.error('❌ [Schema API] Templates error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error fetching templates'
+    });
+  }
+});
+
+// ...existing code...
+
 /**
  * Graph API endpoint that returns nodes and edges in Cytoscape format
  * Requires Marketing Cloud authentication - no mock mode
