@@ -10125,6 +10125,47 @@ app.get('/graph', async (req, res) => {
   }
 });
 
+// Debug endpoint to inspect automation data structure
+app.get('/debug/automations', async (req, res) => {
+  try {
+    if (!req.session.mcCreds) {
+      return res.json({ 
+        message: 'Using mock data', 
+        automations: mockAutomations.slice(0, 2) // Show first 2 automations
+      });
+    }
+    
+    if (!cachedAutomations || cachedAutomations.length === 0) {
+      return res.json({ message: 'No cached automations available' });
+    }
+    
+    // Return first 2 automations with their activity structure
+    const debugData = cachedAutomations.slice(0, 2).map(automation => ({
+      id: automation.id,
+      name: automation.name,
+      activityCount: automation.activities ? automation.activities.length : 0,
+      activities: automation.activities ? automation.activities.map((activity, index) => ({
+        index: index,
+        name: activity.name,
+        type: activity.type,
+        activityType: activity.activityType,
+        objectType: activity.objectType,
+        objectTypeId: activity.objectTypeId,
+        definitionKey: activity.definitionKey,
+        allKeys: Object.keys(activity)
+      })) : []
+    }));
+    
+    res.json({
+      message: 'Raw automation data structure',
+      automations: debugData
+    });
+  } catch (error) {
+    console.error('Debug automations error:', error);
+    res.status(500).json({ error: 'Failed to retrieve debug data' });
+  }
+});
+
 /**
  * Node details endpoint for getting detailed information about a specific node
  * Requires Marketing Cloud authentication - no mock mode
