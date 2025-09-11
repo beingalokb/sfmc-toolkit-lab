@@ -7590,6 +7590,90 @@ function detectTriggeredSendToDataExtensionRelationships(triggeredSends, dataExt
 }
 
 /**
+ * Detect relationships between Automations and Filters
+ * Automations can execute Filter activities
+ */
+function detectAutomationToFilterRelationships(automations, filters) {
+  const relationships = [];
+  
+  if (!automations || !filters || !Array.isArray(automations) || !Array.isArray(filters)) {
+    console.log('⚠️ [Filter Relationships] Invalid input parameters for detectAutomationToFilterRelationships');
+    return relationships;
+  }
+  
+  const filterMap = new Map(filters.map(filter => [filter.name?.toLowerCase(), filter].filter(([key]) => key)));
+  const filterKeyMap = new Map(filters.map(filter => [filter.customerKey?.toLowerCase(), filter].filter(([key]) => key)));
+  
+  console.log('🔍 [Filter Relationships] Analyzing Automation-to-Filter relationships...');
+  console.log(`📊 [Filter Relationships] Processing ${automations.length} automations against ${filters.length} filters`);
+  
+  automations.forEach(automation => {
+    if (automation.activities && Array.isArray(automation.activities)) {
+      automation.activities.forEach((activity, index) => {
+        // Check if this activity is a FilterActivity
+        if (activity.activityType === 'FilterActivity' || activity.type === 'FilterActivity') {
+          console.log(`🔍 [Filter Relationships] Found FilterActivity in automation "${automation.name}": ${activity.name}`);
+          
+          // Method 1: Try to match by filter name or key
+          let matchedFilter = null;
+          
+          // Try exact name match
+          if (activity.name) {
+            const activityNameLower = activity.name.toLowerCase();
+            matchedFilter = filterMap.get(activityNameLower);
+            
+            if (!matchedFilter) {
+              // Try partial name matching
+              for (const [filterName, filter] of filterMap) {
+                if (activityNameLower.includes(filterName) || filterName.includes(activityNameLower)) {
+                  matchedFilter = filter;
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Try by filter key if available
+          if (!matchedFilter && activity.filterKey) {
+            matchedFilter = filterKeyMap.get(activity.filterKey.toLowerCase());
+          }
+          
+          // Method 2: If no direct match, try by activity configuration
+          if (!matchedFilter && activity.filterDefinition) {
+            const filterDef = activity.filterDefinition;
+            // Look for filters that might match based on configuration
+            for (const filter of filters) {
+              if (filter.customerKey === filterDef.filterKey || 
+                  filter.name?.toLowerCase() === filterDef.name?.toLowerCase()) {
+                matchedFilter = filter;
+                break;
+              }
+            }
+          }
+          
+          if (matchedFilter) {
+            relationships.push({
+              id: `${automation.id}-${matchedFilter.id}`,
+              source: automation.id,
+              target: matchedFilter.id,
+              type: 'executes_filter',
+              label: `Step ${index + 1}`,
+              description: `Automation "${automation.name}" executes Filter "${matchedFilter.name}"`
+            });
+            console.log(`✅ [Filter Relationships] Automation-Filter relationship: ${automation.name} → ${matchedFilter.name}`);
+          } else {
+            console.log(`❌ [Filter Relationships] No matching filter found for FilterActivity: ${activity.name}`);
+          }
+        }
+      });
+    }
+  });
+  
+  console.log(`✅ [Filter Relationships] Created ${relationships.length} automation-filter relationships`);
+  return relationships;
+}
+
+/**
  * Detect File Transfer and Data Extract relationships with Data Extensions
  */
 function detectFileTransferDataExtractRelationships(fileTransfers, dataExtracts, dataExtensions) {
