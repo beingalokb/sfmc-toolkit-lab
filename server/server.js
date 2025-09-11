@@ -7629,13 +7629,26 @@ function detectAutomationToFilterRelationships(automations, filters) {
       automation.activities.forEach((activity, activityIndex) => {
         // Log all activity types for debugging
         if (activityIndex < 3) { // Log first 3 activities of each automation
-          console.log(`  Activity ${activityIndex + 1}: type="${activity.activityType || activity.type}", name="${activity.name}"`);
+          console.log(`  Activity ${activityIndex + 1}:`, {
+            activityType: activity.activityType,
+            type: activity.type,
+            objectTypeId: activity.objectTypeId,
+            name: activity.name,
+            definitionKey: activity.definitionKey
+          });
         }
         
-        // Check if this activity is a FilterActivity
-        if (activity.activityType === 'FilterActivity' || activity.type === 'FilterActivity') {
-        // Check if this activity is a FilterActivity
-        if (activity.activityType === 'FilterActivity' || activity.type === 'FilterActivity') {
+        // Enhanced FilterActivity detection - check multiple properties
+        const isFilterActivity = (
+          activity.activityType === 'FilterActivity' || 
+          activity.type === 'FilterActivity' ||
+          activity.objectTypeId === 303 || // FilterActivity object type ID
+          activity.objectTypeId === '303' ||
+          (activity.name && activity.name.toLowerCase().includes('filter')) ||
+          (activity.definitionKey && activity.definitionKey.toLowerCase().includes('filter'))
+        );
+        
+        if (isFilterActivity) {
           filterActivitiesFound++;
           console.log(`🎯 [Filter Relationships] Found FilterActivity in automation "${automation.name}": ${activity.name}`);
           
@@ -7689,7 +7702,6 @@ function detectAutomationToFilterRelationships(automations, filters) {
           } else {
             console.log(`❌ [Filter Relationships] No matching filter found for FilterActivity: ${activity.name}`);
           }
-        }
         }
       });
     } else {
