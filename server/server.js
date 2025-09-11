@@ -7985,6 +7985,140 @@ function detectAutomationToFilterRelationships(automations, filters) {
 }
 
 /**
+ * Enhanced Automation-to-Filter relationship detection using SOAP API chain
+ * Follows the correct SFMC API relationship chain:
+ * Automation → FilterActivity → FilterDefinition → DataExtension
+ * @param {Array} automations - Array of automation objects
+ * @param {Array} filters - Array of filter objects  
+ * @param {string} accessToken - SFMC access token for SOAP API calls
+ * @param {string} subdomain - SFMC subdomain for SOAP API calls
+ * @returns {Promise<Array>} Array of relationship objects
+ */
+async function detectAutomationToFilterRelationshipsEnhanced(automations, filters, accessToken, subdomain) {
+  const relationships = [];
+  
+  if (!automations || !filters || !Array.isArray(automations) || !Array.isArray(filters)) {
+    console.log('⚠️ [Enhanced Filter Relationships] Invalid input parameters');
+    return relationships;
+  }
+  
+  if (!accessToken || !subdomain) {
+    console.log('⚠️ [Enhanced Filter Relationships] Missing access token or subdomain, falling back to basic detection');
+    return detectAutomationToFilterRelationships(automations, filters);
+  }
+  
+  console.log('🚀 [Enhanced Filter Relationships] Starting enhanced SOAP API-based relationship detection...');
+  console.log(`📊 [Enhanced Filter Relationships] Processing ${automations.length} automations against ${filters.length} filters`);
+  
+  let totalFilterActivities = 0;
+  let resolvedRelationships = 0;
+  
+  for (const automation of automations) {
+    if (!automation.activities || !Array.isArray(automation.activities)) {
+      continue;
+    }
+    
+    console.log(`🔍 [Enhanced Filter Relationships] Processing automation: "${automation.name}" with ${automation.activities.length} activities`);
+    
+    for (const [activityIndex, activity] of automation.activities.entries()) {
+      // Detect FilterActivity using enhanced detection
+      const isFilterActivityDetected = isFilterActivity(activity);
+      const detectedActivityType = getActivityType(activity);
+      
+      if (isFilterActivityDetected && activity.activityObjectId) {
+        totalFilterActivities++;
+        console.log(`🎯 [Enhanced Filter Relationships] Found FilterActivity: "${activity.name}" (ObjectID: ${activity.activityObjectId}, Type: ${detectedActivityType})`);
+        
+        try {
+          // Step 1: Get FilterActivity details
+          const filterActivityDetails = await getFilterActivityDetails(activity.activityObjectId, accessToken, subdomain);
+          
+          if (!filterActivityDetails || !filterActivityDetails.FilterDefinitionID) {
+            console.log(`⚠️ [Enhanced Filter Relationships] No FilterDefinitionID found for FilterActivity ${activity.activityObjectId}`);
+            continue;
+          }
+          
+          const filterDefinitionId = filterActivityDetails.FilterDefinitionID[0] || filterActivityDetails.FilterDefinitionID;
+          console.log(`🔗 [Enhanced Filter Relationships] FilterActivity links to FilterDefinition: ${filterDefinitionId}`);
+          
+          // Step 2: Get FilterDefinition details
+          const filterDefinitionDetails = await getFilterDefinitionDetails(filterDefinitionId, accessToken, subdomain);
+          
+          if (!filterDefinitionDetails) {
+            console.log(`⚠️ [Enhanced Filter Relationships] No FilterDefinition found for ID ${filterDefinitionId}`);
+            continue;
+          }
+          
+          // Step 3: Match FilterDefinition with our filters
+          let matchedFilter = null;
+          const filterDefName = filterDefinitionDetails.Name?.[0] || filterDefinitionDetails.Name;
+          const filterDefCustomerKey = filterDefinitionDetails.CustomerKey?.[0] || filterDefinitionDetails.CustomerKey;
+          
+          for (const filter of filters) {
+            // Try matching by name or customer key
+            if (
+              (filterDefName && filter.name === filterDefName) ||
+              (filterDefCustomerKey && filter.customerKey === filterDefCustomerKey) ||
+              (filterDefName && filter.name && filter.name.toLowerCase() === filterDefName.toLowerCase())
+            ) {
+              matchedFilter = filter;
+              console.log(`✅ [Enhanced Filter Relationships] Matched FilterDefinition "${filterDefName}" with Filter "${filter.name}"`);
+              break;
+            }
+          }
+          
+          if (matchedFilter) {
+            relationships.push({
+              id: `${automation.id}-${matchedFilter.id}`,
+              source: automation.id,
+              target: matchedFilter.id,
+              type: 'executes_filter',
+              label: `Step ${activityIndex + 1}`,
+              description: `Automation "${automation.name}" executes Filter "${matchedFilter.name}"`,
+              metadata: {
+                activityObjectId: activity.activityObjectId,
+                filterDefinitionId: filterDefinitionId,
+                stepNumber: activityIndex + 1,
+                resolvedViaSOAP: true,
+                detectedActivityType: detectedActivityType
+              }
+            });
+            
+            resolvedRelationships++;
+            console.log(`✅ [Enhanced Filter Relationships] Created relationship: ${automation.name} → ${matchedFilter.name}`);
+            
+            // Step 4: Optionally resolve DataExtension if available
+            if (filterDefinitionDetails.DataExtensionObjectID) {
+              const dataExtensionObjectId = filterDefinitionDetails.DataExtensionObjectID[0] || filterDefinitionDetails.DataExtensionObjectID;
+              console.log(`🔗 [Enhanced Filter Relationships] FilterDefinition also links to DataExtension: ${dataExtensionObjectId}`);
+              
+              // This could be used to create additional relationships if needed
+              // For now, we'll just log it for debugging
+            }
+            
+          } else {
+            console.log(`⚠️ [Enhanced Filter Relationships] No matching filter found for FilterDefinition "${filterDefName}"`);
+          }
+          
+        } catch (error) {
+          console.error(`❌ [Enhanced Filter Relationships] Error processing FilterActivity ${activity.activityObjectId}:`, error.message);
+        }
+      }
+    }
+  }
+  
+  console.log(`📊 [Enhanced Filter Relationships] Summary: Found ${totalFilterActivities} FilterActivities, resolved ${resolvedRelationships} relationships`);
+  
+  // If we didn't find any relationships via SOAP, fall back to basic name matching
+  if (relationships.length === 0 && totalFilterActivities > 0) {
+    console.log('🔄 [Enhanced Filter Relationships] No SOAP-resolved relationships found, falling back to basic name matching...');
+    return detectAutomationToFilterRelationships(automations, filters);
+  }
+  
+  return relationships;
+}
+
+/**
  * Detect File Transfer and Data Extract relationships with Data Extensions
  */
 function detectFileTransferDataExtractRelationships(fileTransfers, dataExtracts, dataExtensions) {
@@ -8413,6 +8547,276 @@ async function generateLiveGraphDataEnhanced(sfmcObjects, types = [], keys = [],
   
   // Generate graph data using enhanced async relationship detection
   return await generateEnhancedAsyncGraphData(sfmcObjects, types, keys, selectedObjects, accessToken, subdomain);
+}
+
+/**
+ * Generate graph data with enhanced async SOAP API integration
+ * @param {Object} sfmcObjects - SFMC objects containing automations, DEs, etc.
+ * @param {Array} types - Optional filter by object types
+ * @param {Array} keys - Optional filter by object keys
+ * @param {Object} selectedObjects - Optional filter by selected objects from frontend
+ * @param {string} accessToken - SFMC access token for SOAP API calls
+ * @param {string} subdomain - SFMC subdomain for SOAP API calls
+ * @returns {Promise<Object>} Graph data with nodes and edges
+ */
+async function generateEnhancedAsyncGraphData(sfmcObjects, types = [], keys = [], selectedObjects = {}, accessToken, subdomain) {
+  console.log('🚀 [Enhanced Async Graph] === STARTING ENHANCED ASYNC GRAPH GENERATION ===');
+  
+  const debugStats = {
+    inputObjects: {},
+    selectedObjects: {},
+    relationships: {
+      detected: 0,
+      automationToDE: 0,
+      automationToFilter: 0,
+      filterToDE: 0,
+      enhanced: 0
+    },
+    nodes: {
+      created: 0,
+      included: 0,
+      automations: 0,
+      dataExtensions: 0,
+      filters: 0
+    },
+    edges: {
+      created: 0,
+      included: 0
+    }
+  };
+
+  // Count input objects for debugging
+  Object.keys(sfmcObjects).forEach(category => {
+    if (Array.isArray(sfmcObjects[category])) {
+      debugStats.inputObjects[category] = sfmcObjects[category].length;
+    }
+  });
+
+  // Count selected objects for debugging
+  Object.keys(selectedObjects).forEach(category => {
+    if (typeof selectedObjects[category] === 'object') {
+      debugStats.selectedObjects[category] = Object.keys(selectedObjects[category]).length;
+    }
+  });
+
+  console.log('📊 [Enhanced Async Graph] Input stats:', debugStats);
+
+  // Extract object arrays with fallback for different naming conventions
+  const allAutomations = sfmcObjects.automations || sfmcObjects.Automations || [];
+  const allDataExtensions = sfmcObjects.dataExtensions || sfmcObjects.DataExtensions || [];
+  const allFilters = sfmcObjects.filters || sfmcObjects.Filters || [];
+
+  console.log('📊 [Enhanced Async Graph] Object counts:', {
+    automations: allAutomations.length,
+    dataExtensions: allDataExtensions.length,
+    filters: allFilters.length
+  });
+
+  // 🚀 Enhanced relationship detection with async SOAP API integration
+  console.log('🔍 [Enhanced Async Graph] Detecting relationships with enhanced async methods...');
+  
+  const relationships = [
+    ...detectAutomationToDataExtensionRelationships(allAutomations, allDataExtensions),
+    ...(await detectAutomationToFilterRelationshipsEnhanced(allAutomations, allFilters, accessToken, subdomain)),
+    ...detectFilterToDataExtensionRelationships(allFilters, allDataExtensions)
+  ];
+
+  debugStats.relationships.detected = relationships.length;
+  debugStats.relationships.automationToDE = relationships.filter(r => r.type === 'creates_audience' || r.type === 'sends_to').length;
+  debugStats.relationships.automationToFilter = relationships.filter(r => r.type === 'executes_filter').length;
+  debugStats.relationships.filterToDE = relationships.filter(r => r.type === 'filters_data').length;
+  debugStats.relationships.enhanced = relationships.filter(r => r.metadata?.resolvedViaSOAP).length;
+
+  console.log('📊 [Enhanced Async Graph] Relationship detection stats:', debugStats.relationships);
+
+  // Create relationship map for quick lookup
+  const relationshipMap = new Map();
+  relationships.forEach(rel => {
+    if (!relationshipMap.has(rel.source)) {
+      relationshipMap.set(rel.source, new Set());
+    }
+    if (!relationshipMap.has(rel.target)) {
+      relationshipMap.set(rel.target, new Set());
+    }
+    relationshipMap.get(rel.source).add(rel.target);
+    relationshipMap.get(rel.target).add(rel.source);
+  });
+
+  // Filter objects based on selection criteria
+  const hasAnySelection = Object.keys(selectedObjects).length > 0 && 
+    Object.values(selectedObjects).some(categoryObj => 
+      typeof categoryObj === 'object' && Object.keys(categoryObj).length > 0
+    );
+
+  let filteredAutomations = [...allAutomations];
+  let filteredDataExtensions = [...allDataExtensions];
+  let filteredFilters = [...allFilters];
+
+  if (hasAnySelection) {
+    console.log('🔍 [Enhanced Async Graph] Applying selection filtering...');
+    
+    const getRelatedObjectIds = (objectId) => {
+      const related = new Set([objectId]);
+      const queue = [objectId];
+      
+      while (queue.length > 0) {
+        const currentId = queue.shift();
+        const connections = relationshipMap.get(currentId);
+        if (connections) {
+          connections.forEach(connectedId => {
+            if (!related.has(connectedId)) {
+              related.add(connectedId);
+              queue.push(connectedId);
+            }
+          });
+        }
+      }
+      
+      return related;
+    };
+
+    const allSelectedIds = new Set();
+
+    // Collect all selected object IDs
+    Object.keys(selectedObjects).forEach(category => {
+      const categorySelection = selectedObjects[category];
+      if (typeof categorySelection === 'object') {
+        Object.keys(categorySelection).forEach(objectId => {
+          if (categorySelection[objectId]) {
+            allSelectedIds.add(objectId);
+          }
+        });
+      }
+    });
+
+    // Get all related objects
+    const allRelatedIds = new Set();
+    allSelectedIds.forEach(selectedId => {
+      const relatedIds = getRelatedObjectIds(selectedId);
+      relatedIds.forEach(id => allRelatedIds.add(id));
+    });
+
+    console.log('🔍 [Enhanced Async Graph] Selection filtering results:', {
+      selectedIds: allSelectedIds.size,
+      relatedIds: allRelatedIds.size
+    });
+
+    // Filter objects to include only selected and related ones
+    filteredAutomations = allAutomations.filter(obj => allRelatedIds.has(obj.id));
+    filteredDataExtensions = allDataExtensions.filter(obj => allRelatedIds.has(obj.id));
+    filteredFilters = allFilters.filter(obj => allRelatedIds.has(obj.id));
+  }
+
+  // Apply additional type and key filtering
+  if (types.length > 0) {
+    console.log(`🔍 [Enhanced Async Graph] Applying type filtering: [${types.join(', ')}]`);
+    
+    const keepAutomations = types.includes('Automations') || types.includes('automations');
+    const keepDataExtensions = types.includes('DataExtensions') || types.includes('dataExtensions');
+    const keepFilters = types.includes('Filters') || types.includes('filters');
+    
+    if (!keepAutomations) filteredAutomations = [];
+    if (!keepDataExtensions) filteredDataExtensions = [];
+    if (!keepFilters) filteredFilters = [];
+  }
+
+  console.log('📊 [Enhanced Async Graph] Filtered object counts:', {
+    automations: filteredAutomations.length,
+    dataExtensions: filteredDataExtensions.length,
+    filters: filteredFilters.length
+  });
+
+  // Create nodes
+  const nodes = [];
+
+  // Add automation nodes
+  filteredAutomations.forEach(automation => {
+    nodes.push({
+      id: automation.id,
+      label: automation.name || 'Unnamed Automation',
+      type: 'Automations',
+      category: 'Automations',
+      metadata: {
+        status: automation.status,
+        schedule: automation.schedule,
+        createdDate: automation.createdDate,
+        modifiedDate: automation.modifiedDate
+      }
+    });
+    debugStats.nodes.automations++;
+  });
+
+  // Add data extension nodes
+  filteredDataExtensions.forEach(de => {
+    nodes.push({
+      id: de.id,
+      label: de.name || 'Unnamed Data Extension',
+      type: 'DataExtensions',
+      category: 'DataExtensions',
+      metadata: {
+        recordCount: de.recordCount,
+        folderPath: de.folderPath,
+        createdDate: de.createdDate,
+        modifiedDate: de.modifiedDate
+      }
+    });
+    debugStats.nodes.dataExtensions++;
+  });
+
+  // Add filter nodes
+  filteredFilters.forEach(filter => {
+    nodes.push({
+      id: filter.id,
+      label: filter.name || 'Unnamed Filter',
+      type: 'Filters',
+      category: 'Filters',
+      metadata: {
+        filterType: filter.filterType,
+        createdDate: filter.createdDate,
+        modifiedDate: filter.modifiedDate
+      }
+    });
+    debugStats.nodes.filters++;
+  });
+
+  debugStats.nodes.created = nodes.length;
+
+  // Create edges from relationships (only include edges between nodes that exist)
+  const nodeIds = new Set(nodes.map(node => node.id));
+  const edges = relationships
+    .filter(rel => nodeIds.has(rel.source) && nodeIds.has(rel.target))
+    .map(rel => ({
+      id: rel.id,
+      source: rel.source,
+      target: rel.target,
+      type: rel.type,
+      label: rel.label || rel.type,
+      metadata: rel.metadata || {}
+    }));
+
+  debugStats.edges.created = edges.length;
+  debugStats.nodes.included = nodes.length;
+  debugStats.edges.included = edges.length;
+
+  const result = {
+    nodes,
+    edges,
+    metadata: {
+      source: 'enhanced-async-live',
+      generatedAt: new Date().toISOString(),
+      hasEnhancedSOAPIntegration: true,
+      debugStats
+    }
+  };
+
+  console.log('✅ [Enhanced Async Graph] Enhanced async graph generation complete:', {
+    nodes: result.nodes.length,
+    edges: result.edges.length,
+    enhancedRelationships: debugStats.relationships.enhanced,
+    source: result.metadata.source
+  });
+
+  return result;
 }
 
 /**
