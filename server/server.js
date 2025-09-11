@@ -5464,6 +5464,207 @@ app.post('/api/email-archiving/export-to-sftp', async (req, res) => {
 
 // ==================== SFMC API FUNCTIONS FOR SCHEMA BUILDER ====================
 
+// 🆕 SOAP API functions for enhanced Filter relationship detection
+
+/**
+ * Get FilterActivity details via SOAP API using activityObjectId
+ * @param {string} activityObjectId - The FilterActivity object ID
+ * @param {string} accessToken - SFMC access token
+ * @param {string} subdomain - SFMC subdomain
+ * @returns {Promise<Object|null>} FilterActivity details or null if not found
+ */
+async function getFilterActivityDetails(activityObjectId, accessToken, subdomain) {
+  try {
+    console.log(`🔍 [SOAP API] Getting FilterActivity details for ID: ${activityObjectId}`);
+    
+    const soapEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+        <s:Header>
+          <h:fueloauth xmlns:h="http://exacttarget.com">${accessToken}</h:fueloauth>
+        </s:Header>
+        <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>FilterActivity</ObjectType>
+              <Properties>ObjectID</Properties>
+              <Properties>Name</Properties>
+              <Properties>FilterDefinitionID</Properties>
+              <Properties>ActivityType</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>ObjectID</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>${activityObjectId}</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>
+    `;
+
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          'SOAPAction': 'Retrieve'
+        }
+      }
+    );
+
+    const xml2js = require('xml2js');
+    const parser = new xml2js.Parser();
+    const result = await parser.parseStringPromise(response.data);
+    const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+    
+    if (results && results.length > 0) {
+      const filterActivity = results[0];
+      console.log(`✅ [SOAP API] Found FilterActivity:`, filterActivity);
+      return filterActivity;
+    } else {
+      console.log(`⚠️ [SOAP API] No FilterActivity found for ID: ${activityObjectId}`);
+      return null;
+    }
+    
+  } catch (error) {
+    console.error(`❌ [SOAP API] Error getting FilterActivity details:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Get FilterDefinition details via SOAP API using FilterDefinitionID
+ * @param {string} filterDefinitionId - The FilterDefinition ID
+ * @param {string} accessToken - SFMC access token
+ * @param {string} subdomain - SFMC subdomain
+ * @returns {Promise<Object|null>} FilterDefinition details or null if not found
+ */
+async function getFilterDefinitionDetails(filterDefinitionId, accessToken, subdomain) {
+  try {
+    console.log(`🔍 [SOAP API] Getting FilterDefinition details for ID: ${filterDefinitionId}`);
+    
+    const soapEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+        <s:Header>
+          <h:fueloauth xmlns:h="http://exacttarget.com">${accessToken}</h:fueloauth>
+        </s:Header>
+        <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>FilterDefinition</ObjectType>
+              <Properties>ObjectID</Properties>
+              <Properties>Name</Properties>
+              <Properties>CustomerKey</Properties>
+              <Properties>DataExtensionObjectID</Properties>
+              <Properties>DataFilter</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>ObjectID</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>${filterDefinitionId}</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>
+    `;
+
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          'SOAPAction': 'Retrieve'
+        }
+      }
+    );
+
+    const xml2js = require('xml2js');
+    const parser = new xml2js.Parser();
+    const result = await parser.parseStringPromise(response.data);
+    const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+    
+    if (results && results.length > 0) {
+      const filterDefinition = results[0];
+      console.log(`✅ [SOAP API] Found FilterDefinition:`, filterDefinition);
+      return filterDefinition;
+    } else {
+      console.log(`⚠️ [SOAP API] No FilterDefinition found for ID: ${filterDefinitionId}`);
+      return null;
+    }
+    
+  } catch (error) {
+    console.error(`❌ [SOAP API] Error getting FilterDefinition details:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Get DataExtension details via SOAP API using ObjectID
+ * @param {string} dataExtensionObjectId - The DataExtension ObjectID
+ * @param {string} accessToken - SFMC access token
+ * @param {string} subdomain - SFMC subdomain
+ * @returns {Promise<Object|null>} DataExtension details or null if not found
+ */
+async function getDataExtensionByObjectId(dataExtensionObjectId, accessToken, subdomain) {
+  try {
+    console.log(`🔍 [SOAP API] Getting DataExtension details for ObjectID: ${dataExtensionObjectId}`);
+    
+    const soapEnvelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+        <s:Header>
+          <h:fueloauth xmlns:h="http://exacttarget.com">${accessToken}</h:fueloauth>
+        </s:Header>
+        <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>DataExtension</ObjectType>
+              <Properties>ObjectID</Properties>
+              <Properties>Name</Properties>
+              <Properties>CustomerKey</Properties>
+              <Properties>CategoryID</Properties>
+              <Filter xsi:type="SimpleFilterPart">
+                <Property>ObjectID</Property>
+                <SimpleOperator>equals</SimpleOperator>
+                <Value>${dataExtensionObjectId}</Value>
+              </Filter>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>
+    `;
+
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      soapEnvelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml',
+          'SOAPAction': 'Retrieve'
+        }
+      }
+    );
+
+    const xml2js = require('xml2js');
+    const parser = new xml2js.Parser();
+    const result = await parser.parseStringPromise(response.data);
+    const results = result?.['soap:Envelope']?.['soap:Body']?.['RetrieveResponseMsg']?.['Results'];
+    
+    if (results && results.length > 0) {
+      const dataExtension = results[0];
+      console.log(`✅ [SOAP API] Found DataExtension:`, dataExtension);
+      return dataExtension;
+    } else {
+      console.log(`⚠️ [SOAP API] No DataExtension found for ObjectID: ${dataExtensionObjectId}`);
+      return null;
+    }
+    
+  } catch (error) {
+    console.error(`❌ [SOAP API] Error getting DataExtension details:`, error.message);
+    return null;
+  }
+}
+
 // Helper function to recursively search for targetDataExtensions in any object structure
 function findTargetDataExtensionsRecursive(obj, path = '') {
   const results = [];
@@ -8111,6 +8312,39 @@ function classifyRelationshipStyle(relationshipType) {
   
   // Default fallback
   return 'direct';
+}
+
+/**
+ * Enhanced async version of graph generation with SOAP API integration
+ * @param {Object} sfmcObjects - SFMC objects containing automations, DEs, etc.
+ * @param {Array} types - Optional filter by object types
+ * @param {Array} keys - Optional filter by object keys
+ * @param {Object} selectedObjects - Optional filter by selected objects from frontend
+ * @param {string} accessToken - SFMC access token for SOAP API calls
+ * @param {string} subdomain - SFMC subdomain for SOAP API calls
+ * @returns {Promise<Object>} Graph data with nodes and edges
+ */
+async function generateLiveGraphDataEnhanced(sfmcObjects, types = [], keys = [], selectedObjects = {}, accessToken, subdomain) {
+  console.log('🔍 [Graph Enhanced] === STARTING ENHANCED ASYNC GRAPH GENERATION ===');
+  console.log('🔍 [Graph Enhanced] Input parameters:', {
+    types,
+    keys,
+    selectedObjectsCount: Object.keys(selectedObjects).length,
+    selectedObjects: JSON.stringify(selectedObjects, null, 2),
+    hasAccessToken: !!accessToken,
+    hasSubdomain: !!subdomain
+  });
+  
+  // 🚀 NEW: Check if we have efficient schema data from MetadataCrawler
+  if (sfmcObjects.schemaData) {
+    console.log('🚀 [Graph Enhanced] Using efficient schema data from MetadataCrawler');
+    return generateGraphFromSchemaData(sfmcObjects.schemaData, types, keys, selectedObjects);
+  }
+  
+  console.log('� [Graph Enhanced] Using enhanced async graph generation with SOAP API integration');
+  
+  // Generate graph data using enhanced async relationship detection
+  return await generateEnhancedAsyncGraphData(sfmcObjects, types, keys, selectedObjects, accessToken, subdomain);
 }
 
 /**
