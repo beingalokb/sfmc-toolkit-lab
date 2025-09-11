@@ -6372,12 +6372,12 @@ async function fetchSFMCDataExtracts(accessToken, restEndpoint) {
 // ==================== RELATIONSHIP DETECTION FUNCTIONS ====================
 
 /**
- * Helper function to get activity type from SFMC activity object
+ * Helper function to get activity type from SFMC activity object for enhanced detection
  * Handles different possible field names in real SFMC API responses
  * @param {Object} activity - SFMC activity object
  * @returns {string} Activity type or 'unknown'
  */
-function getActivityType(activity) {
+function getActivityTypeEnhanced(activity) {
   if (!activity || typeof activity !== 'object') {
     return 'unknown';
   }
@@ -6415,7 +6415,7 @@ function isFilterActivity(activity) {
   );
   
   // Secondary detection: activity type field
-  const activityType = getActivityType(activity);
+  const activityType = getActivityType(activity, null); // Use the comprehensive function
   const isFilterByType = (
     activityType === 'FilterActivity' ||
     activityType === 'Filter' ||
@@ -7883,7 +7883,7 @@ function detectAutomationToFilterRelationships(automations, filters) {
         }
         
         // 🆕 Enhanced activity type detection
-        const detectedActivityType = getActivityType(activity);
+        const detectedActivityType = getActivityType(activity, automation.name);
         const isFilterActivityDetected = isFilterActivity(activity);
         
         // Enhanced debugging for activity type detection
@@ -8023,7 +8023,7 @@ async function detectAutomationToFilterRelationshipsEnhanced(automations, filter
     for (const [activityIndex, activity] of automation.activities.entries()) {
       // Detect FilterActivity using enhanced detection
       const isFilterActivityDetected = isFilterActivity(activity);
-      const detectedActivityType = getActivityType(activity);
+      const detectedActivityType = getActivityType(activity, automation.name);
       
       if (isFilterActivityDetected && activity.activityObjectId) {
         totalFilterActivities++;
