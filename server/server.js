@@ -6426,12 +6426,17 @@ function detectFilterToDataExtensionRelationships(filters, dataExtensions) {
       const potentialMatches = dataExtensions.filter(de => {
         const deNameLower = de.name.toLowerCase();
         
-        // Strategy 1: Direct substring matching
+        // Strategy 1: Exact name match (highest confidence)
+        if (filterNameLower === deNameLower) {
+          return true;
+        }
+        
+        // Strategy 2: Direct substring matching (high confidence)
         if (filterNameLower.includes(deNameLower) || deNameLower.includes(filterNameLower)) {
           return true;
         }
         
-        // Strategy 2: Remove common suffixes/prefixes and compare
+        // Strategy 3: Remove common suffixes/prefixes and compare (medium confidence)
         const cleanFilterName = filterNameLower
           .replace(/\s+(filter|segment|audience|list)$/i, '')
           .replace(/^(filter|segment|audience|list)\s+/i, '');
@@ -6443,15 +6448,15 @@ function detectFilterToDataExtensionRelationships(filters, dataExtensions) {
           return true;
         }
         
-        // Strategy 3: Word-based matching (check if they share significant words)
-        const filterWords = cleanFilterName.split(/\s+/).filter(w => w.length > 2);
-        const deWords = cleanDeName.split(/\s+/).filter(w => w.length > 2);
+        // Strategy 4: Word-based matching with higher threshold (lower confidence)
+        const filterWords = cleanFilterName.split(/\s+/).filter(w => w.length > 3);
+        const deWords = cleanDeName.split(/\s+/).filter(w => w.length > 3);
         
         if (filterWords.length > 0 && deWords.length > 0) {
           const commonWords = filterWords.filter(word => deWords.includes(word));
-          // If they share at least half of the words from the shorter name
+          // Require at least 75% of words to match (more strict)
           const minWords = Math.min(filterWords.length, deWords.length);
-          if (commonWords.length >= Math.max(1, Math.floor(minWords / 2))) {
+          if (commonWords.length >= Math.max(2, Math.ceil(minWords * 0.75))) {
             return true;
           }
         }
@@ -6483,17 +6488,19 @@ function detectFilterToDataExtensionRelationships(filters, dataExtensions) {
         const keyTerms = filterNameLower
           .replace(/[^a-z0-9\s]/g, '')
           .split(/\s+/)
-          .filter(term => term.length > 3 && !['filter', 'segment', 'audience', 'list', 'data', 'extension'].includes(term));
+          .filter(term => term.length > 4 && !['filter', 'segment', 'audience', 'list', 'data', 'extension', 'true', 'false', 'days'].includes(term));
         
         if (keyTerms.length > 0) {
           console.log(`🔍 [Filter Relationships] Trying fallback with key terms:`, keyTerms);
           
           const fallbackMatches = dataExtensions.filter(de => {
             const deNameLower = de.name.toLowerCase();
-            return keyTerms.some(term => deNameLower.includes(term));
+            // Require at least 2 key terms to match for fallback (more strict)
+            const matchingTerms = keyTerms.filter(term => deNameLower.includes(term));
+            return matchingTerms.length >= Math.min(2, keyTerms.length);
           });
           
-          if (fallbackMatches.length > 0 && fallbackMatches.length <= 5) { // Limit to avoid too many false positives
+          if (fallbackMatches.length > 0 && fallbackMatches.length <= 3) { // Limit to avoid too many false positives
             console.log(`🎯 [Filter Relationships] Found ${fallbackMatches.length} fallback matches:`, 
               fallbackMatches.map(de => de.name));
             
@@ -7649,6 +7656,7 @@ function detectAllAssetRelationships(sfmcObjects) {
   const allRelationships = [
     ...detectQueryToDataExtensionRelationships(queries, dataExtensions),
     ...detectFilterToDataExtensionRelationships(filters, dataExtensions),
+    ...detectAutomationToFilterRelationships(automations, filters),
     ...detectAutomationToDataExtensionRelationships(automations, dataExtensions, queries, fileTransfers, dataExtracts),
     ...detectJourneyToDataExtensionRelationships(journeys, dataExtensions),
     ...detectTriggeredSendToDataExtensionRelationships(triggeredSends, dataExtensions),
@@ -8388,6 +8396,7 @@ function generateLegacyGraphData(sfmcObjects, types = [], keys = [], selectedObj
   const allRelationships = [
     ...detectQueryToDataExtensionRelationships(allSqlQueries, allDataExtensions),
     ...detectFilterToDataExtensionRelationships(allFilters, allDataExtensions),
+    ...detectAutomationToFilterRelationships(allAutomations, allFilters),
     ...detectAutomationToDataExtensionRelationships(allAutomations, allDataExtensions, allSqlQueries, allFileTransfers, allDataExtracts),
     ...detectJourneyToDataExtensionRelationships(allJourneys, allDataExtensions),
     ...detectTriggeredSendToDataExtensionRelationships(allTriggeredSends, allDataExtensions)
@@ -10121,7 +10130,11 @@ app.get('/objects', async (req, res) => {
             dataExtracts: sfmcObjects['Data Extracts'].length
           });
           
-          res.json(sfmcObjects);
+          // Filter out internal objects before returning
+          const filteredObjects = { ...sfmcObjects };
+          delete filteredObjects['_AutomationRelationships'];
+          
+          res.json(filteredObjects);
         } else {
           console.log('⚠️ [Objects API] Live API returned empty data, falling back to mock data...');
           throw new Error('API returned empty data - likely authentication or permission issues');
