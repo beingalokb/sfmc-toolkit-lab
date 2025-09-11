@@ -7601,19 +7601,6 @@ function detectAutomationToFilterRelationships(automations, filters) {
     return relationships;
   }
   
-  const filterMap = new Map();
-  const filterKeyMap = new Map();
-  
-  // Build maps safely
-  filters.forEach(filter => {
-    if (filter.name) {
-      filterMap.set(filter.name.toLowerCase(), filter);
-    }
-    if (filter.customerKey) {
-      filterKeyMap.set(filter.customerKey.toLowerCase(), filter);
-    }
-  });
-  
   console.log('🔍 [Filter Relationships] Analyzing Automation-to-Filter relationships...');
   console.log(`📊 [Filter Relationships] Processing ${automations.length} automations against ${filters.length} filters`);
   
@@ -7633,27 +7620,11 @@ function detectAutomationToFilterRelationships(automations, filters) {
           console.log(`  Full activity object:`, JSON.stringify(activity, null, 2));
         }
         
-        // Enhanced FilterActivity detection - check multiple properties
+        // 🆕 CORRECT FilterActivity detection based on SFMC API structure
+        // According to the API documentation: objectTypeId 303 = FilterActivity
         const isFilterActivity = (
-          activity.activityType === 'FilterActivity' || 
-          activity.type === 'FilterActivity' ||
-          activity.objectTypeId === 303 || // FilterActivity object type ID
-          activity.objectTypeId === '303' ||
-          (activity.name && activity.name.toLowerCase().includes('filter')) ||
-          (activity.definitionKey && activity.definitionKey.toLowerCase().includes('filter')) ||
-          // Additional broad patterns for real SFMC data
-          (activity.name && (
-            activity.name.toLowerCase().includes('datafilter') ||
-            activity.name.toLowerCase().includes('data filter') ||
-            activity.name.toLowerCase().includes('segment')
-          )) ||
-          // Check configuration objects that might indicate filter activities
-          (activity.configuration && (
-            JSON.stringify(activity.configuration).toLowerCase().includes('filter') ||
-            JSON.stringify(activity.configuration).toLowerCase().includes('segment')
-          )) ||
-          // Check if activity references a filter by ID
-          (activity.filterKey || activity.filterId || activity.segmentId)
+          activity.objectTypeId === 303 || 
+          activity.objectTypeId === '303'
         );
         
         // Also log when we find activities that might be filters but don't match our detection
@@ -7667,6 +7638,7 @@ function detectAutomationToFilterRelationships(automations, filters) {
             activityType: activity.activityType,
             type: activity.type,
             objectTypeId: activity.objectTypeId,
+            activityObjectId: activity.activityObjectId,
             allKeys: Object.keys(activity)
           });
         }
@@ -7674,39 +7646,38 @@ function detectAutomationToFilterRelationships(automations, filters) {
         if (isFilterActivity) {
           filterActivitiesFound++;
           console.log(`🎯 [Filter Relationships] Found FilterActivity in automation "${automation.name}": ${activity.name}`);
+          console.log(`  🔍 Activity details:`, {
+            name: activity.name,
+            id: activity.id,
+            activityObjectId: activity.activityObjectId,
+            objectTypeId: activity.objectTypeId
+          });
           
-          // Method 1: Try to match by filter name or key
+          // 🆕 TODO: Implement proper SFMC API chain to resolve filter relationships
+          // This requires SOAP API calls to:
+          // 1. Get FilterActivity details using activityObjectId
+          // 2. Get FilterDefinition using FilterDefinitionID
+          // 3. Match with filters based on FilterDefinition name/customerKey
+          
+          // For now, try basic name matching as fallback
           let matchedFilter = null;
           
-          // Try exact name match
+          // Try to match by filter name
           if (activity.name) {
             const activityNameLower = activity.name.toLowerCase();
-            matchedFilter = filterMap.get(activityNameLower);
             
-            if (!matchedFilter) {
-              // Try partial name matching
-              for (const [filterName, filter] of filterMap) {
-                if (activityNameLower.includes(filterName) || filterName.includes(activityNameLower)) {
-                  matchedFilter = filter;
-                  break;
-                }
-              }
-            }
-          }
-          
-          // Try by filter key if available
-          if (!matchedFilter && activity.filterKey) {
-            matchedFilter = filterKeyMap.get(activity.filterKey.toLowerCase());
-          }
-          
-          // Method 2: If no direct match, try by activity configuration
-          if (!matchedFilter && activity.filterDefinition) {
-            const filterDef = activity.filterDefinition;
-            // Look for filters that might match based on configuration
+            // Look for filters that might match based on name similarity
             for (const filter of filters) {
-              if (filter.customerKey === filterDef.filterKey || 
-                  filter.name?.toLowerCase() === filterDef.name?.toLowerCase()) {
+              const filterNameLower = (filter.name || '').toLowerCase();
+              if (filterNameLower && (
+                activityNameLower.includes(filterNameLower) || 
+                filterNameLower.includes(activityNameLower) ||
+                // Check for common filter patterns
+                (activityNameLower.includes('purchased') && filterNameLower.includes('purchased')) ||
+                (activityNameLower.includes('promo') && filterNameLower.includes('promo'))
+              )) {
                 matchedFilter = filter;
+                console.log(`✅ [Filter Relationships] Matched by name similarity: "${activity.name}" → "${filter.name}"`);
                 break;
               }
             }
@@ -7719,11 +7690,18 @@ function detectAutomationToFilterRelationships(automations, filters) {
               target: matchedFilter.id,
               type: 'executes_filter',
               label: `Step ${activityIndex + 1}`,
-              description: `Automation "${automation.name}" executes Filter "${matchedFilter.name}"`
+              description: `Automation "${automation.name}" executes Filter "${matchedFilter.name}"`,
+              metadata: {
+                activityObjectId: activity.activityObjectId,
+                stepNumber: activityIndex + 1,
+                needsSOAPResolution: true // Flag for future SOAP API implementation
+              }
             });
             console.log(`✅ [Filter Relationships] Automation-Filter relationship: ${automation.name} → ${matchedFilter.name}`);
           } else {
             console.log(`❌ [Filter Relationships] No matching filter found for FilterActivity: ${activity.name}`);
+            console.log(`  💡 [Filter Relationships] Available filters:`, filters.map(f => f.name));
+            console.log(`  🔧 [Filter Relationships] This requires SOAP API resolution using activityObjectId: ${activity.activityObjectId}`);
           }
         }
       });
@@ -10015,7 +9993,7 @@ app.get('/graph', async (req, res) => {
       const sfmcObjects = await fetchAllSFMCObjects(accessToken, subdomain, restEndpoint);
       
       // Generate graph data from real SFMC objects with selected object filtering
-      const graphData = generateLiveGraphData(sfmcObjects, types, parsedKeys, parsedSelectedObjects);
+      const graphData = await generateLiveGraphDataEnhanced(sfmcObjects, types, parsedKeys, parsedSelectedObjects, accessToken, subdomain);
       
       // Check if we got meaningful graph data
       const hasGraphData = graphData && graphData.nodes && graphData.nodes.length > 0;
