@@ -772,9 +772,14 @@ const ObjectExplorer = ({
                     <h4>🛤️ Journey Details</h4>
                   </div>
                   <div className="info-grid">
-                    {/* Entry Source Information */}
+                    {/* Entry Source Information with improved display logic */}
                     {(selectedObject.metadata?.entryDataExtensionId || selectedObject.entryDataExtensionId) ? (
                       <>
+                        {/* DE-based Journey */}
+                        <div className="info-item">
+                          <label>Entry Source:</label>
+                          <span>Data Extension</span>
+                        </div>
                         <div className="info-item">
                           <label>Entry Data Extension ID:</label>
                           <span className="mono">
@@ -789,32 +794,69 @@ const ObjectExplorer = ({
                             </span>
                           </div>
                         )}
+                        {(selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType) && (
+                          <div className="info-item">
+                            <label>Entry Source Type:</label>
+                            <span>
+                              {selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType}
+                            </span>
+                          </div>
+                        )}
                       </>
-                    ) : (selectedObject.metadata?.entrySourceDescription || selectedObject.entrySourceDescription) ? (
+                    ) : (selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType) ? (
                       <>
+                        {/* Non-DE Journey with known type */}
                         <div className="info-item">
-                          <label>Entry Source Type:</label>
+                          <label>Entry Source:</label>
                           <span>
-                            {selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType || 'Unknown'}
+                            {(selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType) === 'APIEvent' ? 'API Event' :
+                             (selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType) === 'SalesforceDataEvent' ? 'Salesforce Data Event' :
+                             (selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType) === 'EmailAudience' ? 'Email Audience' :
+                             (selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType)}
                           </span>
                         </div>
                         <div className="info-item">
-                          <label>Entry Source Description:</label>
+                          <label>Entry Source Type:</label>
+                          <span>
+                            {selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType}
+                          </span>
+                        </div>
+                        <div className="info-item">
+                          <label>Data Extension:</label>
+                          <span>Not applicable (event-based entry)</span>
+                        </div>
+                      </>
+                    ) : (selectedObject.metadata?.entrySourceDescription || selectedObject.entrySourceDescription) ? (
+                      <>
+                        {/* Non-DE Journey with description only */}
+                        <div className="info-item">
+                          <label>Entry Source:</label>
                           <span>
                             {selectedObject.metadata?.entrySourceDescription || selectedObject.entrySourceDescription}
                           </span>
                         </div>
+                        <div className="info-item">
+                          <label>Data Extension:</label>
+                          <span>Not applicable</span>
+                        </div>
                       </>
                     ) : (
-                      <div className="info-item">
-                        <label>Entry Source:</label>
-                        <span>No entry source detected</span>
-                      </div>
+                      <>
+                        {/* Unknown entry source */}
+                        <div className="info-item">
+                          <label>Entry Source:</label>
+                          <span>Unknown / Not a DE-based entry</span>
+                        </div>
+                        <div className="info-item">
+                          <label>Data Extension:</label>
+                          <span>Not detected</span>
+                        </div>
+                      </>
                     )}
                     
                     {(selectedObject.metadata?.dataExtensionSource || selectedObject.dataExtensionSource) && (
                       <div className="info-item">
-                        <label>Source Detection Method:</label>
+                        <label>Detection Method:</label>
                         <span className="mono">
                           {selectedObject.metadata?.dataExtensionSource || selectedObject.dataExtensionSource}
                         </span>
@@ -842,6 +884,7 @@ const ObjectExplorer = ({
                     
                     {/* Debug: Show entrySource structure if no entry source found */}
                     {!(selectedObject.metadata?.entryDataExtensionId || selectedObject.entryDataExtensionId) && 
+                     !(selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType) &&
                      !(selectedObject.metadata?.entrySourceDescription || selectedObject.entrySourceDescription) &&
                      selectedObject.metadata?.entrySource && (
                       <div className="info-item">

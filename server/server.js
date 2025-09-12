@@ -6265,7 +6265,7 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
       if (eventDef.name) {
         const entrySourceInfo = {
           eventDefinitionKey: eventDef.eventDefinitionKey,
-          type: eventDef.type || 'Unknown',
+          type: eventDef.type || eventDef.eventType || 'Unknown',
           category: eventDef.category || 'Unknown',
           dataExtensionId: eventDef.dataExtensionId || null,
           dataExtensionName: eventDef.dataExtensionName || null,
@@ -6282,6 +6282,14 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
         }
         
         journeyToEntrySourceMap.set(eventDef.name, entrySourceInfo);
+        
+        // Enhanced logging for debugging
+        console.log(`🔗 [SFMC API] Event definition "${eventDef.name}":`, {
+          type: entrySourceInfo.type,
+          hasDE: !!entrySourceInfo.dataExtensionId,
+          deId: entrySourceInfo.dataExtensionId,
+          deName: entrySourceInfo.dataExtensionName
+        });
         
         if (entrySourceInfo.dataExtensionId) {
           console.log(`🔗 [SFMC API] Mapped journey "${eventDef.name}" to DE: ${entrySourceInfo.dataExtensionId} (${entrySourceInfo.dataExtensionName}) via ${entrySourceInfo.type}`);
@@ -6353,6 +6361,43 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
                   entrySourceDescription = `${entrySourceInfo.type} Entry Source`;
               }
               console.log(`📡 [SFMC API] Journey "${journey.name}" has ${entrySourceDescription} (no DE)`);
+            }
+          } else {
+            // Fallback: Try to detect entry source type from entrySource structure
+            console.log(`⚠️ [SFMC API] Journey "${journey.name}" not found in event definitions, checking entrySource for type`);
+            
+            if (detailedJourney.entrySource) {
+              // Check various possible locations for entry source type
+              const possibleType = detailedJourney.entrySource.type || 
+                                   detailedJourney.entrySource.eventType ||
+                                   detailedJourney.entrySource.sourceType;
+              
+              if (possibleType) {
+                entrySourceType = possibleType;
+                console.log(`✅ [SFMC API] Journey "${journey.name}" entry source type from entrySource: ${entrySourceType}`);
+                
+                // Set appropriate description
+                switch(entrySourceType) {
+                  case 'APIEvent':
+                    entrySourceDescription = 'API Event Entry Source';
+                    break;
+                  case 'SalesforceDataEvent':
+                    entrySourceDescription = 'Salesforce Data Event Entry Source';
+                    break;
+                  case 'EmailAudience':
+                    entrySourceDescription = 'Email Audience Entry Source';
+                    break;
+                  default:
+                    entrySourceDescription = `${entrySourceType} Entry Source`;
+                }
+              } else {
+                // Last resort fallback based on entrySource structure
+                if (detailedJourney.entrySource.arguments && !detailedJourney.entrySource.arguments.dataExtensionId) {
+                  entrySourceType = 'APIEvent';
+                  entrySourceDescription = 'API Event Entry Source';
+                  console.log(`🔄 [SFMC API] Journey "${journey.name}" fallback detected as API Event (has arguments but no DE)`);
+                }
+              }
             }
           }
           
