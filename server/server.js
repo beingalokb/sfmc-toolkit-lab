@@ -11018,15 +11018,42 @@ function processSchemaForSFMC(schema, sfmcObjects) {
       // Link to entry Data Extension using the extracted ID
       if (j.entryDataExtensionId) {
         const deNodeId = j.entryDataExtensionId; // Use the extracted DE ID
+        
+        // Look up the actual Data Extension to get its real name
+        let actualDE = null;
+        let deName = 'Entry Data Extension'; // Default fallback
+        
+        if (sfmcObjects['Data Extensions']) {
+          actualDE = sfmcObjects['Data Extensions'].find(de => 
+            de.id === deNodeId || 
+            de.ObjectID === deNodeId ||
+            de.customerKey === deNodeId ||
+            de.externalKey === deNodeId
+          );
+          
+          if (actualDE) {
+            deName = actualDE.name || actualDE.Name || deName;
+            console.log(`✅ [Journey Relationship] Found actual DE name for ${deNodeId}: "${deName}"`);
+          } else {
+            console.log(`⚠️ [Journey Relationship] Could not find actual DE for ID ${deNodeId}, using fallback name`);
+          }
+        }
+        
+        // Use the Journey's entryDataExtensionName if available and no actual DE found
+        if (!actualDE && j.entryDataExtensionName) {
+          deName = j.entryDataExtensionName;
+          console.log(`✅ [Journey Relationship] Using entryDataExtensionName: "${deName}"`);
+        }
+        
         pushNode({
           id: deNodeId,
           type: 'Data Extensions', 
-          label: 'Entry Data Extension',
+          label: deName,
           category: 'Data Extensions',
-          metadata: { isEntrySource: true, journeyId: j.id }
+          metadata: actualDE ? { ...actualDE, isEntrySource: true, journeyId: j.id } : { isEntrySource: true, journeyId: j.id }
         });
         pushEdge(jNodeId, deNodeId, 'entry_source', 'uses as entry source');
-        console.log(`🔗 [Journey Relationship] Created: ${j.name} → Entry DE (${deNodeId})`);
+        console.log(`🔗 [Journey Relationship] Created: ${j.name} → ${deName} (${deNodeId})`);
       }
 
       // Process journey activities for additional relationships
