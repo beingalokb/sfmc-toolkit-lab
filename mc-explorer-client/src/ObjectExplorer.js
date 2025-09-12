@@ -19,7 +19,7 @@ const ObjectExplorer = ({
     { key: 'Journeys', label: 'Journeys', icon: '🛤️' },
     { key: 'SQL Queries', label: 'Queries', icon: '🔍' },
     { key: 'Triggered Sends', label: 'Triggered Sends', icon: '📧' },
-    { key: 'Filters', label: 'Filters', icon: '🔧' },
+    { key: 'Data Filters', label: 'Data Filters', icon: '🔧' },
     { key: 'File Transfers', label: 'File Transfers', icon: '📁' },
     { key: 'Data Extracts', label: 'Data Extracts', icon: '📤' }
   ];
@@ -59,15 +59,20 @@ const ObjectExplorer = ({
         
         // Group nodes by category
         fullSchema.nodes.forEach(node => {
-          if (!objects[node.category]) {
-            objects[node.category] = [];
+          let category = node.category;
+          
+          // Normalize category names for compatibility
+          if (category === 'Filters') category = 'Data Filters';
+          
+          if (!objects[category]) {
+            objects[category] = [];
           }
           
-          objects[node.category].push({
+          objects[category].push({
             id: node.id,
             name: node.label,
             type: node.type,
-            category: node.category,
+            category: category,
             metadata: node.metadata || {},
             x: node.x,
             y: node.y
@@ -81,7 +86,16 @@ const ObjectExplorer = ({
         window.schemaEdges = fullSchema.edges || [];
         window.schemaNodes = fullSchema.nodes || [];
         
-        console.log('✅ [ObjectExplorer] SFMC objects loaded:', Object.keys(objects).map(k => `${k}: ${objects[k].length}`));
+        // Debug logging for category mismatches
+        console.log('✅ [ObjectExplorer] SFMC objects loaded:');
+        Object.entries(objects).forEach(([category, items]) => {
+          console.log(`   ${category}: ${items.length} items`);
+          if (items.length > 0) {
+            console.log(`     Sample: ${items[0].name} (ID: ${items[0].id})`);
+          }
+        });
+        console.log('✅ [ObjectExplorer] Total categories:', Object.keys(objects).length);
+        console.log('✅ [ObjectExplorer] Expected categories:', objectTypes.map(ot => ot.key));
         console.log('✅ [ObjectExplorer] Relationships loaded:', fullSchema.edges?.length || 0, 'edges');
       } else {
         throw new Error(data.error || 'Failed to load SFMC objects');
@@ -101,18 +115,31 @@ const ObjectExplorer = ({
       return;
     }
 
+    const searchLower = searchTerm.toLowerCase();
     const filtered = {};
+    
     Object.entries(sfmcObjects).forEach(([category, objects]) => {
-      const matchingObjects = objects.filter(obj => 
-        obj.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        obj.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        obj.id.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      const matchingObjects = objects.filter(obj => {
+        const name = (obj.name || '').toLowerCase();
+        const type = (obj.type || '').toLowerCase();
+        const id = (obj.id || '').toLowerCase();
+        const customerKey = (obj.customerKey || '').toLowerCase();
+        const description = (obj.description || '').toLowerCase();
+        
+        return name.includes(searchLower) ||
+               type.includes(searchLower) ||
+               id.includes(searchLower) ||
+               customerKey.includes(searchLower) ||
+               description.includes(searchLower);
+      });
       
       if (matchingObjects.length > 0) {
         filtered[category] = matchingObjects;
       }
     });
+    
+    console.log(`🔍 [ObjectExplorer] Search for "${searchTerm}" found:`, 
+      Object.entries(filtered).map(([cat, objs]) => `${cat}: ${objs.length}`));
     
     setFilteredObjects(filtered);
   }, [searchTerm, sfmcObjects]);
@@ -288,13 +315,27 @@ const ObjectExplorer = ({
       {/* Header */}
       <div className="explorer-header">
         <h2>📋 SFMC Object Explorer</h2>
-        <button 
-          onClick={loadSFMCObjects} 
-          disabled={loading}
-          className="load-button"
-        >
-          {loading ? '🔄 Loading...' : '🔄 Load SFMC Objects'}
-        </button>
+        <div className="header-buttons">
+          <button 
+            onClick={loadSFMCObjects} 
+            disabled={loading}
+            className="load-button"
+          >
+            {loading ? '🔄 Loading...' : '🔄 Load SFMC Objects'}
+          </button>
+          <button 
+            onClick={() => {
+              console.log('🔍 [Debug] Current SFMC Objects:', sfmcObjects);
+              console.log('🔍 [Debug] Schema Edges:', window.schemaEdges);
+              console.log('🔍 [Debug] Schema Nodes:', window.schemaNodes);
+              alert('Debug info logged to console. Check Developer Tools > Console');
+            }}
+            className="debug-button"
+            title="Log debug information to console"
+          >
+            🐛 Debug
+          </button>
+        </div>
       </div>
 
       {error && (

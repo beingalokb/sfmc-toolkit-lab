@@ -22,7 +22,12 @@
   font-size: 24px;
 }
 
-.load-button {
+.header-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.load-button, .debug-button {
   padding: 10px 20px;
   background-color: #2196f3;
   color: white;
@@ -34,8 +39,12 @@
   transition: background-color 0.2s;
 }
 
-.load-button:hover:not(:disabled) {
-  background-color: #1976d2;
+.debug-button {
+  background-color: #ff9800;
+}
+
+.load-button:hover:not(:disabled), .debug-button:hover {
+  opacity: 0.9;
 }
 
 .load-button:disabled {

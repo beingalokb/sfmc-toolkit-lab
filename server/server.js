@@ -8356,7 +8356,7 @@ async function fetchAllSFMCObjectsLegacy(accessToken, subdomain, restEndpoint) {
     'Automations': [],
     'Journeys': [],
     'Triggered Sends': [],
-    'Filters': [],
+    'Data Filters': [], // Changed from 'Filters' to 'Data Filters'
     'File Transfers': [],
     'Data Extracts': []
   };
@@ -8435,10 +8435,10 @@ async function fetchAllSFMCObjectsLegacy(accessToken, subdomain, restEndpoint) {
     }
 
     if (filters.status === 'fulfilled') {
-      allObjects['Filters'] = filters.value;
-      console.log(`✅ [SFMC API] Fetched ${filters.value.length} Filters`);
+      allObjects['Data Filters'] = filters.value; // Changed from 'Filters' to 'Data Filters'
+      console.log(`✅ [SFMC API] Fetched ${filters.value.length} Data Filters`);
     } else {
-      console.error('❌ [SFMC API] Failed to fetch Filters:', filters.reason.message);
+      console.error('❌ [SFMC API] Failed to fetch Data Filters:', filters.reason.message);
     }
 
     if (fileTransfers.status === 'fulfilled') {
@@ -10458,7 +10458,7 @@ function processSchemaForSFMC(schema, sfmcObjects) {
     let nodeCounter = 0;
     Object.entries(sfmcObjects).forEach(([category, objects]) => {
       if (objects && Array.isArray(objects)) {
-        objects.slice(0, 20).forEach((obj, index) => { // Limit to 20 per category to avoid overwhelming
+        objects.forEach((obj, index) => { // Show ALL objects, not just 20
           const nodeId = `${category.toLowerCase().replace(/\s+/g, '_')}_${obj.id || obj.customerKey || index}`;
           
           // Use same grid layout as frontend fallback
@@ -10481,7 +10481,7 @@ function processSchemaForSFMC(schema, sfmcObjects) {
           processedSchema.nodes.push(node);
           nodeCounter++;
         });
-        console.log(`🆕 [Schema] Created ${Math.min(objects.length, 20)} nodes from ${category}`);
+        console.log(`🆕 [Schema] Created ${objects.length} nodes from ${category}`);
       }
     });
   }
@@ -10706,7 +10706,7 @@ app.post('/api/schema/process', async (req, res) => {
           journeys: sfmcObjects['Journeys']?.length || 0,
           triggeredSends: sfmcObjects['Triggered Sends']?.length || 0,
           queries: sfmcObjects['SQL Queries']?.length || 0,
-          filters: sfmcObjects['Filters']?.length || 0,
+          dataFilters: sfmcObjects['Data Filters']?.length || 0, // Changed from 'filters' to 'dataFilters'
           fileTransfers: sfmcObjects['File Transfers']?.length || 0,
           dataExtracts: sfmcObjects['Data Extracts']?.length || 0,
           totalCategories: Object.keys(sfmcObjects).length
