@@ -6020,8 +6020,8 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
                   
                   // Create relationship: Automation → Data Extension (via Query)
                   automationRelationships.push({
-                    id: `auto_${automation.id}-de_${targetDeKey || targetDeName}`,
-                    source: `auto_${automation.id}`,
+                    id: `${automation.id}-de_${targetDeKey || targetDeName}`,
+                    source: automation.id, // Use original ID
                     target: targetDeKey || targetDeName, // Use key or name as identifier
                     type: 'targets',
                     label: 'targets via Query',
@@ -6066,8 +6066,8 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
                   
                   // Create relationship: Automation → Data Extension (via Import)
                   automationRelationships.push({
-                    id: `auto_${automation.id}-de_${targetDE.CustomerKey || targetDE.Name}`,
-                    source: `auto_${automation.id}`,
+                    id: `${automation.id}-de_${targetDE.CustomerKey || targetDE.Name}`,
+                    source: automation.id, // Use original ID
                     target: targetDE.CustomerKey || targetDE.Name,
                     type: 'imports',
                     label: 'imports to',
@@ -6098,7 +6098,7 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
       }
       
       processedAutomations.push({
-        id: `auto_${automation.id}`,
+        id: automation.id, // Use original ID instead of prefixed version
         name: automation.name || 'Unnamed Automation',
         description: automation.description || '',
         status: automation.status,
@@ -6153,7 +6153,7 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
     console.log(`✅ [SFMC API] Found ${interactions.length} Journeys`);
     
     return interactions.map(journey => ({
-      id: `journey_${journey.id}`,
+      id: journey.id, // Use original ID instead of prefixed version
       name: journey.name || 'Unnamed Journey',
       description: journey.description || '',
       status: journey.status,
@@ -6224,7 +6224,7 @@ async function fetchSFMCTriggeredSends(accessToken, subdomain) {
     const triggeredSends = Array.isArray(results) ? results : [results];
     
     return triggeredSends.map(ts => ({
-      id: `ts_${ts.CustomerKey}`,
+      id: ts.CustomerKey, // Use original CustomerKey instead of prefixed version
       name: ts.Name,
       customerKey: ts.CustomerKey,
       description: ts.Description || '',
@@ -6291,7 +6291,7 @@ async function fetchSFMCFilters(accessToken, subdomain) {
     const filters = Array.isArray(results) ? results : [results];
     
     return filters.map(filter => ({
-      id: filter.CustomerKey || `filter_${filter.CustomerKey}`,
+      id: filter.CustomerKey, // Use original CustomerKey instead of fallback prefix
       name: filter.Name,
       customerKey: filter.CustomerKey,
       description: filter.Description || '',
@@ -6327,7 +6327,7 @@ async function fetchSFMCFileTransfers(accessToken, restEndpoint) {
     const fileTransfers = response.data?.items || [];
     
     return fileTransfers.map(ft => ({
-      id: `ft_${ft.id}`,
+      id: ft.id, // Use original ID instead of prefixed version
       name: ft.name,
       description: ft.description || '',
       fileTransferType: ft.fileTransferType,
@@ -6360,7 +6360,7 @@ async function fetchSFMCDataExtracts(accessToken, restEndpoint) {
     const dataExtracts = response.data?.items || [];
     
     return dataExtracts.map(extract => ({
-      id: `extract_${extract.id}`,
+      id: extract.id, // Use original ID instead of prefixed version
       name: extract.name,
       description: extract.description || '',
       extractType: extract.extractType,
@@ -10549,7 +10549,7 @@ function processSchemaForSFMC(schema, sfmcObjects) {
 
     // --- Automations + Activities ---
     (sfmcObjects['Automations'] || []).forEach(auto => {
-      const autoNodeId = `auto_${auto.id}`;
+      const autoNodeId = auto.id; // Use original ID
       pushNode({ id: autoNodeId, type: 'Automations', label: auto.name, category: 'Automations', metadata: auto });
 
       (auto.steps || []).forEach((step, stepIdx) => {
@@ -10576,7 +10576,7 @@ function processSchemaForSFMC(schema, sfmcObjects) {
 
           // DE links from REST (if present)
           (act.targetDataExtensions || []).forEach(tde => {
-            const deNodeId = `de_${tde.key || tde.id}`;
+            const deNodeId = tde.key || tde.id; // Use original ID
             pushNode({
               id: deNodeId,
               type: 'Data Extensions',
@@ -10596,17 +10596,17 @@ function processSchemaForSFMC(schema, sfmcObjects) {
 
     // --- Journeys ---
     (sfmcObjects['Journeys'] || []).forEach(j => {
-      const jNodeId = `journey_${j.id}`;
+      const jNodeId = j.id; // Use original ID
       pushNode({ id: jNodeId, type: 'Journeys', label: j.name, category: 'Journeys', metadata: j });
 
       if (j.entrySource?.dataExtensionId) {
-        const deNodeId = `de_${j.entrySource.dataExtensionId}`;
+        const deNodeId = j.entrySource.dataExtensionId; // Use original ID
         pushEdge(jNodeId, deNodeId, 'entersFrom', 'entry source');
       }
 
       (j.activities || []).forEach(act => {
         if (act.type === 'EMAIL' && act.arguments?.triggeredSendDefinitionId) {
-          const tsNodeId = `ts_${act.arguments.triggeredSendDefinitionId}`;
+          const tsNodeId = act.arguments.triggeredSendDefinitionId; // Use original ID
           pushEdge(jNodeId, tsNodeId, 'sends', 'sends email');
         }
       });
@@ -10614,25 +10614,25 @@ function processSchemaForSFMC(schema, sfmcObjects) {
 
     // --- Triggered Sends ---
     (sfmcObjects['Triggered Sends'] || []).forEach(ts => {
-      const tsNodeId = `ts_${ts.id}`;
+      const tsNodeId = ts.id; // Use original ID
       pushNode({ id: tsNodeId, type: 'Triggered Sends', label: ts.name, category: 'Triggered Sends', metadata: ts });
 
       if (ts.dataExtensionId) {
-        const deNodeId = `de_${ts.dataExtensionId}`;
+        const deNodeId = ts.dataExtensionId; // Use original ID
         pushEdge(tsNodeId, deNodeId, 'usesDE', 'subscriber DE');
       }
     });
 
     // --- File Transfers ---
     (sfmcObjects['File Transfers'] || []).forEach(ft => {
-      const ftNodeId = `ft_${ft.id}`;
+      const ftNodeId = ft.id; // Use original ID
       pushNode({ id: ftNodeId, type: 'File Transfers', label: ft.name, category: 'File Transfers', metadata: ft });
       // Linking to Automation activities handled above
     });
 
     // --- Data Extracts ---
     (sfmcObjects['Data Extracts'] || []).forEach(dx => {
-      const dxNodeId = `dex_${dx.id}`;
+      const dxNodeId = dx.id; // Use original ID
       pushNode({ id: dxNodeId, type: 'Data Extracts', label: dx.name, category: 'Data Extracts', metadata: dx });
     });
 
