@@ -10678,6 +10678,7 @@ function processSchemaForSFMC(schema, sfmcObjects) {
       const autoNodeId = auto.id; // Use original ID
       pushNode({ id: autoNodeId, type: 'Automations', label: auto.name, category: 'Automations', metadata: auto });
 
+      // Process activities but don't create separate nodes - just create direct DE relationships
       (auto.steps || []).forEach((step, stepIdx) => {
         (step.activities || []).forEach((act, actIdx) => {
           const typeMap = {
@@ -10688,19 +10689,8 @@ function processSchemaForSFMC(schema, sfmcObjects) {
             42:  'DataExtractActivity'
           };
           const actType = typeMap[act.objectTypeId] || 'GenericActivity';
-          const actNodeId = `${autoNodeId}_act_${stepIdx}_${actType}`;
 
-          pushNode({
-            id: actNodeId,
-            type: 'Activity',
-            label: actType,
-            category: 'Activity',
-            metadata: act
-          });
-
-          pushEdge(autoNodeId, actNodeId, 'executes_activity', `Step ${step.step}`);
-
-          // DE links from REST (if present)
+          // Don't create activity nodes - just create direct relationships from automation to DEs
           (act.targetDataExtensions || []).forEach(tde => {
             const deNodeId = tde.key || tde.id; // Use original ID
             pushNode({
@@ -10710,11 +10700,11 @@ function processSchemaForSFMC(schema, sfmcObjects) {
               category: 'Data Extensions',
               metadata: tde
             });
-            const rel = actType === 'FilterActivity' ? 'filtersInto'
+            const rel = actType === 'FilterActivity' ? 'filters'
                       : actType === 'QueryActivity'  ? 'targets'
-                      : actType === 'ImportActivity' ? 'importsInto'
+                      : actType === 'ImportActivity' ? 'imports to'
                       : 'uses';
-            pushEdge(actNodeId, deNodeId, rel, rel);
+            pushEdge(autoNodeId, deNodeId, rel, `${rel} via ${actType}`);
           });
         });
       });
