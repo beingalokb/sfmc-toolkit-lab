@@ -6500,6 +6500,29 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
             });
           }
           
+          // SAFETY CHECK: Ensure entrySourceType and entrySourceDescription are never null
+          if (entrySourceType === null || entrySourceType === undefined) {
+            // Final fallback based on journey name and structure
+            if (journey.name && (journey.name.toLowerCase().includes('api') || journey.name.toLowerCase().includes('event'))) {
+              entrySourceType = 'APIEvent';
+              entrySourceDescription = 'API Event Entry Source (name-based detection)';
+              console.log(`🛡️ [SFMC API] Safety fallback: Journey "${journey.name}" set to API Event by name pattern`);
+            } else if (entryDataExtensionId) {
+              entrySourceType = 'DataExtension';
+              entrySourceDescription = 'Data Extension Entry Source';
+              console.log(`🛡️ [SFMC API] Safety fallback: Journey "${journey.name}" set to DE-based (has DE ID)`);
+            } else {
+              entrySourceType = 'Unknown';
+              entrySourceDescription = 'Unknown Entry Source';
+              console.log(`🛡️ [SFMC API] Safety fallback: Journey "${journey.name}" set to Unknown`);
+            }
+          }
+          
+          if (entrySourceDescription === null || entrySourceDescription === undefined) {
+            entrySourceDescription = entrySourceType === 'APIEvent' ? 'API Event Entry Source' : `${entrySourceType} Entry Source`;
+            console.log(`🛡️ [SFMC API] Safety fallback: Journey "${journey.name}" description set to "${entrySourceDescription}"`);
+          }
+          
           const returnObject = {
             id: journey.id, // Use original ID
             name: journey.name || 'Unnamed Journey',
@@ -6590,6 +6613,29 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
               entrySourceDescription = 'Unknown Entry Source (detailed fetch failed)';
               console.log(`🔄 [SFMC API] Journey "${journey.name}" fallback set to Unknown type`);
             }
+          }
+          
+          // SAFETY CHECK: Ensure entrySourceType and entrySourceDescription are never null (fallback case)
+          if (entrySourceType === null || entrySourceType === undefined) {
+            // Final fallback based on journey name and structure
+            if (journey.name && (journey.name.toLowerCase().includes('api') || journey.name.toLowerCase().includes('event'))) {
+              entrySourceType = 'APIEvent';
+              entrySourceDescription = 'API Event Entry Source (name-based detection - fallback)';
+              console.log(`🛡️ [SFMC API] Fallback safety: Journey "${journey.name}" set to API Event by name pattern`);
+            } else if (entryDataExtensionId) {
+              entrySourceType = 'DataExtension';
+              entrySourceDescription = 'Data Extension Entry Source';
+              console.log(`🛡️ [SFMC API] Fallback safety: Journey "${journey.name}" set to DE-based (has DE ID)`);
+            } else {
+              entrySourceType = 'Unknown';
+              entrySourceDescription = 'Unknown Entry Source';
+              console.log(`🛡️ [SFMC API] Fallback safety: Journey "${journey.name}" set to Unknown`);
+            }
+          }
+          
+          if (entrySourceDescription === null || entrySourceDescription === undefined) {
+            entrySourceDescription = entrySourceType === 'APIEvent' ? 'API Event Entry Source' : `${entrySourceType} Entry Source`;
+            console.log(`🛡️ [SFMC API] Fallback safety: Journey "${journey.name}" description set to "${entrySourceDescription}"`);
           }
           
           // Return basic journey info if detailed fetch fails
