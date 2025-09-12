@@ -24,6 +24,7 @@ const ObjectExplorer = ({
     { key: 'Triggered Sends', label: 'Triggered Sends', icon: '📧' },
     { key: 'Data Filters', label: 'Data Filters', icon: '🔧' },
     { key: 'Filter Activities', label: 'Filter Activities', icon: '⚙️' },
+    { key: 'Event Definitions', label: 'Event Definitions', icon: '📡' },
     { key: 'File Transfers', label: 'File Transfers', icon: '📁' },
     { key: 'Data Extracts', label: 'Data Extracts', icon: '📤' }
   ];
@@ -771,30 +772,55 @@ const ObjectExplorer = ({
                     <h4>🛤️ Journey Details</h4>
                   </div>
                   <div className="info-grid">
-                    <div className="info-item">
-                      <label>Entry Data Extension ID:</label>
-                      <span className="mono">
-                        {selectedObject.metadata?.entryDataExtensionId || 
-                         selectedObject.entryDataExtensionId || 
-                         'null'}
-                      </span>
-                    </div>
-                    {(selectedObject.metadata?.entryDataExtensionName || selectedObject.entryDataExtensionName) && (
+                    {/* Entry Source Information */}
+                    {(selectedObject.metadata?.entryDataExtensionId || selectedObject.entryDataExtensionId) ? (
+                      <>
+                        <div className="info-item">
+                          <label>Entry Data Extension ID:</label>
+                          <span className="mono">
+                            {selectedObject.metadata?.entryDataExtensionId || selectedObject.entryDataExtensionId}
+                          </span>
+                        </div>
+                        {(selectedObject.metadata?.entryDataExtensionName || selectedObject.entryDataExtensionName) && (
+                          <div className="info-item">
+                            <label>Entry Data Extension Name:</label>
+                            <span>
+                              {selectedObject.metadata?.entryDataExtensionName || selectedObject.entryDataExtensionName}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    ) : (selectedObject.metadata?.entrySourceDescription || selectedObject.entrySourceDescription) ? (
+                      <>
+                        <div className="info-item">
+                          <label>Entry Source Type:</label>
+                          <span>
+                            {selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType || 'Unknown'}
+                          </span>
+                        </div>
+                        <div className="info-item">
+                          <label>Entry Source Description:</label>
+                          <span>
+                            {selectedObject.metadata?.entrySourceDescription || selectedObject.entrySourceDescription}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
                       <div className="info-item">
-                        <label>Entry Data Extension Name:</label>
-                        <span>
-                          {selectedObject.metadata?.entryDataExtensionName || selectedObject.entryDataExtensionName}
-                        </span>
+                        <label>Entry Source:</label>
+                        <span>No entry source detected</span>
                       </div>
                     )}
+                    
                     {(selectedObject.metadata?.dataExtensionSource || selectedObject.dataExtensionSource) && (
                       <div className="info-item">
-                        <label>DE Source Method:</label>
+                        <label>Source Detection Method:</label>
                         <span className="mono">
                           {selectedObject.metadata?.dataExtensionSource || selectedObject.dataExtensionSource}
                         </span>
                       </div>
                     )}
+                    
                     {selectedObject.metadata?.status && (
                       <div className="info-item">
                         <label>Status:</label>
@@ -813,8 +839,10 @@ const ObjectExplorer = ({
                         <span>{Array.isArray(selectedObject.metadata.activities) ? selectedObject.metadata.activities.length : 0}</span>
                       </div>
                     )}
-                    {/* Debug: Show entrySource structure if no DE found */}
+                    
+                    {/* Debug: Show entrySource structure if no entry source found */}
                     {!(selectedObject.metadata?.entryDataExtensionId || selectedObject.entryDataExtensionId) && 
+                     !(selectedObject.metadata?.entrySourceDescription || selectedObject.entrySourceDescription) &&
                      selectedObject.metadata?.entrySource && (
                       <div className="info-item">
                         <label>Debug - Entry Source:</label>

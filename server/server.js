@@ -6259,17 +6259,35 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
       console.warn('⚠️ [SFMC API] Failed to fetch event definitions:', eventDefsError.message);
     }
     
-    // Create a mapping of Journey ID to Data Extension from event definitions
-    const journeyToDataExtensionMap = new Map();
+    // Create a mapping of Journey ID to entry source from event definitions
+    const journeyToEntrySourceMap = new Map();
     eventDefinitions.forEach(eventDef => {
-      if (eventDef.dataExtensionId && eventDef.name) {
-        // Event definitions might map to journeys by name or other identifier
-        journeyToDataExtensionMap.set(eventDef.name, {
-          dataExtensionId: eventDef.dataExtensionId,
-          dataExtensionName: eventDef.dataExtensionName,
-          eventDefinitionKey: eventDef.eventDefinitionKey
-        });
-        console.log(`🔗 [SFMC API] Mapped journey "${eventDef.name}" to DE: ${eventDef.dataExtensionId} (${eventDef.dataExtensionName})`);
+      if (eventDef.name) {
+        const entrySourceInfo = {
+          eventDefinitionKey: eventDef.eventDefinitionKey,
+          type: eventDef.type || 'Unknown',
+          category: eventDef.category || 'Unknown',
+          dataExtensionId: eventDef.dataExtensionId || null,
+          dataExtensionName: eventDef.dataExtensionName || null,
+          arguments: eventDef.arguments || null
+        };
+        
+        // Check arguments for additional data extension info (SmartCapture, API Events, etc.)
+        if (!entrySourceInfo.dataExtensionId && eventDef.arguments) {
+          if (eventDef.arguments.dataExtensionId) {
+            entrySourceInfo.dataExtensionId = eventDef.arguments.dataExtensionId;
+            entrySourceInfo.dataExtensionName = eventDef.arguments.dataExtensionName || null;
+            console.log(`✅ [SFMC API] Found DE in arguments for "${eventDef.name}": ${entrySourceInfo.dataExtensionId}`);
+          }
+        }
+        
+        journeyToEntrySourceMap.set(eventDef.name, entrySourceInfo);
+        
+        if (entrySourceInfo.dataExtensionId) {
+          console.log(`🔗 [SFMC API] Mapped journey "${eventDef.name}" to DE: ${entrySourceInfo.dataExtensionId} (${entrySourceInfo.dataExtensionName}) via ${entrySourceInfo.type}`);
+        } else {
+          console.log(`📡 [SFMC API] Mapped journey "${eventDef.name}" to ${entrySourceInfo.type} entry source (no DE)`);
+        }
       }
     });
     
@@ -6293,6 +6311,8 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           let entryDataExtensionId = null;
           let entryDataExtensionName = null;
           let dataExtensionSource = null;
+          let entrySourceType = null;
+          let entrySourceDescription = null;
           
           // Method 1: Check entrySource.arguments.dataExtensionId
           if (detailedJourney.entrySource?.arguments?.dataExtensionId) {
@@ -6302,12 +6322,38 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           }
           
           // Method 2: Check event definitions mapping by journey name
-          if (!entryDataExtensionId && journeyToDataExtensionMap.has(journey.name)) {
-            const eventDefMapping = journeyToDataExtensionMap.get(journey.name);
-            entryDataExtensionId = eventDefMapping.dataExtensionId;
-            entryDataExtensionName = eventDefMapping.dataExtensionName;
-            dataExtensionSource = 'eventDefinitions';
-            console.log(`✅ [SFMC API] Journey "${journey.name}" has entry DE via event definitions: ${entryDataExtensionId} (${entryDataExtensionName})`);
+          if (journeyToEntrySourceMap.has(journey.name)) {
+            const entrySourceInfo = journeyToEntrySourceMap.get(journey.name);
+            entrySourceType = entrySourceInfo.type;
+            
+            if (entrySourceInfo.dataExtensionId && !entryDataExtensionId) {
+              entryDataExtensionId = entrySourceInfo.dataExtensionId;
+              entryDataExtensionName = entrySourceInfo.dataExtensionName;
+              dataExtensionSource = 'eventDefinitions';
+              console.log(`✅ [SFMC API] Journey "${journey.name}" has entry DE via event definitions: ${entryDataExtensionId} (${entryDataExtensionName})`);
+            } else if (!entrySourceInfo.dataExtensionId) {
+              // Handle non-DE entry sources
+              switch(entrySourceInfo.type) {
+                case 'APIEvent':
+                  entrySourceDescription = 'API Event Entry Source';
+                  break;
+                case 'SalesforceDataEvent':
+                  entrySourceDescription = 'Salesforce Data Event Entry Source';
+                  break;
+                case 'Audience':
+                case 'MobileConnect':
+                case 'MobilePush':
+                  entrySourceDescription = `${entrySourceInfo.type} Entry Source`;
+                  break;
+                case 'SmartCapture':
+                case 'CloudPage':
+                  entrySourceDescription = 'CloudPage Smart Capture Entry Source';
+                  break;
+                default:
+                  entrySourceDescription = `${entrySourceInfo.type} Entry Source`;
+              }
+              console.log(`📡 [SFMC API] Journey "${journey.name}" has ${entrySourceDescription} (no DE)`);
+            }
           }
           
           // Method 3: Check if entrySource has other data extension references
@@ -6321,10 +6367,15 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
               dataExtensionSource = 'entrySource.dataExtensionId';
               console.log(`✅ [SFMC API] Journey "${journey.name}" has entry DE via entrySource.dataExtensionId: ${entryDataExtensionId}`);
             }
+            
+            // Try to detect entry source type from entrySource structure
+            if (!entrySourceType && detailedJourney.entrySource.type) {
+              entrySourceType = detailedJourney.entrySource.type;
+            }
           }
           
-          if (!entryDataExtensionId) {
-            console.log(`⚠️ [SFMC API] Journey "${journey.name}" has no identifiable entry Data Extension`);
+          if (!entryDataExtensionId && !entrySourceDescription) {
+            console.log(`⚠️ [SFMC API] Journey "${journey.name}" has no identifiable entry source`);
           }
           
           return {
@@ -6339,6 +6390,8 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
             entryDataExtensionId: entryDataExtensionId, // Add this for easier relationship building
             entryDataExtensionName: entryDataExtensionName, // Add name if available
             dataExtensionSource: dataExtensionSource, // Track which method found the DE
+            entrySourceType: entrySourceType, // Type of entry source (APIEvent, DataExtension, etc.)
+            entrySourceDescription: entrySourceDescription, // Human-readable description for non-DE sources
             activities: detailedJourney.activities || [],
             type: 'Journey'
           };
@@ -6349,11 +6402,40 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           // Check event definitions mapping even if detailed fetch fails
           let entryDataExtensionId = null;
           let entryDataExtensionName = null;
-          if (journeyToDataExtensionMap.has(journey.name)) {
-            const eventDefMapping = journeyToDataExtensionMap.get(journey.name);
-            entryDataExtensionId = eventDefMapping.dataExtensionId;
-            entryDataExtensionName = eventDefMapping.dataExtensionName;
-            console.log(`✅ [SFMC API] Journey "${journey.name}" has entry DE via event definitions (fallback): ${entryDataExtensionId}`);
+          let entrySourceType = null;
+          let entrySourceDescription = null;
+          
+          if (journeyToEntrySourceMap.has(journey.name)) {
+            const entrySourceInfo = journeyToEntrySourceMap.get(journey.name);
+            entrySourceType = entrySourceInfo.type;
+            
+            if (entrySourceInfo.dataExtensionId) {
+              entryDataExtensionId = entrySourceInfo.dataExtensionId;
+              entryDataExtensionName = entrySourceInfo.dataExtensionName;
+              console.log(`✅ [SFMC API] Journey "${journey.name}" has entry DE via event definitions (fallback): ${entryDataExtensionId}`);
+            } else {
+              // Handle non-DE entry sources
+              switch(entrySourceInfo.type) {
+                case 'APIEvent':
+                  entrySourceDescription = 'API Event Entry Source';
+                  break;
+                case 'SalesforceDataEvent':
+                  entrySourceDescription = 'Salesforce Data Event Entry Source';
+                  break;
+                case 'Audience':
+                case 'MobileConnect':
+                case 'MobilePush':
+                  entrySourceDescription = `${entrySourceInfo.type} Entry Source`;
+                  break;
+                case 'SmartCapture':
+                case 'CloudPage':
+                  entrySourceDescription = 'CloudPage Smart Capture Entry Source';
+                  break;
+                default:
+                  entrySourceDescription = `${entrySourceInfo.type} Entry Source`;
+              }
+              console.log(`📡 [SFMC API] Journey "${journey.name}" has ${entrySourceDescription} (fallback, no DE)`);
+            }
           }
           
           // Return basic journey info if detailed fetch fails
@@ -6369,6 +6451,8 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
             entryDataExtensionId: entryDataExtensionId,
             entryDataExtensionName: entryDataExtensionName,
             dataExtensionSource: entryDataExtensionId ? 'eventDefinitions-fallback' : null,
+            entrySourceType: entrySourceType,
+            entrySourceDescription: entrySourceDescription,
             activities: journey.activities || [],
             type: 'Journey'
           };
@@ -11015,8 +11099,9 @@ function processSchemaForSFMC(schema, sfmcObjects) {
       const jNodeId = j.id; // Use original ID
       pushNode({ id: jNodeId, type: 'Journeys', label: j.name, category: 'Journeys', metadata: j });
 
-      // Link to entry Data Extension using the extracted ID
+      // Handle Journey entry sources (both DE and non-DE types)
       if (j.entryDataExtensionId) {
+        // Data Extension entry source
         const deNodeId = j.entryDataExtensionId; // Use the extracted DE ID
         
         // Look up the actual Data Extension to get its real name
@@ -11054,6 +11139,26 @@ function processSchemaForSFMC(schema, sfmcObjects) {
         });
         pushEdge(jNodeId, deNodeId, 'entry_source', 'uses as entry source');
         console.log(`🔗 [Journey Relationship] Created: ${j.name} → ${deName} (${deNodeId})`);
+        
+      } else if (j.entrySourceDescription) {
+        // Non-Data Extension entry source (API Event, Salesforce Data Event, etc.)
+        const entrySourceNodeId = `${j.id}_entry_source`;
+        const entrySourceType = j.entrySourceType || 'Unknown';
+        
+        pushNode({
+          id: entrySourceNodeId,
+          type: 'Event Definition',
+          label: j.entrySourceDescription,
+          category: 'Event Definitions',
+          metadata: {
+            entrySourceType: entrySourceType,
+            journeyId: j.id,
+            isNonDEEntrySource: true,
+            description: j.entrySourceDescription
+          }
+        });
+        pushEdge(jNodeId, entrySourceNodeId, 'entry_source', 'triggered by');
+        console.log(`🔗 [Journey Relationship] Created: ${j.name} → ${j.entrySourceDescription} (${entrySourceType})`);
       }
 
       // Process journey activities for additional relationships
