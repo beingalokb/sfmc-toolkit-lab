@@ -6546,6 +6546,82 @@ async function fetchSFMCDataExtracts(accessToken, restEndpoint) {
   }
 }
 
+/**
+ * Fetch SFMC Filter Activities via SOAP API
+ * @param {string} accessToken 
+ * @param {string} subdomain 
+ * @returns {Promise<Array>} Array of FilterActivity objects
+ */
+async function fetchSFMCFilterActivities(accessToken, subdomain) {
+  console.log('🔄 [SFMC API] Fetching Filter Activities...');
+  
+  try {
+    const envelope = `
+      <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <s:Header><fueloauth>${accessToken}</fueloauth></s:Header>
+        <s:Body>
+          <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <RetrieveRequest>
+              <ObjectType>FilterActivity</ObjectType>
+              <Properties>ObjectID</Properties>
+              <Properties>Name</Properties>
+              <Properties>Description</Properties>
+              <Properties>CustomerKey</Properties>
+              <Properties>CreatedDate</Properties>
+              <Properties>ModifiedDate</Properties>
+              <Properties>CategoryID</Properties>
+            </RetrieveRequest>
+          </RetrieveRequestMsg>
+        </s:Body>
+      </s:Envelope>`;
+
+    const response = await axios.post(
+      `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`,
+      envelope,
+      {
+        headers: {
+          'Content-Type': 'text/xml; charset=utf-8',
+          'SOAPAction': 'Retrieve'
+        }
+      }
+    );
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
+    
+    const retrieveResponse = result['soap:Envelope']['soap:Body']['RetrieveResponseMsg'];
+    
+    if (retrieveResponse.OverallStatus !== 'OK') {
+      console.log('⚠️ [SFMC API] FilterActivity retrieve not OK:', retrieveResponse.OverallStatus);
+      return [];
+    }
+
+    const results = retrieveResponse.Results;
+    if (!results) {
+      console.log('✅ [SFMC API] No Filter Activities found');
+      return [];
+    }
+
+    const resultArray = Array.isArray(results) ? results : [results];
+    console.log(`✅ [SFMC API] Found ${resultArray.length} Filter Activities`);
+
+    return resultArray.map(filterActivity => ({
+      id: filterActivity.ObjectID || filterActivity.CustomerKey || 'unknown',
+      name: filterActivity.Name || 'Unnamed Filter Activity',
+      description: filterActivity.Description || '',
+      customerKey: filterActivity.CustomerKey || '',
+      createdDate: filterActivity.CreatedDate || '',
+      modifiedDate: filterActivity.ModifiedDate || '',
+      categoryId: filterActivity.CategoryID || '',
+      type: 'FilterActivity'
+    }));
+
+  } catch (error) {
+    console.error('❌ [SFMC API] Error fetching Filter Activities:', error.message);
+    return [];
+  }
+}
+
 // ==================== RELATIONSHIP DETECTION FUNCTIONS ====================
 
 /**
