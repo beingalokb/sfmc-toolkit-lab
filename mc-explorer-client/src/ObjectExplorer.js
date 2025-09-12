@@ -151,6 +151,9 @@ const ObjectExplorer = ({
     const edges = window.schemaEdges || [];
     const nodes = window.schemaNodes || [];
     
+    console.log(`🔍 [ObjectExplorer] Getting relationships for "${object.name}" (ID: ${object.id})`);
+    console.log(`🔍 [ObjectExplorer] Total edges: ${edges.length}, Total nodes: ${nodes.length}`);
+    
     // Create a map of node IDs to node objects for quick lookup
     const nodeMap = {};
     nodes.forEach(node => {
@@ -159,8 +162,15 @@ const ObjectExplorer = ({
     
     // Find outgoing relationships (this object -> other objects)
     const outgoingEdges = edges.filter(edge => edge.source === object.id);
+    console.log(`🔍 [ObjectExplorer] Found ${outgoingEdges.length} outgoing edges for "${object.name}"`);
     outgoingEdges.forEach(edge => {
       const targetNode = nodeMap[edge.target];
+      console.log(`🔍 [ObjectExplorer] Outgoing edge:`, { 
+        source: edge.source, 
+        target: edge.target, 
+        label: edge.label, 
+        targetNode: targetNode?.label 
+      });
       if (targetNode) {
         relationships.push({
           type: 'outgoing',
@@ -175,8 +185,15 @@ const ObjectExplorer = ({
     
     // Find incoming relationships (other objects -> this object)
     const incomingEdges = edges.filter(edge => edge.target === object.id);
+    console.log(`🔍 [ObjectExplorer] Found ${incomingEdges.length} incoming edges for "${object.name}"`);
     incomingEdges.forEach(edge => {
       const sourceNode = nodeMap[edge.source];
+      console.log(`🔍 [ObjectExplorer] Incoming edge:`, { 
+        source: edge.source, 
+        target: edge.target, 
+        label: edge.label, 
+        sourceNode: sourceNode?.label 
+      });
       if (sourceNode) {
         relationships.push({
           type: 'incoming',
@@ -445,6 +462,11 @@ const ObjectExplorer = ({
       index === self.findIndex(r => r.target === rel.target && r.relationship === rel.relationship)
     );
     
+    console.log(`🔍 [ObjectExplorer] Final relationships for "${object.name}":`, uniqueRelationships.length);
+    uniqueRelationships.forEach((rel, idx) => {
+      console.log(`  ${idx + 1}. ${rel.relationship} -> ${rel.target} (${rel.targetCategory}) ${rel.targetId ? '[Clickable]' : '[Not Clickable]'}`);
+    });
+    
     return uniqueRelationships;
   };
 
@@ -631,13 +653,31 @@ const ObjectExplorer = ({
                             className={`relationship-card ${rel.type}`}
                             onClick={() => {
                               // Try to find and select the related object
-                              const relatedObject = Object.values(sfmcObjects).flat().find(obj => 
+                              let relatedObject = Object.values(sfmcObjects).flat().find(obj => 
                                 obj.id === rel.targetId || obj.name === rel.target
                               );
+                              
+                              // If not found in sfmcObjects, try to find in schema nodes and create a virtual object
+                              if (!relatedObject && rel.targetId) {
+                                const schemaNode = (window.schemaNodes || []).find(node => node.id === rel.targetId);
+                                if (schemaNode) {
+                                  relatedObject = {
+                                    id: schemaNode.id,
+                                    name: schemaNode.label || schemaNode.id,
+                                    type: schemaNode.type,
+                                    category: schemaNode.category || 'System Object',
+                                    metadata: schemaNode.metadata || {}
+                                  };
+                                  console.log(`🔍 [ObjectExplorer] Created virtual object for system table:`, relatedObject);
+                                }
+                              }
+                              
                               if (relatedObject) {
                                 // Add current object to navigation history
                                 setNavigationHistory(prev => [...prev, selectedObject]);
                                 setSelectedObject(relatedObject);
+                              } else {
+                                console.log(`⚠️ [ObjectExplorer] Could not find related object: ${rel.target} (ID: ${rel.targetId})`);
                               }
                             }}
                             style={{ cursor: rel.targetId ? 'pointer' : 'default' }}
