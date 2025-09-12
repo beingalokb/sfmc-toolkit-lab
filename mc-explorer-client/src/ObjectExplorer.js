@@ -21,6 +21,7 @@ const ObjectExplorer = ({
     { key: 'SQL Queries', label: 'Queries', icon: '🔍' },
     { key: 'Triggered Sends', label: 'Triggered Sends', icon: '📧' },
     { key: 'Data Filters', label: 'Data Filters', icon: '🔧' },
+    { key: 'Filter Activities', label: 'Filter Activities', icon: '⚙️' },
     { key: 'File Transfers', label: 'File Transfers', icon: '📁' },
     { key: 'Data Extracts', label: 'Data Extracts', icon: '📤' }
   ];

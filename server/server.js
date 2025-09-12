@@ -6216,7 +6216,7 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
   try {
     console.log('🔍 [SFMC API] Fetching Journeys...');
     
-    // First get interactions (journeys)
+    // First get interactions (journeys) list
     const interactionsResponse = await axios.get(`${restEndpoint}/interaction/v1/interactions`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -6228,21 +6228,77 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
     console.log('📡 [SFMC API] Journeys REST response received');
 
     const interactions = interactionsResponse.data?.items || [];
+    console.log(`📊 [SFMC API] Found ${interactions.length} Journeys, fetching detailed definitions...`);
     
-    console.log(`✅ [SFMC API] Found ${interactions.length} Journeys`);
+    // Fetch detailed definition for each journey to get entrySource.arguments
+    const detailedJourneys = await Promise.allSettled(
+      interactions.map(async (journey) => {
+        try {
+          console.log(`🔍 [SFMC API] Fetching detailed definition for journey: ${journey.name} (${journey.id})`);
+          
+          const detailResponse = await axios.get(`${restEndpoint}/interaction/v1/interactions/${journey.id}`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 15000 // 15 second timeout per journey
+          });
+          
+          const detailedJourney = detailResponse.data;
+          
+          // Extract entry source Data Extension ID
+          let entryDataExtensionId = null;
+          if (detailedJourney.entrySource?.arguments?.dataExtensionId) {
+            entryDataExtensionId = detailedJourney.entrySource.arguments.dataExtensionId;
+            console.log(`✅ [SFMC API] Journey "${journey.name}" has entry DE: ${entryDataExtensionId}`);
+          }
+          
+          return {
+            id: journey.id, // Use original ID
+            name: journey.name || 'Unnamed Journey',
+            description: journey.description || '',
+            status: journey.status,
+            createdDate: journey.createdDate,
+            modifiedDate: journey.modifiedDate,
+            version: journey.version,
+            entrySource: detailedJourney.entrySource || {},
+            entryDataExtensionId: entryDataExtensionId, // Add this for easier relationship building
+            activities: detailedJourney.activities || [],
+            type: 'Journey'
+          };
+          
+        } catch (error) {
+          console.warn(`⚠️ [SFMC API] Failed to fetch detailed definition for journey ${journey.name}: ${error.message}`);
+          // Return basic journey info if detailed fetch fails
+          return {
+            id: journey.id,
+            name: journey.name || 'Unnamed Journey',
+            description: journey.description || '',
+            status: journey.status,
+            createdDate: journey.createdDate,
+            modifiedDate: journey.modifiedDate,
+            version: journey.version,
+            entrySource: journey.entrySource || {},
+            entryDataExtensionId: null,
+            activities: journey.activities || [],
+            type: 'Journey'
+          };
+        }
+      })
+    );
     
-    return interactions.map(journey => ({
-      id: journey.id, // Use original ID instead of prefixed version
-      name: journey.name || 'Unnamed Journey',
-      description: journey.description || '',
-      status: journey.status,
-      createdDate: journey.createdDate,
-      modifiedDate: journey.modifiedDate,
-      version: journey.version,
-      entrySource: journey.entrySource || {},
-      activities: journey.activities || [],
-      type: 'Journey'
-    }));
+    // Process results and handle failures
+    const processedJourneys = detailedJourneys
+      .filter(result => result.status === 'fulfilled')
+      .map(result => result.value);
+    
+    const failedCount = detailedJourneys.filter(result => result.status === 'rejected').length;
+    if (failedCount > 0) {
+      console.warn(`⚠️ [SFMC API] ${failedCount} journey detail fetches failed`);
+    }
+    
+    console.log(`✅ [SFMC API] Successfully processed ${processedJourneys.length} Journeys with detailed definitions`);
+    return processedJourneys;
     
   } catch (error) {
     console.error('❌ [SFMC API] Error fetching Journeys:', error.message);
@@ -8478,6 +8534,7 @@ async function fetchAllSFMCObjectsLegacy(accessToken, subdomain, restEndpoint) {
     'Journeys': [],
     'Triggered Sends': [],
     'Data Filters': [], // Changed from 'Filters' to 'Data Filters'
+    'Filter Activities': [],
     'File Transfers': [],
     'Data Extracts': []
   };
@@ -8491,6 +8548,7 @@ async function fetchAllSFMCObjectsLegacy(accessToken, subdomain, restEndpoint) {
       journeys,
       triggeredSends,
       filters,
+      filterActivities,
       fileTransfers,
       dataExtracts
     ] = await Promise.allSettled([
@@ -8500,6 +8558,7 @@ async function fetchAllSFMCObjectsLegacy(accessToken, subdomain, restEndpoint) {
       fetchSFMCJourneys(accessToken, restEndpoint),
       fetchSFMCTriggeredSends(accessToken, subdomain),
       fetchSFMCFilters(accessToken, subdomain),
+      fetchSFMCFilterActivities(accessToken, subdomain),
       fetchSFMCFileTransfers(accessToken, restEndpoint),
       fetchSFMCDataExtracts(accessToken, restEndpoint)
     ]);
@@ -8560,6 +8619,13 @@ async function fetchAllSFMCObjectsLegacy(accessToken, subdomain, restEndpoint) {
       console.log(`✅ [SFMC API] Fetched ${filters.value.length} Data Filters`);
     } else {
       console.error('❌ [SFMC API] Failed to fetch Data Filters:', filters.reason.message);
+    }
+
+    if (filterActivities.status === 'fulfilled') {
+      allObjects['Filter Activities'] = filterActivities.value;
+      console.log(`✅ [SFMC API] Fetched ${filterActivities.value.length} Filter Activities`);
+    } else {
+      console.error('❌ [SFMC API] Failed to fetch Filter Activities:', filterActivities.reason.message);
     }
 
     if (fileTransfers.status === 'fulfilled') {
@@ -10760,11 +10826,21 @@ function processSchemaForSFMC(schema, sfmcObjects) {
       const jNodeId = j.id; // Use original ID
       pushNode({ id: jNodeId, type: 'Journeys', label: j.name, category: 'Journeys', metadata: j });
 
-      if (j.entrySource?.dataExtensionId) {
-        const deNodeId = j.entrySource.dataExtensionId; // Use original ID
-        pushEdge(jNodeId, deNodeId, 'entersFrom', 'entry source');
+      // Link to entry Data Extension using the extracted ID
+      if (j.entryDataExtensionId) {
+        const deNodeId = j.entryDataExtensionId; // Use the extracted DE ID
+        pushNode({
+          id: deNodeId,
+          type: 'Data Extensions', 
+          label: 'Entry Data Extension',
+          category: 'Data Extensions',
+          metadata: { isEntrySource: true, journeyId: j.id }
+        });
+        pushEdge(jNodeId, deNodeId, 'entry_source', 'uses as entry source');
+        console.log(`🔗 [Journey Relationship] Created: ${j.name} → Entry DE (${deNodeId})`);
       }
 
+      // Process journey activities for additional relationships
       (j.activities || []).forEach(act => {
         if (act.type === 'EMAIL' && act.arguments?.triggeredSendDefinitionId) {
           const tsNodeId = act.arguments.triggeredSendDefinitionId; // Use original ID
@@ -10812,6 +10888,46 @@ function processSchemaForSFMC(schema, sfmcObjects) {
       if (filter.dataExtensionId || filter.dataSourceId) {
         const sourceDeId = filter.dataExtensionId || filter.dataSourceId;
         pushEdge(filterNodeId, sourceDeId, 'filters', 'filters data from');
+      }
+    });
+
+    // --- Filter Activities ---
+    (sfmcObjects['Filter Activities'] || []).forEach(filterActivity => {
+      const filterActivityNodeId = filterActivity.id; // Use original ID
+      pushNode({ 
+        id: filterActivityNodeId, 
+        type: 'Filter Activities', 
+        label: filterActivity.name, 
+        category: 'Filter Activities', 
+        metadata: filterActivity 
+      });
+      
+      // Link to source Data Extension (from FilterDefinition)
+      if (filterActivity.sourceDataExtensionId) {
+        const sourceDeId = filterActivity.sourceDataExtensionId;
+        pushNode({
+          id: sourceDeId,
+          type: 'Data Extensions',
+          label: 'Source Data Extension',
+          category: 'Data Extensions',
+          metadata: { isFilterSource: true }
+        });
+        pushEdge(filterActivityNodeId, sourceDeId, 'reads_from', 'reads data from');
+        console.log(`🔗 [Filter Activity Relationship] Created: ${filterActivity.name} → Source DE (${sourceDeId})`);
+      }
+      
+      // Link to destination Data Extension
+      if (filterActivity.destinationObjectId) {
+        const targetDeId = filterActivity.destinationObjectId;
+        pushNode({
+          id: targetDeId,
+          type: 'Data Extensions',
+          label: 'Target Data Extension',
+          category: 'Data Extensions',
+          metadata: { isFilterTarget: true }
+        });
+        pushEdge(filterActivityNodeId, targetDeId, 'writes_to', 'writes filtered data to');
+        console.log(`🔗 [Filter Activity Relationship] Created: ${filterActivity.name} → Target DE (${targetDeId})`);
       }
     });
 
