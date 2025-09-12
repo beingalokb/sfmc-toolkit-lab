@@ -13,6 +13,7 @@ const ObjectExplorer = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [debugInfo, setDebugInfo] = useState(null); // Store server debug info
+  const [collapsedCategories, setCollapsedCategories] = useState({}); // Track collapsed categories
 
   // Object type configurations
   const objectTypes = [
@@ -541,37 +542,51 @@ const ObjectExplorer = ({
             {objectTypes.map(objectType => {
               const objects = filteredObjects[objectType.key] || [];
               const totalCount = sfmcObjects[objectType.key]?.length || 0;
+              const isCollapsed = collapsedCategories[objectType.key] || false;
               
               return (
                 <div key={objectType.key} className="object-category">
-                  <div className="category-header">
+                  <div 
+                    className={`category-header ${isCollapsed ? 'collapsed' : ''}`}
+                    onClick={() => {
+                      setCollapsedCategories(prev => ({
+                        ...prev,
+                        [objectType.key]: !prev[objectType.key]
+                      }));
+                    }}
+                  >
                     <span className="category-icon">{objectType.icon}</span>
                     <span className="category-label">{objectType.label}</span>
                     <span className="category-count">
                       ({searchTerm ? objects.length : totalCount})
                     </span>
+                    <span className="collapse-indicator">
+                      {isCollapsed ? '▶' : '▼'}
+                    </span>
                   </div>
                   
-                  <div className="object-list">
-                    {objects.map(object => (
-                      <div
-                        key={object.id}
-                        className={`object-item ${selectedObject?.id === object.id ? 'selected' : ''}`}
-                        onClick={() => {
-                          // Clear navigation history when selecting from left panel
-                          setNavigationHistory([]);
-                          setSelectedObject(object);
-                        }}
-                      >
-                        <div className="object-name">{object.name}</div>
-                        <div className="object-id">{object.id}</div>
-                      </div>
-                    ))}
-                    
-                    {objects.length === 0 && totalCount > 0 && searchTerm && (
-                      <div className="no-matches">No matches found</div>
-                    )}
-                  </div>
+                  {!isCollapsed && (
+                    <div className="object-list">
+                      {objects.map(object => (
+                        <div
+                          key={object.id}
+                          className={`object-item ${selectedObject?.id === object.id ? 'selected' : ''}`}
+                          onClick={() => {
+                            // Clear navigation history when selecting from left panel
+                            setNavigationHistory([]);
+                            setSelectedObject(object);
+                          }}
+                        >
+                          <div className="object-name">{object.name}</div>
+                          <div className="object-id">{object.id}</div>
+                        </div>
+                      ))}
+                      
+                      {objects.length === 0 && totalCount > 0 && searchTerm && (
+                        <div className="no-matches">No matches found</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -582,43 +597,6 @@ const ObjectExplorer = ({
         <div className="right-panel">
           {selectedObject ? (
             <div className="object-details">
-              {/* Navigation Breadcrumbs */}
-              {navigationHistory.length > 0 && (
-                <div className="navigation-breadcrumbs">
-                  <div className="breadcrumb-trail">
-                    {navigationHistory.map((historyItem, index) => (
-                      <span key={index}>
-                        <button 
-                          className="breadcrumb-link"
-                          onClick={() => {
-                            // Go back to this point in history
-                            const newHistory = navigationHistory.slice(0, index);
-                            setNavigationHistory(newHistory);
-                            setSelectedObject(historyItem);
-                          }}
-                        >
-                          {historyItem.name}
-                        </button>
-                        <span className="breadcrumb-separator"> → </span>
-                      </span>
-                    ))}
-                    <span className="current-object">{selectedObject.name}</span>
-                  </div>
-                  <button 
-                    className="back-button"
-                    onClick={() => {
-                      if (navigationHistory.length > 0) {
-                        const previous = navigationHistory[navigationHistory.length - 1];
-                        setNavigationHistory(prev => prev.slice(0, -1));
-                        setSelectedObject(previous);
-                      }
-                    }}
-                  >
-                    ← Back
-                  </button>
-                </div>
-              )}
-
               {/* Header Card */}
               <div className="detail-card header-card">
                 <div className="card-header">
@@ -661,6 +639,43 @@ const ObjectExplorer = ({
                 const relationships = getObjectRelationships(selectedObject);
                 return (
                   <div className="detail-card relationships-card">
+                    {/* Navigation Breadcrumbs - moved here for better visibility */}
+                    {navigationHistory.length > 0 && (
+                      <div className="navigation-breadcrumbs">
+                        <div className="breadcrumb-trail">
+                          {navigationHistory.map((historyItem, index) => (
+                            <span key={index}>
+                              <button 
+                                className="breadcrumb-link"
+                                onClick={() => {
+                                  // Go back to this point in history
+                                  const newHistory = navigationHistory.slice(0, index);
+                                  setNavigationHistory(newHistory);
+                                  setSelectedObject(historyItem);
+                                }}
+                              >
+                                {historyItem.name}
+                              </button>
+                              <span className="breadcrumb-separator"> → </span>
+                            </span>
+                          ))}
+                          <span className="current-object">{selectedObject.name}</span>
+                        </div>
+                        <button 
+                          className="back-button"
+                          onClick={() => {
+                            if (navigationHistory.length > 0) {
+                              const previous = navigationHistory[navigationHistory.length - 1];
+                              setNavigationHistory(prev => prev.slice(0, -1));
+                              setSelectedObject(previous);
+                            }
+                          }}
+                        >
+                          ← Back
+                        </button>
+                      </div>
+                    )}
+                    
                     <div className="card-header">
                       <h4>🔗 Related Objects</h4>
                       <span className="relationship-count">{relationships.length}</span>
@@ -748,6 +763,43 @@ const ObjectExplorer = ({
                   </div>
                 </div>
               </div>
+
+              {/* Journey-specific Information */}
+              {selectedObject.type === 'Journey' && (
+                <div className="detail-card journey-card">
+                  <div className="card-header">
+                    <h4>🛤️ Journey Details</h4>
+                  </div>
+                  <div className="info-grid">
+                    <div className="info-item">
+                      <label>Entry Data Extension ID:</label>
+                      <span className="mono">
+                        {selectedObject.metadata?.entryDataExtensionId || 
+                         selectedObject.entryDataExtensionId || 
+                         'null'}
+                      </span>
+                    </div>
+                    {selectedObject.metadata?.status && (
+                      <div className="info-item">
+                        <label>Status:</label>
+                        <span>{selectedObject.metadata.status}</span>
+                      </div>
+                    )}
+                    {selectedObject.metadata?.version && (
+                      <div className="info-item">
+                        <label>Version:</label>
+                        <span>{selectedObject.metadata.version}</span>
+                      </div>
+                    )}
+                    {selectedObject.metadata?.activities && (
+                      <div className="info-item">
+                        <label>Activities Count:</label>
+                        <span>{Array.isArray(selectedObject.metadata.activities) ? selectedObject.metadata.activities.length : 0}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Metadata Card */}
               {selectedObject.metadata && Object.keys(selectedObject.metadata).filter(key => 

@@ -117,6 +117,25 @@
   color: #333;
   cursor: pointer;
   user-select: none;
+  transition: background-color 0.2s;
+}
+
+.category-header:hover {
+  background-color: #ebebeb;
+}
+
+.category-header.collapsed {
+  border-bottom: none;
+}
+
+.collapse-indicator {
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.2s;
+}
+
+.category-header.collapsed .collapse-indicator {
+  transform: rotate(0deg);
 }
 
 .category-icon {
@@ -137,8 +156,26 @@
 }
 
 .object-list {
-  max-height: 300px;
+  max-height: 250px;
   overflow-y: auto;
+  background-color: #fff;
+}
+
+.object-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.object-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.object-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.object-list::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .object-item {
