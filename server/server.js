@@ -10641,12 +10641,20 @@ function processSchemaForSFMC(schema, sfmcObjects) {
   } else if (sfmcObjects && Object.keys(sfmcObjects).length > 0) {
     // Create nodes from SFMC objects when schema is empty
     console.log('🆕 [Schema] Creating nodes from SFMC objects (empty schema)');
+    console.log('🔍 [Schema] SFMC objects available for node creation:', Object.keys(sfmcObjects));
     
     let nodeCounter = 0;
     const createdNodeIds = new Set(); // Track created node IDs to prevent duplicates
     
     Object.entries(sfmcObjects).forEach(([category, objects]) => {
+      console.log(`🔍 [Schema] Processing category "${category}":`, {
+        hasObjects: !!objects,
+        isArray: Array.isArray(objects),
+        count: objects?.length || 0
+      });
+      
       if (objects && Array.isArray(objects)) {
+        console.log(`📊 [Schema] Creating ${objects.length} nodes for category: ${category}`);
         objects.forEach((obj, index) => { // Show ALL objects, not just 20
           // Use the original object ID to prevent duplicates
           const nodeId = obj.id || obj.customerKey || `${category.toLowerCase().replace(/\s+/g, '_')}_${index}`;
@@ -10679,8 +10687,14 @@ function processSchemaForSFMC(schema, sfmcObjects) {
           nodeCounter++;
         });
         console.log(`🆕 [Schema] Created ${objects.length} unique nodes from ${category}`);
+        console.log(`📊 [Schema] Total nodes created so far: ${processedSchema.nodes.length}`);
+      } else {
+        console.log(`⚠️ [Schema] Skipping category "${category}": objects is not a valid array`);
       }
     });
+    console.log(`✅ [Schema] FINAL: Created ${processedSchema.nodes.length} total nodes from ${Object.keys(sfmcObjects).length} SFMC object categories`);
+  } else {
+    console.log('⚠️ [Schema] No SFMC objects available for node creation');
   }
 
   // --- Step 2: Copy edges ---
