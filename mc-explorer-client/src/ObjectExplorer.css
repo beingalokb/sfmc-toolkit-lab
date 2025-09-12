@@ -640,6 +640,55 @@
   font-weight: 500;
 }
 
+/* Debug Information Panel */
+.debug-info-panel {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  font-size: 14px;
+  max-width: 600px;
+}
+
+.debug-info-panel h4 {
+  margin: 0 0 15px 0;
+  color: #856404;
+  font-size: 16px;
+}
+
+.debug-section {
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #fffbf0;
+  border-radius: 5px;
+  border: 1px solid #f1c40f;
+}
+
+.debug-section.error {
+  background-color: #ffebee;
+  border-color: #f44336;
+}
+
+.debug-section h5 {
+  margin: 0 0 8px 0;
+  color: #856404;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.debug-section.error h5 {
+  color: #d32f2f;
+}
+
+.debug-section p {
+  margin: 4px 0;
+  color: #333;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .explorer-content {

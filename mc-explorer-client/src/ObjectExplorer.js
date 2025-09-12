@@ -12,6 +12,7 @@ const ObjectExplorer = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [debugInfo, setDebugInfo] = useState(null); // Store server debug info
 
   // Object type configurations
   const objectTypes = [
@@ -55,6 +56,24 @@ const ObjectExplorer = ({
       if (data.success) {
         // Store the full schema data for relationship analysis
         const fullSchema = data.schema;
+        
+        // Log debug information if available
+        if (data.debug) {
+          console.log('🔍 [ObjectExplorer] Debug info from server:', data.debug);
+          setDebugInfo(data.debug); // Store debug info in state
+          
+          // If we have 0 nodes and debug info, log it prominently
+          if (fullSchema.nodes.length === 0) {
+            console.warn('⚠️ [ObjectExplorer] No objects returned from server!');
+            console.log('🔍 [ObjectExplorer] Server debug info:', {
+              authentication: data.debug.authentication,
+              sfmcObjects: data.debug.sfmcObjects,
+              sfmcFetchError: data.debug.sfmcFetchError,
+              inputSchema: data.debug.inputSchema,
+              processedSchema: data.debug.processedSchema
+            });
+          }
+        }
         
         // Extract SFMC objects from the processed schema
         const objects = {};
@@ -760,7 +779,61 @@ const ObjectExplorer = ({
                 <p>Click on any object in the left panel to view its details and relationships.</p>
                 
                 {Object.keys(sfmcObjects).length === 0 && !loading && (
-                  <p>Click "Load SFMC Objects" to get started.</p>
+                  <div>
+                    <p>Click "Load SFMC Objects" to get started.</p>
+                    
+                    {/* Debug Information Display */}
+                    {debugInfo && (
+                      <div className="debug-info-panel">
+                        <h4>🔍 Debug Information</h4>
+                        <div className="debug-section">
+                          <h5>Authentication</h5>
+                          <p>Has Token: {debugInfo.authentication?.hasToken ? '✅ Yes' : '❌ No'}</p>
+                          <p>Token Length: {debugInfo.authentication?.tokenLength || 0} characters</p>
+                          <p>Subdomain: {debugInfo.authentication?.subdomain || 'Not provided'}</p>
+                        </div>
+                        
+                        <div className="debug-section">
+                          <h5>SFMC Objects</h5>
+                          {debugInfo.sfmcObjects?.length > 0 ? (
+                            debugInfo.sfmcObjects.map(obj => (
+                              <p key={obj.category}>
+                                {obj.category}: {obj.count} objects {obj.hasObjects ? '✅' : '❌'}
+                              </p>
+                            ))
+                          ) : (
+                            <p>❌ No SFMC objects returned</p>
+                          )}
+                        </div>
+                        
+                        {debugInfo.sfmcFetchError && (
+                          <div className="debug-section error">
+                            <h5>❌ SFMC Fetch Error</h5>
+                            <p>Error: {debugInfo.sfmcFetchError.message}</p>
+                            <p>Type: {debugInfo.sfmcFetchError.type}</p>
+                            <p>Time: {debugInfo.sfmcFetchError.timestamp}</p>
+                          </div>
+                        )}
+                        
+                        <div className="debug-section">
+                          <h5>Schema Processing</h5>
+                          <p>Input Nodes: {debugInfo.inputSchema?.nodes || 0}</p>
+                          <p>Input Edges: {debugInfo.inputSchema?.edges || 0}</p>
+                          <p>Output Nodes: {debugInfo.processedSchema?.nodes || 0}</p>
+                          <p>Output Edges: {debugInfo.processedSchema?.edges || 0}</p>
+                        </div>
+                        
+                        {debugInfo.nodeTypes && Object.keys(debugInfo.nodeTypes).length > 0 && (
+                          <div className="debug-section">
+                            <h5>Node Types</h5>
+                            {Object.entries(debugInfo.nodeTypes).map(([type, count]) => (
+                              <p key={type}>{type}: {count}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

@@ -11056,7 +11056,21 @@ app.post('/api/schema/process', async (req, res) => {
       }
     } catch (error) {
       console.warn('⚠️ [Schema API] Could not fetch SFMC objects, processing without linking:', error.message);
-      console.error('🔍 [Schema API] SFMC fetch error details:', error);
+      console.error('🔍 [Schema API] SFMC fetch error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method
+      });
+      
+      // Store error info for debug response
+      sfmcObjects._fetchError = {
+        message: error.message,
+        type: error.constructor.name,
+        timestamp: new Date().toISOString()
+      };
     }
     
     // Process schema with SFMC integration
@@ -11089,14 +11103,51 @@ app.post('/api/schema/process', async (req, res) => {
         edges: processedSchema.edges.length,
         sfmcLinked: processedSchema.nodes.filter(n => n.metadata?.sfmcLinked).length,
         relationshipsBuilt: processedSchema.edges.filter(e => !e.metadata?.schemaGenerated).length
+      },
+      // Add debug information to the response
+      debug: {
+        authentication: {
+          hasToken: !!accessToken,
+          tokenLength: accessToken ? accessToken.length : 0,
+          subdomain: subdomain || 'not provided'
+        },
+        sfmcObjects: Object.entries(sfmcObjects).filter(([key]) => !key.startsWith('_')).map(([category, objects]) => ({
+          category,
+          count: objects ? objects.length : 0,
+          hasObjects: !!(objects && objects.length > 0)
+        })),
+        sfmcFetchError: sfmcObjects._fetchError || null,
+        inputSchema: {
+          nodes: schema?.nodes?.length || 0,
+          edges: schema?.edges?.length || 0
+        },
+        processedSchema: {
+          nodes: processedSchema.nodes.length,
+          edges: processedSchema.edges.length
+        },
+        nodeTypes: processedSchema.nodes.reduce((acc, node) => {
+          acc[node.type] = (acc[node.type] || 0) + 1;
+          return acc;
+        }, {}),
+        timestamp: new Date().toISOString()
       }
     });
     
   } catch (error) {
     console.error('❌ [Schema API] Processing error:', error);
+    console.error('❌ [Schema API] Error stack:', error.stack);
     res.status(500).json({
       success: false,
-      error: 'Internal server error during schema processing'
+      error: 'Internal server error during schema processing',
+      debug: {
+        errorMessage: error.message,
+        errorType: error.constructor.name,
+        timestamp: new Date().toISOString(),
+        authentication: {
+          hasToken: !!(req.body?.accessToken),
+          hasSubdomain: !!(req.body?.subdomain)
+        }
+      }
     });
   }
 });
