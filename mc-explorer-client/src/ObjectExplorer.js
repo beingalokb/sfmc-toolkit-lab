@@ -779,6 +779,22 @@ const ObjectExplorer = ({
                          'null'}
                       </span>
                     </div>
+                    {(selectedObject.metadata?.entryDataExtensionName || selectedObject.entryDataExtensionName) && (
+                      <div className="info-item">
+                        <label>Entry Data Extension Name:</label>
+                        <span>
+                          {selectedObject.metadata?.entryDataExtensionName || selectedObject.entryDataExtensionName}
+                        </span>
+                      </div>
+                    )}
+                    {(selectedObject.metadata?.dataExtensionSource || selectedObject.dataExtensionSource) && (
+                      <div className="info-item">
+                        <label>DE Source Method:</label>
+                        <span className="mono">
+                          {selectedObject.metadata?.dataExtensionSource || selectedObject.dataExtensionSource}
+                        </span>
+                      </div>
+                    )}
                     {selectedObject.metadata?.status && (
                       <div className="info-item">
                         <label>Status:</label>
@@ -795,6 +811,16 @@ const ObjectExplorer = ({
                       <div className="info-item">
                         <label>Activities Count:</label>
                         <span>{Array.isArray(selectedObject.metadata.activities) ? selectedObject.metadata.activities.length : 0}</span>
+                      </div>
+                    )}
+                    {/* Debug: Show entrySource structure if no DE found */}
+                    {!(selectedObject.metadata?.entryDataExtensionId || selectedObject.entryDataExtensionId) && 
+                     selectedObject.metadata?.entrySource && (
+                      <div className="info-item">
+                        <label>Debug - Entry Source:</label>
+                        <span className="long-text">
+                          {JSON.stringify(selectedObject.metadata.entrySource, null, 2)}
+                        </span>
                       </div>
                     )}
                   </div>

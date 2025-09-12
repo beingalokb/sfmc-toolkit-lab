@@ -6228,7 +6228,50 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
     console.log('📡 [SFMC API] Journeys REST response received');
 
     const interactions = interactionsResponse.data?.items || [];
-    console.log(`📊 [SFMC API] Found ${interactions.length} Journeys, fetching detailed definitions...`);
+    console.log(`📊 [SFMC API] Found ${interactions.length} Journeys, fetching detailed definitions and event definitions...`);
+    
+    // Fetch event definitions to get Journey → Data Extension mappings
+    console.log('🔍 [SFMC API] Fetching event definitions for Journey entry sources...');
+    let eventDefinitions = [];
+    try {
+      const eventDefsResponse = await axios.get(`${restEndpoint}/interaction/v1/eventDefinitions?$page=1&$pagesize=500&category=Audience`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000
+      });
+      
+      eventDefinitions = eventDefsResponse.data?.items || [];
+      console.log(`✅ [SFMC API] Fetched ${eventDefinitions.length} event definitions`);
+      
+      // Log some sample event definitions for debugging
+      if (eventDefinitions.length > 0) {
+        console.log('📊 [SFMC API] Sample event definition:', {
+          id: eventDefinitions[0].id,
+          name: eventDefinitions[0].name,
+          dataExtensionId: eventDefinitions[0].dataExtensionId,
+          dataExtensionName: eventDefinitions[0].dataExtensionName,
+          eventDefinitionKey: eventDefinitions[0].eventDefinitionKey
+        });
+      }
+    } catch (eventDefsError) {
+      console.warn('⚠️ [SFMC API] Failed to fetch event definitions:', eventDefsError.message);
+    }
+    
+    // Create a mapping of Journey ID to Data Extension from event definitions
+    const journeyToDataExtensionMap = new Map();
+    eventDefinitions.forEach(eventDef => {
+      if (eventDef.dataExtensionId && eventDef.name) {
+        // Event definitions might map to journeys by name or other identifier
+        journeyToDataExtensionMap.set(eventDef.name, {
+          dataExtensionId: eventDef.dataExtensionId,
+          dataExtensionName: eventDef.dataExtensionName,
+          eventDefinitionKey: eventDef.eventDefinitionKey
+        });
+        console.log(`🔗 [SFMC API] Mapped journey "${eventDef.name}" to DE: ${eventDef.dataExtensionId} (${eventDef.dataExtensionName})`);
+      }
+    });
     
     // Fetch detailed definition for each journey to get entrySource.arguments
     const detailedJourneys = await Promise.allSettled(
@@ -6246,11 +6289,42 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           
           const detailedJourney = detailResponse.data;
           
-          // Extract entry source Data Extension ID
+          // Extract entry source Data Extension ID from multiple sources
           let entryDataExtensionId = null;
+          let entryDataExtensionName = null;
+          let dataExtensionSource = null;
+          
+          // Method 1: Check entrySource.arguments.dataExtensionId
           if (detailedJourney.entrySource?.arguments?.dataExtensionId) {
             entryDataExtensionId = detailedJourney.entrySource.arguments.dataExtensionId;
-            console.log(`✅ [SFMC API] Journey "${journey.name}" has entry DE: ${entryDataExtensionId}`);
+            dataExtensionSource = 'entrySource.arguments';
+            console.log(`✅ [SFMC API] Journey "${journey.name}" has entry DE via entrySource: ${entryDataExtensionId}`);
+          }
+          
+          // Method 2: Check event definitions mapping by journey name
+          if (!entryDataExtensionId && journeyToDataExtensionMap.has(journey.name)) {
+            const eventDefMapping = journeyToDataExtensionMap.get(journey.name);
+            entryDataExtensionId = eventDefMapping.dataExtensionId;
+            entryDataExtensionName = eventDefMapping.dataExtensionName;
+            dataExtensionSource = 'eventDefinitions';
+            console.log(`✅ [SFMC API] Journey "${journey.name}" has entry DE via event definitions: ${entryDataExtensionId} (${entryDataExtensionName})`);
+          }
+          
+          // Method 3: Check if entrySource has other data extension references
+          if (!entryDataExtensionId && detailedJourney.entrySource) {
+            // Log the full entrySource for debugging
+            console.log(`🔍 [SFMC API] Journey "${journey.name}" entrySource structure:`, JSON.stringify(detailedJourney.entrySource, null, 2));
+            
+            // Check for other possible locations
+            if (detailedJourney.entrySource.dataExtensionId) {
+              entryDataExtensionId = detailedJourney.entrySource.dataExtensionId;
+              dataExtensionSource = 'entrySource.dataExtensionId';
+              console.log(`✅ [SFMC API] Journey "${journey.name}" has entry DE via entrySource.dataExtensionId: ${entryDataExtensionId}`);
+            }
+          }
+          
+          if (!entryDataExtensionId) {
+            console.log(`⚠️ [SFMC API] Journey "${journey.name}" has no identifiable entry Data Extension`);
           }
           
           return {
@@ -6263,12 +6337,25 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
             version: journey.version,
             entrySource: detailedJourney.entrySource || {},
             entryDataExtensionId: entryDataExtensionId, // Add this for easier relationship building
+            entryDataExtensionName: entryDataExtensionName, // Add name if available
+            dataExtensionSource: dataExtensionSource, // Track which method found the DE
             activities: detailedJourney.activities || [],
             type: 'Journey'
           };
           
         } catch (error) {
           console.warn(`⚠️ [SFMC API] Failed to fetch detailed definition for journey ${journey.name}: ${error.message}`);
+          
+          // Check event definitions mapping even if detailed fetch fails
+          let entryDataExtensionId = null;
+          let entryDataExtensionName = null;
+          if (journeyToDataExtensionMap.has(journey.name)) {
+            const eventDefMapping = journeyToDataExtensionMap.get(journey.name);
+            entryDataExtensionId = eventDefMapping.dataExtensionId;
+            entryDataExtensionName = eventDefMapping.dataExtensionName;
+            console.log(`✅ [SFMC API] Journey "${journey.name}" has entry DE via event definitions (fallback): ${entryDataExtensionId}`);
+          }
+          
           // Return basic journey info if detailed fetch fails
           return {
             id: journey.id,
@@ -6279,7 +6366,9 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
             modifiedDate: journey.modifiedDate,
             version: journey.version,
             entrySource: journey.entrySource || {},
-            entryDataExtensionId: null,
+            entryDataExtensionId: entryDataExtensionId,
+            entryDataExtensionName: entryDataExtensionName,
+            dataExtensionSource: entryDataExtensionId ? 'eventDefinitions-fallback' : null,
             activities: journey.activities || [],
             type: 'Journey'
           };
@@ -6297,7 +6386,17 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
       console.warn(`⚠️ [SFMC API] ${failedCount} journey detail fetches failed`);
     }
     
-    console.log(`✅ [SFMC API] Successfully processed ${processedJourneys.length} Journeys with detailed definitions`);
+    // Log summary of Data Extension mappings found
+    const journeysWithDE = processedJourneys.filter(j => j.entryDataExtensionId);
+    console.log(`✅ [SFMC API] Successfully processed ${processedJourneys.length} Journeys (${journeysWithDE.length} with entry Data Extensions)`);
+    
+    if (journeysWithDE.length > 0) {
+      console.log('📊 [SFMC API] Journeys with entry Data Extensions:');
+      journeysWithDE.forEach(journey => {
+        console.log(`   • ${journey.name}: ${journey.entryDataExtensionId} (${journey.entryDataExtensionName || 'name unknown'}) via ${journey.dataExtensionSource}`);
+      });
+    }
+    
     return processedJourneys;
     
   } catch (error) {
