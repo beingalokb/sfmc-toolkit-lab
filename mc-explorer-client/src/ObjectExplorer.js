@@ -927,7 +927,7 @@ const ObjectExplorer = ({
 
               {/* Metadata Card */}
               {selectedObject.metadata && Object.keys(selectedObject.metadata).filter(key => 
-                !['sfmcLinked', 'createdFromSFMC', 'steps', 'activities', 'targetDataExtensions', 'entrySource'].includes(key)
+                !['sfmcLinked', 'createdFromSFMC', 'steps', 'activities', 'targetDataExtensions', 'entrySource', 'entrySourceType', 'entrySourceDescription', 'entryDataExtensionId', 'entryDataExtensionName', 'dataExtensionSource'].includes(key)
               ).length > 0 && (
                 <div className="detail-card metadata-card">
                   <div className="card-header">
@@ -935,7 +935,7 @@ const ObjectExplorer = ({
                   </div>
                   <div className="metadata-grid">
                     {Object.entries(selectedObject.metadata)
-                      .filter(([key]) => !['sfmcLinked', 'createdFromSFMC', 'steps', 'activities', 'targetDataExtensions', 'entrySource'].includes(key))
+                      .filter(([key]) => !['sfmcLinked', 'createdFromSFMC', 'steps', 'activities', 'targetDataExtensions', 'entrySource', 'entrySourceType', 'entrySourceDescription', 'entryDataExtensionId', 'entryDataExtensionName', 'dataExtensionSource'].includes(key))
                       .map(([key, value]) => (
                         <div key={key} className="metadata-item">
                           <label>{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</label>
