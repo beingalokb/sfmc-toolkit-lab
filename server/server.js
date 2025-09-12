@@ -6254,6 +6254,24 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           dataExtensionName: eventDefinitions[0].dataExtensionName,
           eventDefinitionKey: eventDefinitions[0].eventDefinitionKey
         });
+        
+        // ADDITIONAL DEBUG: Check if our specific journey name is in the event definitions
+        const apiEntryEventDef = eventDefinitions.find(ed => ed.name === 'Journey Builder API Entry Event Demo');
+        if (apiEntryEventDef) {
+          console.log(`🚨 [DEBUG] Found event definition for API Entry Journey:`, {
+            name: apiEntryEventDef.name,
+            id: apiEntryEventDef.id,
+            type: apiEntryEventDef.type,
+            eventType: apiEntryEventDef.eventType,
+            dataExtensionId: apiEntryEventDef.dataExtensionId,
+            dataExtensionName: apiEntryEventDef.dataExtensionName,
+            eventDefinitionKey: apiEntryEventDef.eventDefinitionKey,
+            arguments: apiEntryEventDef.arguments
+          });
+        } else {
+          console.log(`🚨 [DEBUG] NO event definition found for "Journey Builder API Entry Event Demo"`);
+          console.log(`🚨 [DEBUG] Available event definition names:`, eventDefinitions.map(ed => ed.name));
+        }
       }
     } catch (eventDefsError) {
       console.warn('⚠️ [SFMC API] Failed to fetch event definitions:', eventDefsError.message);
@@ -6290,6 +6308,14 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           deId: entrySourceInfo.dataExtensionId,
           deName: entrySourceInfo.dataExtensionName
         });
+        
+        // ADDITIONAL DEBUG: Check if this is our specific journey
+        if (eventDef.name === 'Journey Builder API Entry Event Demo') {
+          console.log(`🚨 [DEBUG] API Entry Journey mapped to entry source:`, {
+            name: eventDef.name,
+            entrySourceInfo: entrySourceInfo
+          });
+        }
         
         if (entrySourceInfo.dataExtensionId) {
           console.log(`🔗 [SFMC API] Mapped journey "${eventDef.name}" to DE: ${entrySourceInfo.dataExtensionId} (${entrySourceInfo.dataExtensionName}) via ${entrySourceInfo.type}`);
