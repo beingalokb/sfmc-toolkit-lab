@@ -363,6 +363,81 @@ const ObjectExplorer = ({
           }
         }
       }
+
+      // SQL Query relationships
+      if (object.category === 'SQL Queries') {
+        // Find source Data Extensions from SQL parsing
+        if (object.metadata?.sourceDataExtensions) {
+          object.metadata.sourceDataExtensions.forEach(sourceDEName => {
+            const sourceDE = Object.values(sfmcObjects).flat().find(de => 
+              de.category === 'Data Extensions' && 
+              (de.name === sourceDEName || de.metadata?.name === sourceDEName)
+            );
+            
+            if (sourceDE) {
+              relationships.push({
+                type: 'incoming',
+                relationship: 'reads from',
+                target: sourceDE.name,
+                targetCategory: 'Data Extensions',
+                description: `Query reads data from: ${sourceDE.name}`,
+                targetId: sourceDE.id
+              });
+            } else {
+              // Add system tables or unmatched tables
+              relationships.push({
+                type: 'incoming',
+                relationship: 'reads from',
+                target: sourceDEName,
+                targetCategory: sourceDEName.startsWith('_') ? 'System Table' : 'Data Extensions',
+                description: `Query reads data from: ${sourceDEName}`,
+                targetId: null // No clickable link for system tables
+              });
+            }
+          });
+        }
+
+        // Find target Data Extension
+        if (object.metadata?.targetDataExtensionName) {
+          const targetDE = Object.values(sfmcObjects).flat().find(de => 
+            de.category === 'Data Extensions' && 
+            (de.name === object.metadata.targetDataExtensionName || de.metadata?.name === object.metadata.targetDataExtensionName)
+          );
+          
+          if (targetDE) {
+            relationships.push({
+              type: 'outgoing',
+              relationship: 'writes to',
+              target: targetDE.name,
+              targetCategory: 'Data Extensions',
+              description: `Query writes data to: ${targetDE.name}`,
+              targetId: targetDE.id
+            });
+          }
+        }
+
+        // Find automations that use this query
+        Object.values(sfmcObjects).flat().forEach(otherObject => {
+          if (otherObject.category === 'Automations' && otherObject.metadata?.steps) {
+            otherObject.metadata.steps.forEach(step => {
+              if (step.activities) {
+                step.activities.forEach(activity => {
+                  if (activity.name === object.name || activity.queryDefinitionId === object.id) {
+                    relationships.push({
+                      type: 'incoming',
+                      relationship: 'executed by automation',
+                      target: otherObject.name,
+                      targetCategory: 'Automations',
+                      description: `Query executed by Automation: ${otherObject.name}`,
+                      targetId: otherObject.id
+                    });
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
     }
     
     // Remove duplicates based on target and relationship type

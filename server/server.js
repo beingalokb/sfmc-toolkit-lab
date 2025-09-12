@@ -5814,6 +5814,78 @@ async function fetchSFMCDataExtensions(accessToken, subdomain) {
 }
 
 /**
+ * Extract source Data Extensions from SQL query text
+ * Looks for table names in FROM and JOIN clauses
+ */
+function extractSourceDataExtensionsFromSQL(sqlText) {
+  if (!sqlText || typeof sqlText !== 'string') {
+    return [];
+  }
+
+  const sourceDataExtensions = [];
+  
+  try {
+    // Convert to uppercase for easier parsing
+    const sql = sqlText.toUpperCase();
+    
+    // Regular expressions to match table names in FROM and JOIN clauses
+    const patterns = [
+      /FROM\s+([^\s,\(\)]+)/gi,           // FROM table_name
+      /JOIN\s+([^\s,\(\)]+)/gi,           // JOIN table_name  
+      /LEFT\s+JOIN\s+([^\s,\(\)]+)/gi,    // LEFT JOIN table_name
+      /RIGHT\s+JOIN\s+([^\s,\(\)]+)/gi,   // RIGHT JOIN table_name
+      /INNER\s+JOIN\s+([^\s,\(\)]+)/gi,   // INNER JOIN table_name
+      /OUTER\s+JOIN\s+([^\s,\(\)]+)/gi    // OUTER JOIN table_name
+    ];
+    
+    patterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(sql)) !== null) {
+        let tableName = match[1].trim();
+        
+        // Remove common SQL keywords and aliases
+        tableName = tableName.replace(/\s+(AS|ON|WHERE|GROUP|ORDER|HAVING).*/i, '');
+        tableName = tableName.replace(/\s+[a-zA-Z_][a-zA-Z0-9_]*$/, ''); // Remove alias
+        
+        // Clean up table name
+        tableName = tableName.replace(/['"`,\[\]]/g, ''); // Remove quotes and brackets
+        tableName = tableName.trim();
+        
+        // Skip if it's a common SQL keyword or function
+        const sqlKeywords = ['SELECT', 'FROM', 'WHERE', 'ORDER', 'GROUP', 'HAVING', 'UNION', 'CASE', 'WHEN'];
+        if (!sqlKeywords.includes(tableName) && tableName.length > 0) {
+          // Convert back to original case for display
+          const originalCase = extractOriginalCaseTableName(sqlText, tableName);
+          if (originalCase && !sourceDataExtensions.includes(originalCase)) {
+            sourceDataExtensions.push(originalCase);
+          }
+        }
+      }
+    });
+    
+    console.log(`🔍 [SQL Parser] Found source tables:`, sourceDataExtensions);
+    
+  } catch (error) {
+    console.warn('⚠️ [SQL Parser] Error parsing SQL:', error.message);
+  }
+  
+  return sourceDataExtensions;
+}
+
+/**
+ * Extract the original case of table name from SQL text
+ */
+function extractOriginalCaseTableName(sqlText, uppercaseTableName) {
+  try {
+    const regex = new RegExp(`\\b${uppercaseTableName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    const match = sqlText.match(regex);
+    return match ? match[0] : uppercaseTableName.toLowerCase();
+  } catch (error) {
+    return uppercaseTableName.toLowerCase();
+  }
+}
+
+/**
  * Fetch SQL Queries from SFMC using SOAP API with enhanced DE relationship detection
  * Uses QueryDefinition object type to get SQL text and target DE information
  */
@@ -5886,11 +5958,15 @@ async function fetchSFMCQueries(accessToken, restEndpoint) {
           const targetDeName = query.DataExtensionTarget?.Name || '';
           const targetDeKey = query.DataExtensionTarget?.CustomerKey || '';
           
+          // Parse SQL to find source Data Extensions
+          const sourceDataExtensions = extractSourceDataExtensionsFromSQL(queryText);
+          
           console.log(`🔍 [SFMC SOAP] Processing query "${queryName}":`, {
             id: queryId,
             targetDE: targetDeName,
             targetKey: targetDeKey,
-            hasQueryText: !!queryText
+            hasQueryText: !!queryText,
+            sourceDEs: sourceDataExtensions
           });
           
           return {
@@ -5903,6 +5979,7 @@ async function fetchSFMCQueries(accessToken, restEndpoint) {
             sqlStatement: queryText,
             targetDataExtensionName: targetDeName,
             targetDataExtensionKey: targetDeKey,
+            sourceDataExtensions: sourceDataExtensions, // Add source DEs
             createdDate: query.CreatedDate,
             modifiedDate: query.ModifiedDate,
             status: query.Status || 'Unknown',
@@ -10592,6 +10669,51 @@ function processSchemaForSFMC(schema, sfmcObjects) {
           });
         });
       });
+    });
+
+    // --- SQL Queries ---
+    (sfmcObjects['SQL Queries'] || []).forEach(query => {
+      const queryNodeId = query.id; // Use original ID
+      pushNode({ id: queryNodeId, type: 'SQL Queries', label: query.name, category: 'SQL Queries', metadata: query });
+
+      // Link to target Data Extension
+      if (query.targetDataExtensionName || query.targetDataExtensionKey) {
+        const targetDEId = query.targetDataExtensionKey || query.targetDataExtensionName;
+        pushNode({
+          id: targetDEId,
+          type: 'Data Extensions',
+          label: query.targetDataExtensionName || 'Target Data Extension',
+          category: 'Data Extensions',
+          metadata: { name: query.targetDataExtensionName, customerKey: query.targetDataExtensionKey }
+        });
+        pushEdge(queryNodeId, targetDEId, 'targets', 'writes to');
+      }
+
+      // Link to source Data Extensions from SQL parsing
+      if (query.sourceDataExtensions && Array.isArray(query.sourceDataExtensions)) {
+        query.sourceDataExtensions.forEach(sourceDEName => {
+          // Try to find matching Data Extension in SFMC objects
+          let sourceDEId = sourceDEName;
+          const matchingDE = sfmcObjects['Data Extensions']?.find(de => 
+            de.name === sourceDEName || 
+            de.customerKey === sourceDEName ||
+            de.externalKey === sourceDEName
+          );
+          
+          if (matchingDE) {
+            sourceDEId = matchingDE.id || matchingDE.customerKey || sourceDEName;
+          }
+
+          pushNode({
+            id: sourceDEId,
+            type: 'Data Extensions',
+            label: sourceDEName,
+            category: 'Data Extensions',
+            metadata: matchingDE || { name: sourceDEName, isSystemTable: sourceDEName.startsWith('_') }
+          });
+          pushEdge(sourceDEId, queryNodeId, 'used_by_query', 'read by');
+        });
+      }
     });
 
     // --- Journeys ---
