@@ -5793,9 +5793,11 @@ async function fetchSFMCDataExtensions(accessToken, subdomain) {
     console.log(`✅ [SFMC API] Found ${dataExtensions.length} Data Extensions`);
     
     return dataExtensions.map(de => ({
-      id: `de_${de.CustomerKey || de.ObjectID}`,
+      id: de.CustomerKey || de.ObjectID, // Use original CustomerKey/ObjectID without prefix
       name: de.Name || 'Unnamed Data Extension',
       externalKey: de.CustomerKey,
+      customerKey: de.CustomerKey, // Keep this for compatibility
+      objectId: de.ObjectID, // Keep ObjectID for reference
       description: de.Description || '',
       createdDate: de.CreatedDate,
       modifiedDate: de.ModifiedDate,
@@ -6097,7 +6099,7 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
                   
                   // Create relationship: Automation → Data Extension (via Query)
                   automationRelationships.push({
-                    id: `${automation.id}-de_${targetDeKey || targetDeName}`,
+                    id: `${automation.id}-${targetDeKey || targetDeName}`,
                     source: automation.id, // Use original ID
                     target: targetDeKey || targetDeName, // Use key or name as identifier
                     type: 'targets',
@@ -6143,7 +6145,7 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
                   
                   // Create relationship: Automation → Data Extension (via Import)
                   automationRelationships.push({
-                    id: `${automation.id}-de_${targetDE.CustomerKey || targetDE.Name}`,
+                    id: `${automation.id}-${targetDE.CustomerKey || targetDE.Name}`,
                     source: automation.id, // Use original ID
                     target: targetDE.CustomerKey || targetDE.Name,
                     type: 'imports',
@@ -6322,6 +6324,8 @@ async function fetchSFMCTriggeredSends(accessToken, subdomain) {
  */
 async function fetchSFMCFilters(accessToken, subdomain) {
   try {
+    console.log('🔍 [SFMC API] Fetching Data Filters...');
+    
     const axios = require('axios');
     const xml2js = require('xml2js');
     
@@ -6350,39 +6354,72 @@ async function fetchSFMCFilters(accessToken, subdomain) {
       </soapenv:Body>
     </soapenv:Envelope>`;
 
+    console.log(`📡 [SFMC API] Making SOAP request for FilterDefinition to: https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`);
+
     const response = await axios.post(`https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`, soapBody, {
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
         'SOAPAction': 'Retrieve'
-      }
+      },
+      timeout: 30000 // 30 second timeout
     });
+
+    console.log('📡 [SFMC API] Data Filters SOAP response received');
 
     const parser = new xml2js.Parser({ explicitArray: false });
     const result = await parser.parseStringPromise(response.data);
     
+    console.log('🔍 [SFMC API] Parsed Data Filters SOAP response');
+    
     const retrieveResponse = result['soap:Envelope']['soap:Body']['RetrieveResponseMsg'];
     const results = retrieveResponse?.Results;
     
-    if (!results) return [];
+    console.log('🔍 [SFMC API] FilterDefinition results:', {
+      hasResults: !!results,
+      resultsType: Array.isArray(results) ? 'array' : typeof results,
+      resultCount: Array.isArray(results) ? results.length : (results ? 1 : 0)
+    });
+    
+    if (!results) {
+      console.log('⚠️ [SFMC API] No Data Filters found in response');
+      return [];
+    }
     
     const filters = Array.isArray(results) ? results : [results];
+    console.log(`📊 [SFMC API] Processing ${filters.length} FilterDefinition objects`);
     
-    return filters.map(filter => ({
-      id: filter.CustomerKey, // Use original CustomerKey instead of fallback prefix
-      name: filter.Name,
-      customerKey: filter.CustomerKey,
-      description: filter.Description || '',
-      createdDate: filter.CreatedDate,
-      modifiedDate: filter.ModifiedDate,
-      type: 'Filter',
-      // Add potential relationship fields
-      dataSourceId: filter.DataSourceID,
-      dataExtensionId: filter.DataExtensionID,
-      objectId: filter.ObjectID
-    }));
+    const processedFilters = filters.map((filter, index) => {
+      console.log(`🔍 [SFMC API] Processing Data Filter ${index + 1}:`, {
+        name: filter.Name,
+        customerKey: filter.CustomerKey,
+        objectId: filter.ObjectID,
+        dataSourceId: filter.DataSourceID,
+        dataExtensionId: filter.DataExtensionID
+      });
+      
+      return {
+        id: filter.CustomerKey || filter.ObjectID || `filter_${index}`, // Use original CustomerKey or ObjectID
+        name: filter.Name,
+        customerKey: filter.CustomerKey,
+        description: filter.Description || '',
+        createdDate: filter.CreatedDate,
+        modifiedDate: filter.ModifiedDate,
+        type: 'Filter',
+        // Add potential relationship fields
+        dataSourceId: filter.DataSourceID,
+        dataExtensionId: filter.DataExtensionID,
+        objectId: filter.ObjectID
+      };
+    });
+    
+    console.log(`✅ [SFMC API] Successfully processed ${processedFilters.length} Data Filters`);
+    return processedFilters;
     
   } catch (error) {
-    console.error('❌ [SFMC API] Error fetching Filters:', error.message);
+    console.error('❌ [SFMC API] Error fetching Data Filters:', error.message);
+    if (error.response?.data) {
+      console.error('❌ [SFMC API] Data Filters Response data:', error.response.data.substring(0, 500));
+    }
     throw error;
   }
 }
@@ -7345,8 +7382,8 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
           // 🆕 Create a stub DE entry for relationship tracking even if the full DE wasn't fetched
           console.log(`📊 [Activity Debug] DE not found in fetched data, creating stub for relationship tracking: ${targetDE.name || targetDE.key || targetDE.id}`);
           
-          // Use the same ID format as SFMC Data Extensions (de_KEY format)
-          const stubDeId = targetDE.key ? `de_${targetDE.key}` : (targetDE.id ? `de_${targetDE.id}` : `de_${targetDE.name?.replace(/\s+/g, '-').toLowerCase()}`);
+          // Use the same ID format as SFMC Data Extensions (original key/ID format)
+          const stubDeId = targetDE.key || targetDE.id || targetDE.name?.replace(/\s+/g, '-').toLowerCase();
           
           const stubDe = {
             id: stubDeId,
@@ -7495,7 +7532,7 @@ function detectActivityToAssetRelationships(activityId, activity, activityType, 
           // Create a stub DE entry for relationship tracking even if the full DE wasn't fetched
           console.log(`📊 [FilterActivity] DE not found in fetched data, creating stub for relationship tracking: ${targetDE.name || targetDE.key || targetDE.id}`);
           
-          const stubDeId = targetDE.key ? `de_${targetDE.key}` : (targetDE.id ? `de_${targetDE.id}` : `de_${targetDE.name?.replace(/\s+/g, '-').toLowerCase()}`);
+          const stubDeId = targetDE.key || targetDE.id || targetDE.name?.replace(/\s+/g, '-').toLowerCase();
           
           const stubDe = {
             id: stubDeId,
@@ -11053,7 +11090,7 @@ app.get('/api/schema/templates', (req, res) => {
         schema: {
           nodes: [
             {
-              id: 'de_entry',
+              id: 'entry_event',
               type: 'Data Extensions',
               label: 'Entry Event',
               x: 50,
@@ -11096,7 +11133,7 @@ app.get('/api/schema/templates', (req, res) => {
           edges: [
             {
               id: 'edge1',
-              source: 'de_entry',
+              source: 'entry_event',
               target: 'journey1',
               label: 'entry event'
             },
@@ -11128,7 +11165,7 @@ app.get('/api/schema/templates', (req, res) => {
         schema: {
           nodes: [
             {
-              id: 'de_source',
+              id: 'source_data',
               type: 'Data Extensions',
               label: 'Source Data',
               x: 50,
@@ -11152,7 +11189,7 @@ app.get('/api/schema/templates', (req, res) => {
               category: 'Automations'
             },
             {
-              id: 'de_target',
+              id: 'segmented_data',
               type: 'Data Extensions',
               label: 'Segmented Data',
               x: 500,
@@ -11163,7 +11200,7 @@ app.get('/api/schema/templates', (req, res) => {
           edges: [
             {
               id: 'edge1',
-              source: 'de_source',
+              source: 'source_data',
               target: 'filter1',
               label: 'filters'
             },
@@ -11176,7 +11213,7 @@ app.get('/api/schema/templates', (req, res) => {
             {
               id: 'edge3',
               source: 'auto1',
-              target: 'de_target',
+              target: 'segmented_data',
               label: 'outputs to'
             }
           ]
