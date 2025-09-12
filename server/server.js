@@ -10661,6 +10661,18 @@ function processSchemaForSFMC(schema, sfmcObjects) {
       });
     };
 
+    // --- Data Extensions ---
+    (sfmcObjects['Data Extensions'] || []).forEach(de => {
+      const deNodeId = de.id; // Use original ID (CustomerKey or ObjectID)
+      pushNode({ 
+        id: deNodeId, 
+        type: 'Data Extensions', 
+        label: de.name, 
+        category: 'Data Extensions', 
+        metadata: de 
+      });
+    });
+
     // --- Automations + Activities ---
     (sfmcObjects['Automations'] || []).forEach(auto => {
       const autoNodeId = auto.id; // Use original ID
@@ -10793,6 +10805,24 @@ function processSchemaForSFMC(schema, sfmcObjects) {
     (sfmcObjects['Data Extracts'] || []).forEach(dx => {
       const dxNodeId = dx.id; // Use original ID
       pushNode({ id: dxNodeId, type: 'Data Extracts', label: dx.name, category: 'Data Extracts', metadata: dx });
+    });
+
+    // --- Data Filters ---
+    (sfmcObjects['Data Filters'] || []).forEach(filter => {
+      const filterNodeId = filter.id; // Use original ID
+      pushNode({ 
+        id: filterNodeId, 
+        type: 'Data Filters', 
+        label: filter.name, 
+        category: 'Data Filters', 
+        metadata: filter 
+      });
+      
+      // Link to source Data Extension if available
+      if (filter.dataExtensionId || filter.dataSourceId) {
+        const sourceDeId = filter.dataExtensionId || filter.dataSourceId;
+        pushEdge(filterNodeId, sourceDeId, 'filters', 'filters data from');
+      }
     });
 
     console.log(`✅ [Schema] Processed ${nodes.length} nodes and ${edges.length} edges`);
