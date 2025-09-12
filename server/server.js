@@ -6459,7 +6459,22 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
             dataExtensionSource
           });
           
-          return {
+          // ADDITIONAL DEBUG: Check if the specific API Entry Journey
+          if (journey.name === 'Journey Builder API Entry Event Demo') {
+            console.log(`🚨 [DEBUG] API Entry Journey DETAILED CHECK:`, {
+              journeyName: journey.name,
+              entrySourceType: entrySourceType,
+              entrySourceDescription: entrySourceDescription,
+              entryDataExtensionId: entryDataExtensionId,
+              entryDataExtensionName: entryDataExtensionName,
+              dataExtensionSource: dataExtensionSource,
+              detailedJourneyEntrySource: JSON.stringify(detailedJourney.entrySource, null, 2),
+              journeyToEntrySourceMapHasThis: journeyToEntrySourceMap.has(journey.name),
+              availableEventDefinitionNames: Array.from(journeyToEntrySourceMap.keys())
+            });
+          }
+          
+          const returnObject = {
             id: journey.id, // Use original ID
             name: journey.name || 'Unnamed Journey',
             description: journey.description || '',
@@ -6476,6 +6491,20 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
             activities: detailedJourney.activities || [],
             type: 'Journey'
           };
+          
+          // ADDITIONAL DEBUG: Check what's being returned for the specific API Entry Journey
+          if (journey.name === 'Journey Builder API Entry Event Demo') {
+            console.log(`🚨 [DEBUG] API Entry Journey RETURN OBJECT:`, {
+              id: returnObject.id,
+              name: returnObject.name,
+              entrySourceType: returnObject.entrySourceType,
+              entrySourceDescription: returnObject.entrySourceDescription,
+              entryDataExtensionId: returnObject.entryDataExtensionId,
+              dataExtensionSource: returnObject.dataExtensionSource
+            });
+          }
+          
+          return returnObject;
           
         } catch (error) {
           console.warn(`⚠️ [SFMC API] Failed to fetch detailed definition for journey ${journey.name}: ${error.message}`);
@@ -6538,7 +6567,7 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           }
           
           // Return basic journey info if detailed fetch fails
-          return {
+          const fallbackReturnObject = {
             id: journey.id,
             name: journey.name || 'Unnamed Journey',
             description: journey.description || '',
@@ -6555,6 +6584,20 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
             activities: journey.activities || [],
             type: 'Journey'
           };
+          
+          // ADDITIONAL DEBUG: Check what's being returned for the specific API Entry Journey (fallback)
+          if (journey.name === 'Journey Builder API Entry Event Demo') {
+            console.log(`🚨 [DEBUG] API Entry Journey FALLBACK RETURN OBJECT:`, {
+              id: fallbackReturnObject.id,
+              name: fallbackReturnObject.name,
+              entrySourceType: fallbackReturnObject.entrySourceType,
+              entrySourceDescription: fallbackReturnObject.entrySourceDescription,
+              entryDataExtensionId: fallbackReturnObject.entryDataExtensionId,
+              dataExtensionSource: fallbackReturnObject.dataExtensionSource
+            });
+          }
+          
+          return fallbackReturnObject;
         }
       })
     );
