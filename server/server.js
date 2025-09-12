@@ -6265,6 +6265,9 @@ async function fetchSFMCFilters(accessToken, subdomain) {
             <Properties>Description</Properties>
             <Properties>CreatedDate</Properties>
             <Properties>ModifiedDate</Properties>
+            <Properties>DataSourceID</Properties>
+            <Properties>DataExtensionID</Properties>
+            <Properties>DataSource</Properties>
           </RetrieveRequest>
         </RetrieveRequestMsg>
       </soapenv:Body>
@@ -6288,13 +6291,17 @@ async function fetchSFMCFilters(accessToken, subdomain) {
     const filters = Array.isArray(results) ? results : [results];
     
     return filters.map(filter => ({
-      id: `filter_${filter.CustomerKey}`,
+      id: filter.CustomerKey || `filter_${filter.CustomerKey}`,
       name: filter.Name,
       customerKey: filter.CustomerKey,
       description: filter.Description || '',
       createdDate: filter.CreatedDate,
       modifiedDate: filter.ModifiedDate,
-      type: 'Filter'
+      type: 'Filter',
+      // Add potential relationship fields
+      dataSourceId: filter.DataSourceID,
+      dataExtensionId: filter.DataExtensionID,
+      objectId: filter.ObjectID
     }));
     
   } catch (error) {
@@ -10456,17 +10463,27 @@ function processSchemaForSFMC(schema, sfmcObjects) {
     console.log('🆕 [Schema] Creating nodes from SFMC objects (empty schema)');
     
     let nodeCounter = 0;
+    const createdNodeIds = new Set(); // Track created node IDs to prevent duplicates
+    
     Object.entries(sfmcObjects).forEach(([category, objects]) => {
       if (objects && Array.isArray(objects)) {
         objects.forEach((obj, index) => { // Show ALL objects, not just 20
-          const nodeId = `${category.toLowerCase().replace(/\s+/g, '_')}_${obj.id || obj.customerKey || index}`;
+          // Use the original object ID to prevent duplicates
+          const nodeId = obj.id || obj.customerKey || `${category.toLowerCase().replace(/\s+/g, '_')}_${index}`;
+          
+          // Skip if we've already created this node
+          if (createdNodeIds.has(nodeId)) {
+            console.log(`⚠️ [Schema] Skipping duplicate node: ${nodeId}`);
+            return;
+          }
+          createdNodeIds.add(nodeId);
           
           // Use same grid layout as frontend fallback
           const x = 50 + (nodeCounter % 10) * 150;
           const y = 50 + Math.floor(nodeCounter / 10) * 100;
           
           const node = {
-            id: nodeId,
+            id: nodeId, // Use original ID instead of prefixed version
             type: category,
             label: obj.name || obj.label || `${category} ${index + 1}`,
             category: category,
@@ -10481,7 +10498,7 @@ function processSchemaForSFMC(schema, sfmcObjects) {
           processedSchema.nodes.push(node);
           nodeCounter++;
         });
-        console.log(`🆕 [Schema] Created ${objects.length} nodes from ${category}`);
+        console.log(`🆕 [Schema] Created ${objects.length} unique nodes from ${category}`);
       }
     });
   }

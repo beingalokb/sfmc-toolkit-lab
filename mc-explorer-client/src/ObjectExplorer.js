@@ -8,6 +8,7 @@ const ObjectExplorer = ({
   const [sfmcObjects, setSfmcObjects] = useState({});
   const [filteredObjects, setFilteredObjects] = useState({});
   const [selectedObject, setSelectedObject] = useState(null);
+  const [navigationHistory, setNavigationHistory] = useState([]); // Track navigation history
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -300,6 +301,68 @@ const ObjectExplorer = ({
           }
         });
       }
+
+      // Data Filter relationships
+      if (object.category === 'Data Filters') {
+        // Find automations that use this filter
+        Object.values(sfmcObjects).flat().forEach(otherObject => {
+          if (otherObject.category === 'Automations' && otherObject.metadata?.steps) {
+            otherObject.metadata.steps.forEach(step => {
+              if (step.activities) {
+                step.activities.forEach(activity => {
+                  // Check if activity references this filter
+                  if (activity.filterDefinitionId === object.id || 
+                      activity.filterName === object.name ||
+                      (activity.properties && activity.properties.filterDefinitionId === object.id)) {
+                    relationships.push({
+                      type: 'incoming',
+                      relationship: 'used by automation',
+                      target: otherObject.name,
+                      targetCategory: 'Automations',
+                      description: `Filter used by Automation: ${otherObject.name}`,
+                      targetId: otherObject.id
+                    });
+                  }
+                });
+              }
+            });
+          }
+          
+          // Find journeys that use this filter
+          if (otherObject.category === 'Journeys' && otherObject.metadata?.goals) {
+            otherObject.metadata.goals.forEach(goal => {
+              if (goal.filterDefinitionId === object.id || goal.filterName === object.name) {
+                relationships.push({
+                  type: 'incoming',
+                  relationship: 'used by journey',
+                  target: otherObject.name,
+                  targetCategory: 'Journeys',
+                  description: `Filter used by Journey: ${otherObject.name}`,
+                  targetId: otherObject.id
+                });
+              }
+            });
+          }
+        });
+        
+        // Check if this filter is based on a Data Extension
+        if (object.metadata?.dataSourceId || object.metadata?.dataExtensionId) {
+          const sourceDE = Object.values(sfmcObjects).flat().find(de => 
+            de.category === 'Data Extensions' && 
+            (de.id === object.metadata.dataSourceId || de.id === object.metadata.dataExtensionId)
+          );
+          if (sourceDE) {
+            relationships.push({
+              type: 'outgoing',
+              relationship: 'filters data from',
+              target: sourceDE.name,
+              targetCategory: 'Data Extensions',
+              description: `Filters data from Data Extension: ${sourceDE.name}`,
+              targetId: sourceDE.id
+            });
+          }
+        }
+      }
     }
     
     // Remove duplicates based on target and relationship type
@@ -377,7 +440,11 @@ const ObjectExplorer = ({
                       <div
                         key={object.id}
                         className={`object-item ${selectedObject?.id === object.id ? 'selected' : ''}`}
-                        onClick={() => setSelectedObject(object)}
+                        onClick={() => {
+                          // Clear navigation history when selecting from left panel
+                          setNavigationHistory([]);
+                          setSelectedObject(object);
+                        }}
                       >
                         <div className="object-name">{object.name}</div>
                         <div className="object-id">{object.id}</div>
@@ -398,6 +465,43 @@ const ObjectExplorer = ({
         <div className="right-panel">
           {selectedObject ? (
             <div className="object-details">
+              {/* Navigation Breadcrumbs */}
+              {navigationHistory.length > 0 && (
+                <div className="navigation-breadcrumbs">
+                  <div className="breadcrumb-trail">
+                    {navigationHistory.map((historyItem, index) => (
+                      <span key={index}>
+                        <button 
+                          className="breadcrumb-link"
+                          onClick={() => {
+                            // Go back to this point in history
+                            const newHistory = navigationHistory.slice(0, index);
+                            setNavigationHistory(newHistory);
+                            setSelectedObject(historyItem);
+                          }}
+                        >
+                          {historyItem.name}
+                        </button>
+                        <span className="breadcrumb-separator"> → </span>
+                      </span>
+                    ))}
+                    <span className="current-object">{selectedObject.name}</span>
+                  </div>
+                  <button 
+                    className="back-button"
+                    onClick={() => {
+                      if (navigationHistory.length > 0) {
+                        const previous = navigationHistory[navigationHistory.length - 1];
+                        setNavigationHistory(prev => prev.slice(0, -1));
+                        setSelectedObject(previous);
+                      }
+                    }}
+                  >
+                    ← Back
+                  </button>
+                </div>
+              )}
+
               {/* Header Card */}
               <div className="detail-card header-card">
                 <div className="card-header">
@@ -456,6 +560,8 @@ const ObjectExplorer = ({
                                 obj.id === rel.targetId || obj.name === rel.target
                               );
                               if (relatedObject) {
+                                // Add current object to navigation history
+                                setNavigationHistory(prev => [...prev, selectedObject]);
                                 setSelectedObject(relatedObject);
                               }
                             }}
