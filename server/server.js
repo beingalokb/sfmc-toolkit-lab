@@ -6396,29 +6396,54 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
             if (detailedJourney.entrySource) {
               console.log(`🔍 [SFMC API] Journey "${journey.name}" entrySource for type detection:`, JSON.stringify(detailedJourney.entrySource, null, 2));
               
-              // Check various possible locations for entry source type
-              const possibleType = detailedJourney.entrySource.type || 
-                                   detailedJourney.entrySource.eventType ||
-                                   detailedJourney.entrySource.sourceType;
+              // First check for entryMode (most reliable)
+              let possibleType = detailedJourney.entryMode || 
+                                detailedJourney.entrySource.entryMode ||
+                                detailedJourney.entrySource.mode;
+              
+              // If no entryMode, check other possible locations for entry source type
+              if (!possibleType) {
+                possibleType = detailedJourney.entrySource.type || 
+                              detailedJourney.entrySource.eventType ||
+                              detailedJourney.entrySource.sourceType;
+              }
               
               if (possibleType) {
-                entrySourceType = possibleType;
-                console.log(`✅ [SFMC API] Journey "${journey.name}" entry source type from entrySource: ${entrySourceType}`);
-                
-                // Set appropriate description
-                switch(entrySourceType) {
-                  case 'APIEvent':
+                // Normalize the entry source type
+                switch(possibleType.toLowerCase()) {
+                  case 'apievent':
+                  case 'api event':
+                  case 'api':
+                    entrySourceType = 'APIEvent';
                     entrySourceDescription = 'API Event Entry Source';
                     break;
-                  case 'SalesforceDataEvent':
+                  case 'salesforcedataevent':
+                  case 'salesforce data event':
+                  case 'salesforce':
+                    entrySourceType = 'SalesforceDataEvent'; 
                     entrySourceDescription = 'Salesforce Data Event Entry Source';
                     break;
-                  case 'EmailAudience':
-                    entrySourceDescription = 'Email Audience Entry Source';
+                  case 'audience':
+                  case 'emailaudience':
+                  case 'email audience':
+                    entrySourceType = 'Audience';
+                    entrySourceDescription = 'Audience Entry Source';
+                    break;
+                  case 'mobileconnect':
+                  case 'mobile connect':
+                    entrySourceType = 'MobileConnect';
+                    entrySourceDescription = 'Mobile Connect Entry Source';
+                    break;
+                  case 'mobilepush':
+                  case 'mobile push':
+                    entrySourceType = 'MobilePush';
+                    entrySourceDescription = 'Mobile Push Entry Source';
                     break;
                   default:
-                    entrySourceDescription = `${entrySourceType} Entry Source`;
+                    entrySourceType = possibleType;
+                    entrySourceDescription = `${possibleType} Entry Source`;
                 }
+                console.log(`✅ [SFMC API] Journey "${journey.name}" entry source type from ${detailedJourney.entryMode ? 'entryMode' : 'entrySource'}: ${entrySourceType}`);
               } else {
                 // Last resort fallback based on entrySource structure
                 if (detailedJourney.entrySource.arguments && !detailedJourney.entrySource.arguments.dataExtensionId) {
@@ -6494,7 +6519,9 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
               entryDataExtensionId: entryDataExtensionId,
               entryDataExtensionName: entryDataExtensionName,
               dataExtensionSource: dataExtensionSource,
+              detailedJourneyEntryMode: detailedJourney.entryMode,
               detailedJourneyEntrySource: JSON.stringify(detailedJourney.entrySource, null, 2),
+              detailedJourneyKeys: Object.keys(detailedJourney),
               journeyToEntrySourceMapHasThis: journeyToEntrySourceMap.has(journey.name),
               availableEventDefinitionNames: Array.from(journeyToEntrySourceMap.keys())
             });
@@ -6512,14 +6539,20 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
               entrySourceDescription = 'Data Extension Entry Source';
               console.log(`🛡️ [SFMC API] Safety fallback: Journey "${journey.name}" set to DE-based (has DE ID)`);
             } else {
-              entrySourceType = 'Unknown';
-              entrySourceDescription = 'Unknown Entry Source';
-              console.log(`🛡️ [SFMC API] Safety fallback: Journey "${journey.name}" set to Unknown`);
+              entrySourceType = 'APIEvent'; // Default to API Event instead of Unknown for better UX
+              entrySourceDescription = 'API Event Entry Source (default)';
+              console.log(`🛡️ [SFMC API] Safety fallback: Journey "${journey.name}" set to API Event (default)`);
             }
           }
           
           if (entrySourceDescription === null || entrySourceDescription === undefined) {
-            entrySourceDescription = entrySourceType === 'APIEvent' ? 'API Event Entry Source' : `${entrySourceType} Entry Source`;
+            if (entrySourceType === 'APIEvent') {
+              entrySourceDescription = 'API Event Entry Source';
+            } else if (entryDataExtensionId) {
+              entrySourceDescription = 'Data Extension Entry Source';
+            } else {
+              entrySourceDescription = `${entrySourceType} Entry Source`;
+            }
             console.log(`🛡️ [SFMC API] Safety fallback: Journey "${journey.name}" description set to "${entrySourceDescription}"`);
           }
           
@@ -6627,14 +6660,20 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
               entrySourceDescription = 'Data Extension Entry Source';
               console.log(`🛡️ [SFMC API] Fallback safety: Journey "${journey.name}" set to DE-based (has DE ID)`);
             } else {
-              entrySourceType = 'Unknown';
-              entrySourceDescription = 'Unknown Entry Source';
-              console.log(`🛡️ [SFMC API] Fallback safety: Journey "${journey.name}" set to Unknown`);
+              entrySourceType = 'APIEvent'; // Default to API Event instead of Unknown for better UX
+              entrySourceDescription = 'API Event Entry Source (default)';
+              console.log(`🛡️ [SFMC API] Fallback safety: Journey "${journey.name}" set to API Event (default)`);
             }
           }
           
           if (entrySourceDescription === null || entrySourceDescription === undefined) {
-            entrySourceDescription = entrySourceType === 'APIEvent' ? 'API Event Entry Source' : `${entrySourceType} Entry Source`;
+            if (entrySourceType === 'APIEvent') {
+              entrySourceDescription = 'API Event Entry Source';
+            } else if (entryDataExtensionId) {
+              entrySourceDescription = 'Data Extension Entry Source';
+            } else {
+              entrySourceDescription = `${entrySourceType} Entry Source`;
+            }
             console.log(`🛡️ [SFMC API] Fallback safety: Journey "${journey.name}" description set to "${entrySourceDescription}"`);
           }
           
