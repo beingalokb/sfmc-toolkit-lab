@@ -10455,17 +10455,23 @@ function processSchemaForSFMC(schema, sfmcObjects) {
     // Create nodes from SFMC objects when schema is empty
     console.log('🆕 [Schema] Creating nodes from SFMC objects (empty schema)');
     
+    let nodeCounter = 0;
     Object.entries(sfmcObjects).forEach(([category, objects]) => {
       if (objects && Array.isArray(objects)) {
         objects.slice(0, 20).forEach((obj, index) => { // Limit to 20 per category to avoid overwhelming
           const nodeId = `${category.toLowerCase().replace(/\s+/g, '_')}_${obj.id || obj.customerKey || index}`;
+          
+          // Use same grid layout as frontend fallback
+          const x = 50 + (nodeCounter % 10) * 150;
+          const y = 50 + Math.floor(nodeCounter / 10) * 100;
+          
           const node = {
             id: nodeId,
             type: category,
             label: obj.name || obj.label || `${category} ${index + 1}`,
             category: category,
-            x: 100 + (index % 5) * 150, // Arrange in grid
-            y: 100 + Math.floor(index / 5) * 100,
+            x: x,
+            y: y,
             metadata: {
               ...obj,
               sfmcLinked: true,
@@ -10473,6 +10479,7 @@ function processSchemaForSFMC(schema, sfmcObjects) {
             }
           };
           processedSchema.nodes.push(node);
+          nodeCounter++;
         });
         console.log(`🆕 [Schema] Created ${Math.min(objects.length, 20)} nodes from ${category}`);
       }
@@ -10498,6 +10505,12 @@ function processSchemaForSFMC(schema, sfmcObjects) {
 
     const pushNode = (node) => {
       if (!nodeIndex.has(node.id)) {
+        // Assign coordinates if missing
+        if (node.x === undefined || node.y === undefined) {
+          const currentNodeCount = nodes.length;
+          node.x = 50 + (currentNodeCount % 10) * 150;
+          node.y = 50 + Math.floor(currentNodeCount / 10) * 100;
+        }
         nodes.push(node);
         nodeIndex.set(node.id, node);
       }

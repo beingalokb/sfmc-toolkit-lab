@@ -187,23 +187,36 @@ const SchemaBuilder = ({
             const s = schema.nodes.find(n => n.id === edge.source);
             const t = schema.nodes.find(n => n.id === edge.target);
             if (!s || !t) return null;
+            
+            // Safe coordinates with fallback to grid layout
+            const sIdx = schema.nodes.findIndex(n => n.id === s.id);
+            const tIdx = schema.nodes.findIndex(n => n.id === t.id);
+            const safeS = {
+              x: s.x ?? (50 + (sIdx % 10) * 150),
+              y: s.y ?? (50 + Math.floor(sIdx / 10) * 100)
+            };
+            const safeT = {
+              x: t.x ?? (50 + (tIdx % 10) * 150), 
+              y: t.y ?? (50 + Math.floor(tIdx / 10) * 100)
+            };
+            
             return (
               <g key={edge.id}>
                 <line
-                  x1={s.x + 50} y1={s.y + 25}
-                  x2={t.x + 50} y2={t.y + 25}
+                  x1={safeS.x + 60} y1={safeS.y + 25}
+                  x2={safeT.x + 60} y2={safeT.y + 25}
                   stroke="#666" strokeWidth="2" markerEnd="url(#arrowhead)"
                 />
                 <text
-                  x={(s.x + t.x) / 2 + 50}
-                  y={(s.y + t.y) / 2 + 20}
+                  x={(safeS.x + safeT.x) / 2 + 60}
+                  y={(safeS.y + safeT.y) / 2 + 20}
                   fill="#333" fontSize="11" textAnchor="middle"
                 >
                   {edge.label}
                 </text>
                 <circle
-                  cx={(s.x + t.x) / 2 + 50}
-                  cy={(s.y + t.y) / 2 + 25}
+                  cx={(safeS.x + safeT.x) / 2 + 60}
+                  cy={(safeS.y + safeT.y) / 2 + 25}
                   r="6"
                   fill="red" opacity="0.7"
                   onClick={() => deleteEdge(edge.id)}
@@ -215,24 +228,30 @@ const SchemaBuilder = ({
           })}
 
           {/* Nodes */}
-          {schema.nodes.map(node => (
-            <g key={node.id}>
-              <rect
-                x={node.x} y={node.y}
-                width="120" height="50"
-                fill={selectedNode?.id === node.id ? '#e3f2fd' : '#f5f5f5'}
-                stroke={selectedNode?.id === node.id ? '#2196f3' : '#ccc'}
-                strokeWidth="2" rx="6"
-                onClick={(e) => handleNodeClick(node, e)}
-              />
-              <text x={node.x + 60} y={node.y + 25} textAnchor="middle" dominantBaseline="middle" fontSize="12">
-                {node.label.length > 20 ? node.label.substring(0, 20) + '…' : node.label}
-              </text>
-              <text x={node.x + 60} y={node.y + 42} textAnchor="middle" fontSize="9" fill="#666">
-                {node.type}
-              </text>
-            </g>
-          ))}
+          {schema.nodes.map((node, idx) => {
+            // Safe coordinates with fallback to grid layout
+            const x = node.x ?? (50 + (idx % 10) * 150);
+            const y = node.y ?? (50 + Math.floor(idx / 10) * 100);
+            
+            return (
+              <g key={node.id}>
+                <rect
+                  x={x} y={y}
+                  width="120" height="50"
+                  fill={selectedNode?.id === node.id ? '#e3f2fd' : '#f5f5f5'}
+                  stroke={selectedNode?.id === node.id ? '#2196f3' : '#ccc'}
+                  strokeWidth="2" rx="6"
+                  onClick={(e) => handleNodeClick(node, e)}
+                />
+                <text x={x + 60} y={y + 25} textAnchor="middle" dominantBaseline="middle" fontSize="12">
+                  {node.label.length > 20 ? node.label.substring(0, 20) + '…' : node.label}
+                </text>
+                <text x={x + 60} y={y + 42} textAnchor="middle" fontSize="9" fill="#666">
+                  {node.type}
+                </text>
+              </g>
+            );
+          })}
 
           <defs>
             <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
