@@ -24,32 +24,36 @@ const SchemaBuilder = ({
   // --- Call backend to process SFMC relationships ---
   const loadFromSFMC = async () => {
     try {
-      const storedSubdomain = localStorage.getItem('subdomain');
-      const headers = {
-        'Content-Type': 'application/json'
-      };
+      const storedSubdomain = subdomain || localStorage.getItem('subdomain');
+      const storedAccessToken = accessToken || localStorage.getItem('accessToken');
       
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
-      
-      if (storedSubdomain) {
-        headers['x-mc-subdomain'] = storedSubdomain;
-      }
-      
-      console.log('🔄 [Frontend] Calling schema/process with headers:', { 
-        hasToken: !!accessToken, 
+      console.log('🔄 [Frontend] Calling schema/process with credentials:', { 
+        hasToken: !!storedAccessToken, 
+        tokenLength: storedAccessToken ? storedAccessToken.length : 0,
         subdomain: storedSubdomain || 'not found' 
       });
 
       const response = await fetch('/api/schema/process', {
         method: 'POST',
-        headers,
-        body: JSON.stringify({ schema: { nodes: [], edges: [] } })
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          schema: { nodes: [], edges: [] },
+          accessToken: storedAccessToken,
+          subdomain: storedSubdomain
+        })
       });
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
+
+      console.log('📥 [Frontend] Backend response:', { 
+        success: data.success, 
+        nodes: data.schema?.nodes?.length || 0, 
+        edges: data.schema?.edges?.length || 0,
+        error: data.error 
+      });
 
       if (data.success) {
         console.log('✅ [Frontend] Schema loaded successfully:', { 

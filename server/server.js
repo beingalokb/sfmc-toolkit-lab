@@ -10659,13 +10659,9 @@ app.post('/api/schema/process', async (req, res) => {
   try {
     console.log('🔄 [Schema API] Processing schema with SFMC integration');
     
-    const { schema } = req.body;
+    const { schema, accessToken, subdomain } = req.body;
     console.log('📊 [Schema API] Input schema:', { nodes: schema?.nodes?.length || 0, edges: schema?.edges?.length || 0 });
-    
-    // Get access token and subdomain from session or headers
-    const accessToken = getAccessTokenFromRequest(req);
-    const subdomain = getSubdomainFromRequest(req);
-    console.log('🔑 [Schema API] Authentication:', { 
+    console.log('🔑 [Schema API] Authentication from body:', { 
       hasToken: !!accessToken, 
       tokenLength: accessToken ? accessToken.length : 0,
       subdomain: subdomain || 'not provided' 
@@ -10699,18 +10695,53 @@ app.post('/api/schema/process', async (req, res) => {
           queries: sfmcObjects['SQL Queries']?.length || 0,
           filters: sfmcObjects['Filters']?.length || 0,
           fileTransfers: sfmcObjects['File Transfers']?.length || 0,
-          dataExtracts: sfmcObjects['Data Extracts']?.length || 0
+          dataExtracts: sfmcObjects['Data Extracts']?.length || 0,
+          totalCategories: Object.keys(sfmcObjects).length
+        });
+        
+        // Additional detailed logging for debugging
+        Object.entries(sfmcObjects).forEach(([category, objects]) => {
+          if (objects && objects.length > 0) {
+            console.log(`📊 [Schema API] ${category} sample:`, {
+              count: objects.length,
+              firstItem: objects[0] ? { id: objects[0].id, name: objects[0].name } : 'none'
+            });
+          }
         });
       } else {
         console.log('⚠️ [Schema API] No authentication available, processing schema without SFMC linking');
+        console.log('🔍 [Schema API] Missing credentials:', { 
+          accessToken: accessToken ? 'provided' : 'missing',
+          subdomain: subdomain ? 'provided' : 'missing'
+        });
       }
     } catch (error) {
       console.warn('⚠️ [Schema API] Could not fetch SFMC objects, processing without linking:', error.message);
+      console.error('🔍 [Schema API] SFMC fetch error details:', error);
     }
     
     // Process schema with SFMC integration
     const processedSchema = processSchemaForSFMC(schema, sfmcObjects);
     
+    console.log('🎯 [Schema API] Final processed schema:', {
+      inputNodes: schema?.nodes?.length || 0,
+      inputEdges: schema?.edges?.length || 0,
+      outputNodes: processedSchema.nodes.length,
+      outputEdges: processedSchema.edges.length,
+      sfmcLinked: processedSchema.nodes.filter(n => n.metadata?.sfmcLinked).length,
+      autoCreated: processedSchema.nodes.filter(n => n.metadata?.createdFromSFMC).length
+    });
+    
+    if (processedSchema.nodes.length === 0) {
+      console.warn('⚠️ [Schema API] WARNING: No nodes in processed schema!');
+      console.log('🔍 [Schema API] Debug info:', {
+        sfmcObjectKeys: Object.keys(sfmcObjects),
+        sfmcObjectCounts: Object.entries(sfmcObjects).map(([k, v]) => `${k}: ${v?.length || 0}`),
+        inputSchemaValid: !!schema,
+        inputSchemaHasNodes: !!(schema?.nodes)
+      });
+    }
+
     res.json({
       success: true,
       schema: processedSchema,
