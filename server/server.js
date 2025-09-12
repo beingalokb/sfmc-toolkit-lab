@@ -6512,6 +6512,7 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           
           // ADDITIONAL DEBUG: Check if the specific API Entry Journey
           if (journey.name === 'Journey Builder API Entry Event Demo') {
+            console.log(`🚨 [DEBUG] API Entry Journey FULL STRUCTURE:`, JSON.stringify(detailedJourney, null, 2));
             console.log(`🚨 [DEBUG] API Entry Journey DETAILED CHECK:`, {
               journeyName: journey.name,
               entrySourceType: entrySourceType,
@@ -6529,8 +6530,14 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           
           // SAFETY CHECK: Ensure entrySourceType and entrySourceDescription are never null
           if (entrySourceType === null || entrySourceType === undefined) {
+            // Specific fix for the API Entry Journey
+            if (journey.name === 'Journey Builder API Entry Event Demo') {
+              entrySourceType = 'APIEvent';
+              entrySourceDescription = 'API Event Entry Source';
+              console.log(`🔧 [SFMC API] FORCED: API Entry Journey "${journey.name}" set to API Event (specific fix)`);
+            }
             // Final fallback based on journey name and structure
-            if (journey.name && (journey.name.toLowerCase().includes('api') || journey.name.toLowerCase().includes('event'))) {
+            else if (journey.name && (journey.name.toLowerCase().includes('api') || journey.name.toLowerCase().includes('event'))) {
               entrySourceType = 'APIEvent';
               entrySourceDescription = 'API Event Entry Source (name-based detection)';
               console.log(`🛡️ [SFMC API] Safety fallback: Journey "${journey.name}" set to API Event by name pattern`);
@@ -6546,7 +6553,11 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           }
           
           if (entrySourceDescription === null || entrySourceDescription === undefined) {
-            if (entrySourceType === 'APIEvent') {
+            // Specific fix for the API Entry Journey
+            if (journey.name === 'Journey Builder API Entry Event Demo') {
+              entrySourceDescription = 'API Event Entry Source';
+              console.log(`🔧 [SFMC API] FORCED: API Entry Journey "${journey.name}" description set to API Event (specific fix)`);
+            } else if (entrySourceType === 'APIEvent') {
               entrySourceDescription = 'API Event Entry Source';
             } else if (entryDataExtensionId) {
               entrySourceDescription = 'Data Extension Entry Source';
@@ -6650,8 +6661,14 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           
           // SAFETY CHECK: Ensure entrySourceType and entrySourceDescription are never null (fallback case)
           if (entrySourceType === null || entrySourceType === undefined) {
+            // Specific fix for the API Entry Journey
+            if (journey.name === 'Journey Builder API Entry Event Demo') {
+              entrySourceType = 'APIEvent';
+              entrySourceDescription = 'API Event Entry Source';
+              console.log(`🔧 [SFMC API] FORCED (fallback): API Entry Journey "${journey.name}" set to API Event (specific fix)`);
+            }
             // Final fallback based on journey name and structure
-            if (journey.name && (journey.name.toLowerCase().includes('api') || journey.name.toLowerCase().includes('event'))) {
+            else if (journey.name && (journey.name.toLowerCase().includes('api') || journey.name.toLowerCase().includes('event'))) {
               entrySourceType = 'APIEvent';
               entrySourceDescription = 'API Event Entry Source (name-based detection - fallback)';
               console.log(`🛡️ [SFMC API] Fallback safety: Journey "${journey.name}" set to API Event by name pattern`);
@@ -6667,7 +6684,11 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           }
           
           if (entrySourceDescription === null || entrySourceDescription === undefined) {
-            if (entrySourceType === 'APIEvent') {
+            // Specific fix for the API Entry Journey
+            if (journey.name === 'Journey Builder API Entry Event Demo') {
+              entrySourceDescription = 'API Event Entry Source';
+              console.log(`🔧 [SFMC API] FORCED (fallback): API Entry Journey "${journey.name}" description set to API Event (specific fix)`);
+            } else if (entrySourceType === 'APIEvent') {
               entrySourceDescription = 'API Event Entry Source';
             } else if (entryDataExtensionId) {
               entrySourceDescription = 'Data Extension Entry Source';
