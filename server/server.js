@@ -6274,9 +6274,6 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
         responseStatus: eventDefsResponse.status
       });
       
-      // Store event definitions in sfmcObjects for later use in schema building
-      sfmcObjects.eventDefinitions = eventDefinitions;
-      
       // Log some sample event definitions for debugging
       if (eventDefinitions.length > 0) {
         console.log('📊 [SFMC API] Sample event definition:', {
@@ -6307,8 +6304,8 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
       }
     } catch (eventDefsError) {
       console.warn('⚠️ [SFMC API] Failed to fetch event definitions:', eventDefsError.message);
-      // Store empty array for consistency
-      sfmcObjects.eventDefinitions = [];
+      // Use empty array for consistency
+      eventDefinitions = [];
     }
     
     // Create a mapping of Journey ID to entry source from event definitions
@@ -6429,9 +6426,6 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
     });
     
     console.log(`📊 [SFMC API] Total mappings created: ${journeyToEntrySourceMap.size}`);
-    
-    // Store journeyToEntrySourceMap in sfmcObjects for later use in schema building
-    sfmcObjects.journeyToEntrySourceMap = journeyToEntrySourceMap;
     
     // Fetch detailed definition for each journey to get entrySource.arguments
     const detailedJourneys = await Promise.allSettled(
@@ -6956,7 +6950,11 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
       });
     }
     
-    return processedJourneys;
+    return {
+      journeys: processedJourneys,
+      eventDefinitions: eventDefinitions,
+      journeyToEntrySourceMap: journeyToEntrySourceMap
+    };
     
   } catch (error) {
     console.error('❌ [SFMC API] Error fetching Journeys:', error.message);
@@ -9335,8 +9333,12 @@ async function fetchAllSFMCObjectsLegacy(accessToken, subdomain, restEndpoint) {
     }
 
     if (journeys.status === 'fulfilled') {
-      allObjects['Journeys'] = journeys.value;
-      console.log(`✅ [SFMC API] Fetched ${journeys.value.length} Journeys`);
+      const journeyResult = journeys.value;
+      allObjects['Journeys'] = journeyResult.journeys || [];
+      allObjects.eventDefinitions = journeyResult.eventDefinitions || [];
+      allObjects.journeyToEntrySourceMap = journeyResult.journeyToEntrySourceMap || new Map();
+      console.log(`✅ [SFMC API] Fetched ${journeyResult.journeys?.length || 0} Journeys`);
+      console.log(`✅ [SFMC API] Fetched ${journeyResult.eventDefinitions?.length || 0} Event Definitions`);
     } else {
       console.error('❌ [SFMC API] Failed to fetch Journeys:', journeys.reason.message);
     }
