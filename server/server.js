@@ -11587,7 +11587,7 @@ function processSchemaForSFMC(schema, sfmcObjects) {
           id: entrySourceNodeId,
           type: 'Event Definition',
           label: j.entrySourceDescription,
-          category: 'Event Definitions',
+          category: 'Journey Event Definitions',
           metadata: {
             entrySourceType: entrySourceType,
             journeyId: j.id,
@@ -11606,6 +11606,43 @@ function processSchemaForSFMC(schema, sfmcObjects) {
           pushEdge(jNodeId, tsNodeId, 'sends', 'sends email');
         }
       });
+    });
+
+    // --- Event Definitions (standalone objects) ---
+    (sfmcObjects.eventDefinitions || []).forEach(eventDef => {
+      if (eventDef && eventDef.id && eventDef.name) {
+        const eventDefNodeId = `eventdef_${eventDef.id}`;
+        
+        // Get associated Journey and Data Extension info if available
+        const entrySourceInfo = journeyToEntrySourceMap.get(eventDef.name);
+        
+        pushNode({
+          id: eventDefNodeId,
+          type: 'Event Definition',
+          label: eventDef.name,
+          category: 'Journey Event Definitions',
+          metadata: {
+            ...eventDef,
+            eventDefinitionKey: eventDef.eventDefinitionKey,
+            eventType: eventDef.eventType,
+            type: eventDef.type,
+            interactionCount: eventDef.interactionCount,
+            dataExtensionId: entrySourceInfo?.dataExtensionId,
+            dataExtensionName: entrySourceInfo?.dataExtensionName,
+            entrySourceType: entrySourceInfo?.type,
+            createdFromSFMC: true
+          }
+        });
+        
+        // Create relationship to Data Extension if available
+        if (entrySourceInfo?.dataExtensionId) {
+          const deNodeId = entrySourceInfo.dataExtensionId;
+          pushEdge(eventDefNodeId, deNodeId, 'entry_source', 'uses as entry source');
+          console.log(`🔗 [Event Definition Relationship] Created: ${eventDef.name} → DE ${entrySourceInfo.dataExtensionName}`);
+        }
+        
+        console.log(`✅ [Event Definition] Added standalone node: ${eventDef.name} (${eventDef.type})`);
+      }
     });
 
     // --- Triggered Sends ---

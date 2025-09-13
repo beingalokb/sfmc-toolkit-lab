@@ -24,7 +24,7 @@ const ObjectExplorer = ({
     { key: 'Triggered Sends', label: 'Triggered Sends', icon: '📧' },
     { key: 'Data Filters', label: 'Data Filters', icon: '🔧' },
     { key: 'Filter Activities', label: 'Filter Activities', icon: '⚙️' },
-    { key: 'Event Definitions', label: 'Event Definitions', icon: '📡' },
+    { key: 'Journey Event Definitions', label: 'Journey Event Definitions', icon: '📡' },
     { key: 'File Transfers', label: 'File Transfers', icon: '📁' },
     { key: 'Data Extracts', label: 'Data Extracts', icon: '📤' }
   ];
