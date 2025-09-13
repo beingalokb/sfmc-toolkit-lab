@@ -9344,10 +9344,10 @@ async function fetchAllSFMCObjectsLegacy(accessToken, subdomain, restEndpoint) {
     }
 
     if (triggeredSends.status === 'fulfilled') {
-      allObjects['Triggered Sends'] = triggeredSends.value;
-      console.log(`✅ [SFMC API] Fetched ${triggeredSends.value.length} Triggered Sends`);
+      allObjects['Journey Email Triggered Sends'] = triggeredSends.value;
+      console.log(`✅ [SFMC API] Fetched ${triggeredSends.value.length} Journey Email Triggered Sends`);
     } else {
-      console.error('❌ [SFMC API] Failed to fetch Triggered Sends:', triggeredSends.reason.message);
+      console.error('❌ [SFMC API] Failed to fetch Journey Email Triggered Sends:', triggeredSends.reason.message);
     }
 
     if (filters.status === 'fulfilled') {
@@ -11646,9 +11646,74 @@ function processSchemaForSFMC(schema, sfmcObjects) {
 
       // Process journey activities for additional relationships
       (j.activities || []).forEach(act => {
+        // Handle legacy EMAIL activities
         if (act.type === 'EMAIL' && act.arguments?.triggeredSendDefinitionId) {
           const tsNodeId = act.arguments.triggeredSendDefinitionId; // Use original ID
-          pushEdge(jNodeId, tsNodeId, 'sends', 'sends email');
+          pushEdge(jNodeId, tsNodeId, 'sends', 'sends email (legacy)');
+        }
+        
+        // Handle new EMAILV2 activities (Journey email sends)
+        if (act.type === 'EMAILV2' && act.arguments) {
+          console.log(`🔍 [Journey Activity] Processing EMAILV2 activity "${act.name}" in Journey "${j.name}"`);
+          
+          // Create Triggered Send Definition node (system-created)
+          if (act.arguments.triggeredSendKey) {
+            const tsDefNodeId = `ts_def_${act.arguments.triggeredSendKey}`;
+            const tsDefLabel = `${act.name} (Journey TS)`;
+            
+            pushNode({
+              id: tsDefNodeId,
+              type: 'Journey Email Triggered Sends',
+              label: tsDefLabel,
+              category: 'Journey Email Triggered Sends',
+              metadata: {
+                ...act,
+                triggeredSendKey: act.arguments.triggeredSendKey,
+                journeyId: j.id,
+                journeyName: j.name,
+                activityType: 'EMAILV2',
+                isJourneyCreated: true
+              }
+            });
+            
+            // Create edge: Journey → Triggered Send Definition
+            pushEdge(jNodeId, tsDefNodeId, 'creates_ts', 'creates triggered send');
+            console.log(`🔗 [Journey Activity] Created: ${j.name} → ${tsDefLabel} (triggered send)`);
+          }
+          
+          // Create Email Asset node (content)
+          if (act.arguments.email) {
+            const emailAssetId = act.arguments.email.customerKey || act.arguments.email.id;
+            const emailAssetName = act.arguments.email.name || 'Email Asset';
+            const emailNodeId = `email_${emailAssetId}`;
+            
+            pushNode({
+              id: emailNodeId,
+              type: 'Email Assets',
+              label: emailAssetName,
+              category: 'Email Assets',
+              metadata: {
+                ...act.arguments.email,
+                customerKey: act.arguments.email.customerKey,
+                emailId: act.arguments.email.id,
+                journeyActivityId: act.id,
+                journeyActivityName: act.name,
+                sourceJourneyId: j.id,
+                sourceJourneyName: j.name
+              }
+            });
+            
+            // Create edge: Journey → Email Asset
+            pushEdge(jNodeId, emailNodeId, 'sends_email', 'sends email content');
+            console.log(`🔗 [Journey Activity] Created: ${j.name} → ${emailAssetName} (email content)`);
+            
+            // Create edge: Triggered Send → Email Asset (if both exist)
+            if (act.arguments.triggeredSendKey) {
+              const tsDefNodeId = `ts_def_${act.arguments.triggeredSendKey}`;
+              pushEdge(tsDefNodeId, emailNodeId, 'uses_content', 'uses email content');
+              console.log(`🔗 [Journey Activity] Created: TS → ${emailAssetName} (content relationship)`);
+            }
+          }
         }
       });
     });
@@ -11697,10 +11762,10 @@ function processSchemaForSFMC(schema, sfmcObjects) {
       }
     });
 
-    // --- Triggered Sends ---
-    (sfmcObjects['Triggered Sends'] || []).forEach(ts => {
+    // --- Journey Email Triggered Sends ---
+    (sfmcObjects['Journey Email Triggered Sends'] || []).forEach(ts => {
       const tsNodeId = ts.id; // Use original ID
-      pushNode({ id: tsNodeId, type: 'Triggered Sends', label: ts.name, category: 'Triggered Sends', metadata: ts });
+      pushNode({ id: tsNodeId, type: 'Journey Email Triggered Sends', label: ts.name, category: 'Journey Email Triggered Sends', metadata: ts });
 
       if (ts.dataExtensionId) {
         const deNodeId = ts.dataExtensionId; // Use original ID
