@@ -11647,16 +11647,31 @@ function processSchemaForSFMC(schema, sfmcObjects) {
       }
 
       // Process journey activities for additional relationships
-      (j.activities || []).forEach(act => {
+      console.log(`🔍 [Journey Processing] Processing activities for Journey "${j.name}" (${j.id}), has ${(j.activities || []).length} activities`);
+      
+      (j.activities || []).forEach((act, index) => {
+        console.log(`🔍 [Journey Activity ${index + 1}] Type: ${act.type}, Name: "${act.name}", ID: ${act.id}`);
+        
         // Handle legacy EMAIL activities
         if (act.type === 'EMAIL' && act.arguments?.triggeredSendDefinitionId) {
           const tsNodeId = act.arguments.triggeredSendDefinitionId; // Use original ID
           pushEdge(jNodeId, tsNodeId, 'sends', 'sends email (legacy)');
+          console.log(`🔗 [Legacy EMAIL] Created edge: ${j.name} → ${tsNodeId}`);
         }
         
         // Handle new EMAILV2 activities (Journey email sends)
         if (act.type === 'EMAILV2' && act.arguments) {
           console.log(`🔍 [Journey Activity] Processing EMAILV2 activity "${act.name}" in Journey "${j.name}"`);
+          console.log(`🔍 [Journey Activity] Arguments:`, {
+            hasTriggeredSendKey: !!(act.arguments.triggeredSendKey),
+            triggeredSendKey: act.arguments.triggeredSendKey,
+            hasEmail: !!(act.arguments.email),
+            emailInfo: act.arguments.email ? {
+              id: act.arguments.email.id,
+              name: act.arguments.email.name,
+              customerKey: act.arguments.email.customerKey
+            } : null
+          });
           
           // Link to existing Triggered Send Definition (if it exists)
           if (act.arguments.triggeredSendKey) {
