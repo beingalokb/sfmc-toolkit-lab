@@ -766,7 +766,7 @@ const ObjectExplorer = ({
               </div>
 
               {/* Journey-specific Information */}
-              {selectedObject.type === 'Journey' && (
+              {(selectedObject.type === 'Journey' || selectedObject.type === 'Journeys') && (
                 <div className="detail-card journey-card">
                   <div className="card-header">
                     <h4>🛤️ Journey Details</h4>
@@ -776,6 +776,7 @@ const ObjectExplorer = ({
                     {selectedObject.name === 'Journey Builder API Entry Event Demo' && 
                       console.log('🚨 [Frontend DEBUG] API Entry Journey data:', {
                         name: selectedObject.name,
+                        type: selectedObject.type,
                         entrySourceType: selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType,
                         entrySourceDescription: selectedObject.metadata?.entrySourceDescription || selectedObject.entrySourceDescription,
                         entryDataExtensionId: selectedObject.metadata?.entryDataExtensionId || selectedObject.entryDataExtensionId,
@@ -783,6 +784,13 @@ const ObjectExplorer = ({
                         fullObject: selectedObject
                       })
                     }
+                    
+                    {/* ALWAYS show some Journey info for debugging */}
+                    <div className="info-item">
+                      <label>Journey Type Detection:</label>
+                      <span>Type: {selectedObject.type}, Name: {selectedObject.name}</span>
+                    </div>
+                    
                     {/* Entry Source Information with improved display logic */}
                     {(selectedObject.metadata?.entryDataExtensionId || selectedObject.entryDataExtensionId) ? (
                       <>
