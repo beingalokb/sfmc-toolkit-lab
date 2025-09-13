@@ -11582,6 +11582,17 @@ function processSchemaForSFMC(schema, sfmcObjects) {
     
     (sfmcObjects['Journeys'] || []).forEach(j => {
       const jNodeId = j.id; // Use original ID
+      console.log(`🚀 [Journey Processing] Starting processing for Journey: "${j.name}" (ID: ${j.id})`);
+      console.log(`🔍 [Journey Data] Journey object keys:`, Object.keys(j));
+      console.log(`🔍 [Journey Data] Has activities:`, !!(j.activities), `Activities count:`, (j.activities || []).length);
+      if (j.activities && j.activities.length > 0) {
+        console.log(`🔍 [Journey Data] Sample activity:`, {
+          id: j.activities[0].id,
+          name: j.activities[0].name,
+          type: j.activities[0].type,
+          hasArguments: !!(j.activities[0].arguments)
+        });
+      }
       pushNode({ id: jNodeId, type: 'Journeys', label: j.name, category: 'Journeys', metadata: j });
 
       // Handle Journey entry sources (both DE and non-DE types)
