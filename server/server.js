@@ -11575,7 +11575,9 @@ function processSchemaForSFMC(schema, sfmcObjects) {
     console.log('🔍 [Schema Processing] Journeys debug:', {
       hasJourneys: !!(sfmcObjects['Journeys']),
       journeysCount: sfmcObjects['Journeys']?.length || 0,
-      journeysSample: sfmcObjects['Journeys']?.slice(0, 2).map(j => ({ id: j.id, name: j.name })) || []
+      journeysSample: sfmcObjects['Journeys']?.slice(0, 2).map(j => ({ id: j.id, name: j.name })) || [],
+      hasTriggeredSends: !!(sfmcObjects['Journey Email Triggered Sends']),
+      triggeredSendsCount: sfmcObjects['Journey Email Triggered Sends']?.length || 0
     });
     
     (sfmcObjects['Journeys'] || []).forEach(j => {
@@ -11656,29 +11658,44 @@ function processSchemaForSFMC(schema, sfmcObjects) {
         if (act.type === 'EMAILV2' && act.arguments) {
           console.log(`🔍 [Journey Activity] Processing EMAILV2 activity "${act.name}" in Journey "${j.name}"`);
           
-          // Create Triggered Send Definition node (system-created)
+          // Link to existing Triggered Send Definition (if it exists)
           if (act.arguments.triggeredSendKey) {
-            const tsDefNodeId = `ts_def_${act.arguments.triggeredSendKey}`;
-            const tsDefLabel = `${act.name} (Journey TS)`;
+            // Use the triggeredSendKey as the node ID (this matches existing TS CustomerKey)
+            const tsDefNodeId = act.arguments.triggeredSendKey;
             
-            pushNode({
-              id: tsDefNodeId,
-              type: 'Journey Email Triggered Sends',
-              label: tsDefLabel,
-              category: 'Journey Email Triggered Sends',
-              metadata: {
-                ...act,
-                triggeredSendKey: act.arguments.triggeredSendKey,
-                journeyId: j.id,
-                journeyName: j.name,
-                activityType: 'EMAILV2',
-                isJourneyCreated: true
-              }
-            });
+            // Check if this Triggered Send already exists in our fetched data
+            const existingTS = sfmcObjects['Journey Email Triggered Sends']?.find(ts => 
+              ts.customerKey === act.arguments.triggeredSendKey || ts.id === act.arguments.triggeredSendKey
+            );
             
-            // Create edge: Journey → Triggered Send Definition
-            pushEdge(jNodeId, tsDefNodeId, 'creates_ts', 'creates triggered send');
-            console.log(`🔗 [Journey Activity] Created: ${j.name} → ${tsDefLabel} (triggered send)`);
+            if (existingTS) {
+              // Create edge to existing Triggered Send
+              pushEdge(jNodeId, tsDefNodeId, 'uses_ts', 'uses triggered send');
+              console.log(`🔗 [Journey Activity] Linked Journey "${j.name}" to existing TS: ${existingTS.name}`);
+            } else {
+              // Create new Triggered Send node if not found in existing data
+              const tsDefLabel = `${act.name} (Journey TS)`;
+              
+              pushNode({
+                id: tsDefNodeId,
+                type: 'Journey Email Triggered Sends',
+                label: tsDefLabel,
+                category: 'Journey Email Triggered Sends',
+                metadata: {
+                  ...act,
+                  triggeredSendKey: act.arguments.triggeredSendKey,
+                  journeyId: j.id,
+                  journeyName: j.name,
+                  activityType: 'EMAILV2',
+                  isJourneyCreated: true,
+                  source: 'journey_activity'
+                }
+              });
+              
+              // Create edge: Journey → Triggered Send Definition
+              pushEdge(jNodeId, tsDefNodeId, 'creates_ts', 'creates triggered send');
+              console.log(`🔗 [Journey Activity] Created new TS: ${j.name} → ${tsDefLabel}`);
+            }
           }
           
           // Create Email Asset node (content)
@@ -11707,9 +11724,9 @@ function processSchemaForSFMC(schema, sfmcObjects) {
             pushEdge(jNodeId, emailNodeId, 'sends_email', 'sends email content');
             console.log(`🔗 [Journey Activity] Created: ${j.name} → ${emailAssetName} (email content)`);
             
-            // Create edge: Triggered Send → Email Asset (if both exist)
+            // Create edge: Triggered Send → Email Asset (if triggeredSendKey exists)
             if (act.arguments.triggeredSendKey) {
-              const tsDefNodeId = `ts_def_${act.arguments.triggeredSendKey}`;
+              const tsDefNodeId = act.arguments.triggeredSendKey; // Use the actual triggeredSendKey as ID
               pushEdge(tsDefNodeId, emailNodeId, 'uses_content', 'uses email content');
               console.log(`🔗 [Journey Activity] Created: TS → ${emailAssetName} (content relationship)`);
             }
