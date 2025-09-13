@@ -791,6 +791,20 @@ const ObjectExplorer = ({
                       <span>Type: {selectedObject.type}, Name: {selectedObject.name}</span>
                     </div>
                     
+                    {/* DEBUG: Show what backend data we actually have */}
+                    <div className="info-item">
+                      <label>Backend Entry Source Type:</label>
+                      <span className="mono">{JSON.stringify(selectedObject.metadata?.entrySourceType || selectedObject.entrySourceType || 'undefined')}</span>
+                    </div>
+                    <div className="info-item">
+                      <label>Backend Entry Source Description:</label>
+                      <span className="mono">{JSON.stringify(selectedObject.metadata?.entrySourceDescription || selectedObject.entrySourceDescription || 'undefined')}</span>
+                    </div>
+                    <div className="info-item">
+                      <label>Backend Entry DE ID:</label>
+                      <span className="mono">{JSON.stringify(selectedObject.metadata?.entryDataExtensionId || selectedObject.entryDataExtensionId || 'undefined')}</span>
+                    </div>
+                    
                     {/* Entry Source Information with improved display logic */}
                     {(selectedObject.metadata?.entryDataExtensionId || selectedObject.entryDataExtensionId) ? (
                       <>
