@@ -6223,7 +6223,7 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
     });
 
     // First get interactions (journeys) list
-    const interactionsResponse = await axios.get(`${restEndpoint}/interaction/v1/interactions`, {
+    const interactionsResponse = await axios.get(`${restEndpoint}/interaction/v1/interactions?$page=1&$pagesize=50`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
@@ -6232,6 +6232,18 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
     });
 
     console.log('📡 [SFMC API] Journeys REST response received');
+    console.log('🔍 [SFMC API] Raw Journeys response structure:', {
+      hasData: !!interactionsResponse.data,
+      dataKeys: interactionsResponse.data ? Object.keys(interactionsResponse.data) : [],
+      hasItems: !!(interactionsResponse.data?.items),
+      itemsLength: interactionsResponse.data?.items?.length || 0,
+      responseStatus: interactionsResponse.status,
+      responseStatusText: interactionsResponse.statusText
+    });
+    
+    if (interactionsResponse.data && Object.keys(interactionsResponse.data).length > 0) {
+      console.log('📊 [SFMC API] Full Journeys API response sample:', JSON.stringify(interactionsResponse.data, null, 2));
+    }
 
     const interactions = interactionsResponse.data?.items || [];
     console.log(`📊 [SFMC API] Found ${interactions.length} Journeys, fetching detailed definitions and event definitions...`);
@@ -6239,12 +6251,12 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
     // Fetch event definitions to get Journey → Data Extension mappings
     console.log('🔍 [SFMC API] Fetching event definitions for Journey entry sources...');
     console.log('🔐 [SFMC API] Event Definitions API check:', {
-      url: `${restEndpoint}/interaction/v1/eventDefinitions?$page=1&$pagesize=500&category=Audience`,
+      url: `${restEndpoint}/interaction/v1/eventDefinitions?$page=1&$pagesize=100`,
       hasAccessToken: !!accessToken
     });
     let eventDefinitions = [];
     try {
-      const eventDefsResponse = await axios.get(`${restEndpoint}/interaction/v1/eventDefinitions?$page=1&$pagesize=500&category=Audience`, {
+      const eventDefsResponse = await axios.get(`${restEndpoint}/interaction/v1/eventDefinitions?$page=1&$pagesize=100`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
@@ -6254,6 +6266,13 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
       
       eventDefinitions = eventDefsResponse.data?.items || [];
       console.log(`✅ [SFMC API] Fetched ${eventDefinitions.length} event definitions`);
+      console.log('🔍 [SFMC API] Event Definitions response structure:', {
+        hasData: !!eventDefsResponse.data,
+        dataKeys: eventDefsResponse.data ? Object.keys(eventDefsResponse.data) : [],
+        hasItems: !!(eventDefsResponse.data?.items),
+        itemsLength: eventDefsResponse.data?.items?.length || 0,
+        responseStatus: eventDefsResponse.status
+      });
       
       // Store event definitions in sfmcObjects for later use in schema building
       sfmcObjects.eventDefinitions = eventDefinitions;
