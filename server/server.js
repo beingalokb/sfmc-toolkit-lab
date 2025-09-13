@@ -6401,6 +6401,9 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
     
     console.log(`📊 [SFMC API] Total mappings created: ${journeyToEntrySourceMap.size}`);
     
+    // Store journeyToEntrySourceMap in sfmcObjects for later use in schema building
+    sfmcObjects.journeyToEntrySourceMap = journeyToEntrySourceMap;
+    
     // Fetch detailed definition for each journey to get entrySource.arguments
     const detailedJourneys = await Promise.allSettled(
       interactions.map(async (journey) => {
@@ -11619,7 +11622,7 @@ function processSchemaForSFMC(schema, sfmcObjects) {
         const eventDefNodeId = `eventdef_${eventDef.id}`;
         
         // Get associated Journey and Data Extension info if available
-        const entrySourceInfo = journeyToEntrySourceMap.get(eventDef.name);
+        const entrySourceInfo = sfmcObjects.journeyToEntrySourceMap?.get(eventDef.name);
         
         pushNode({
           id: eventDefNodeId,
