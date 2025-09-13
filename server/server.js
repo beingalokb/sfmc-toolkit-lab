@@ -6325,6 +6325,77 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
       }
     });
     
+    // Enhanced mapping logic based on your analysis: Journey ⟶ Event Definition ⟶ Data Extension
+    console.log(`🔧 [SFMC API] Creating enhanced Journey-to-EventDefinition mappings...`);
+    
+    // Create a mapping by eventDefinitionKey and interaction patterns
+    const eventDefByKey = new Map();
+    const eventDefByInteraction = new Map();
+    
+    eventDefinitions.forEach(eventDef => {
+      // Map by eventDefinitionKey for direct lookup
+      if (eventDef.eventDefinitionKey) {
+        eventDefByKey.set(eventDef.eventDefinitionKey, eventDef);
+      }
+      
+      // Map active event definitions (interactionCount > 0) by timestamp patterns
+      if (eventDef.interactionCount > 0) {
+        eventDefByInteraction.set(eventDef.id, eventDef);
+        
+        // Extract timestamp patterns from eventDefinitionKey or name
+        const keyPattern = eventDef.eventDefinitionKey || eventDef.name || '';
+        const namePattern = eventDef.name || '';
+        
+        // Look for timestamp patterns like "20250820T03151" or similar
+        const timestampMatch = keyPattern.match(/(\d{8}T?\d{4,6})/i) || namePattern.match(/(\d{8}T?\d{4,6})/i);
+        if (timestampMatch) {
+          const timestamp = timestampMatch[1];
+          console.log(`🕐 [SFMC API] Event definition "${eventDef.name}" has timestamp pattern: ${timestamp}`);
+          
+          // Store for Journey matching by timestamp
+          if (!eventDefByInteraction.has(`timestamp_${timestamp}`)) {
+            eventDefByInteraction.set(`timestamp_${timestamp}`, []);
+          }
+          eventDefByInteraction.get(`timestamp_${timestamp}`).push(eventDef);
+        }
+      }
+    });
+    
+    console.log(`📊 [SFMC API] Enhanced mapping created:`, {
+      eventDefsByKey: eventDefByKey.size,
+      activeEventDefs: eventDefByInteraction.size,
+      timestampPatterns: Array.from(eventDefByInteraction.keys()).filter(k => k.startsWith('timestamp_')).length
+    });
+    
+    // Create additional flexible mappings for better matching
+    console.log(`🔧 [SFMC API] Creating flexible mappings for Journey name matching...`);
+    eventDefinitions.forEach(eventDef => {
+      if (eventDef.eventDefinitionKey && eventDef.name) {
+        const entrySourceInfo = journeyToEntrySourceMap.get(eventDef.name);
+        if (entrySourceInfo) {
+          // Extract timestamp pattern for flexible matching (e.g., "20250820T03151")
+          const timestampMatch = eventDef.name.match(/(\d{8}T\d{5})/);
+          if (timestampMatch) {
+            const timestamp = timestampMatch[1];
+            const possibleJourneyName = `Journey_${timestamp}`;
+            journeyToEntrySourceMap.set(possibleJourneyName, entrySourceInfo);
+            console.log(`🔗 [SFMC API] Created flexible mapping: "${possibleJourneyName}" -> ${entrySourceInfo.type}`);
+          }
+          
+          // Map by eventDefinitionKey as well
+          journeyToEntrySourceMap.set(eventDef.eventDefinitionKey, entrySourceInfo);
+          
+          // Specific fix for the API Entry Journey demo
+          if (eventDef.name.includes('API Entry') || eventDef.type === 'APIEvent') {
+            journeyToEntrySourceMap.set('Journey Builder API Entry Event Demo', entrySourceInfo);
+            console.log(`🔧 [SFMC API] Created specific mapping for "Journey Builder API Entry Event Demo"`);
+          }
+        }
+      }
+    });
+    
+    console.log(`📊 [SFMC API] Total mappings created: ${journeyToEntrySourceMap.size}`);
+    
     // Fetch detailed definition for each journey to get entrySource.arguments
     const detailedJourneys = await Promise.allSettled(
       interactions.map(async (journey) => {
@@ -6389,6 +6460,55 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
               console.log(`📡 [SFMC API] Journey "${journey.name}" has ${entrySourceDescription} (no DE)`);
             }
           } else {
+            // Method 2.5: Enhanced mapping using triangle approach: Journey ⟶ Event Definition ⟶ Data Extension
+            console.log(`🔧 [SFMC API] Journey "${journey.name}" not found in direct mapping, trying enhanced approach...`);
+            
+            // Extract timestamp pattern from journey name (e.g., "Journey_20250820T03151" → "20250820T03151")
+            const journeyTimestampMatch = journey.name.match(/(\d{8}T?\d{4,6})/i);
+            if (journeyTimestampMatch) {
+              const journeyTimestamp = journeyTimestampMatch[1];
+              console.log(`🕐 [SFMC API] Journey "${journey.name}" has timestamp pattern: ${journeyTimestamp}`);
+              
+              // Look for matching event definitions by timestamp pattern
+              const matchingEventDefs = eventDefByInteraction.get(`timestamp_${journeyTimestamp}`) || [];
+              
+              if (matchingEventDefs.length > 0) {
+                console.log(`🎯 [SFMC API] Found ${matchingEventDefs.length} matching event definitions for timestamp ${journeyTimestamp}`);
+                
+                // Use the first matching event definition (most likely candidate)
+                const matchedEventDef = matchingEventDefs[0];
+                console.log(`✅ [SFMC API] Mapping Journey "${journey.name}" to Event Definition "${matchedEventDef.name}" via timestamp pattern`);
+                
+                // Apply the mapping using triangle approach
+                entrySourceType = matchedEventDef.type || 'APIEvent';
+                if (matchedEventDef.dataExtensionId && !entryDataExtensionId) {
+                  entryDataExtensionId = matchedEventDef.dataExtensionId;
+                  entryDataExtensionName = matchedEventDef.dataExtensionName;
+                  dataExtensionSource = 'triangle-mapping';
+                  console.log(`✅ [SFMC API] Journey "${journey.name}" mapped to DE: ${entryDataExtensionId} (${entryDataExtensionName}) via triangle approach`);
+                }
+                
+                // Set appropriate description
+                switch(entrySourceType) {
+                  case 'APIEvent':
+                    entrySourceDescription = 'API Event Entry Source (triangle mapping)';
+                    break;
+                  case 'SalesforceDataEvent':
+                    entrySourceDescription = 'Salesforce Data Event Entry Source (triangle mapping)';
+                    break;
+                  default:
+                    entrySourceDescription = `${entrySourceType} Entry Source (triangle mapping)`;
+                }
+              } else {
+                console.log(`⚠️ [SFMC API] No matching event definitions found for timestamp ${journeyTimestamp}`);
+              }
+            } else {
+              console.log(`⚠️ [SFMC API] No timestamp pattern found in journey name "${journey.name}"`);
+            }
+          }
+          
+          // Continue with existing fallback logic if still no mapping found
+          if (!entrySourceType) {
             // Fallback: Try to detect entry source type from entrySource structure
             console.log(`⚠️ [SFMC API] Journey "${journey.name}" not found in event definitions, checking entrySource for type`);
             console.log(`🔍 [SFMC API] Available event definition names:`, Array.from(journeyToEntrySourceMap.keys()));
@@ -6401,8 +6521,40 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
                                 detailedJourney.entrySource.entryMode ||
                                 detailedJourney.entrySource.mode;
               
-              // If no entryMode, check other possible locations for entry source type
-              if (!possibleType) {
+              // Handle "NotSet" entryMode - check if we have a matching event definition
+              if (possibleType === 'NotSet') {
+                console.log(`🔧 [SFMC API] Journey "${journey.name}" has entryMode "NotSet", checking for event definition mapping...`);
+                
+                // First try direct mapping
+                if (journeyToEntrySourceMap.has(journey.name)) {
+                  const mappedEntrySource = journeyToEntrySourceMap.get(journey.name);
+                  possibleType = mappedEntrySource.type;
+                  console.log(`✅ [SFMC API] Journey "${journey.name}" mapped via direct event definition: ${possibleType}`);
+                } else {
+                  // Try triangle approach for "NotSet" entryMode
+                  const journeyTimestampMatch = journey.name.match(/(\d{8}T?\d{4,6})/i);
+                  if (journeyTimestampMatch) {
+                    const journeyTimestamp = journeyTimestampMatch[1];
+                    const matchingEventDefs = eventDefByInteraction.get(`timestamp_${journeyTimestamp}`) || [];
+                    
+                    if (matchingEventDefs.length > 0) {
+                      const matchedEventDef = matchingEventDefs[0];
+                      possibleType = matchedEventDef.type || 'APIEvent';
+                      console.log(`✅ [SFMC API] Journey "${journey.name}" with "NotSet" entryMode mapped via triangle approach: ${possibleType}`);
+                    } else {
+                      // Default for "NotSet" - usually means it's an API Event in draft state
+                      possibleType = 'APIEvent';
+                      console.log(`🔄 [SFMC API] Journey "${journey.name}" with "NotSet" entryMode defaulted to APIEvent`);
+                    }
+                  } else {
+                    possibleType = 'APIEvent';
+                    console.log(`🔄 [SFMC API] Journey "${journey.name}" with "NotSet" entryMode and no pattern defaulted to APIEvent`);
+                  }
+                }
+              }
+              
+              // If no entryMode or still NotSet, check other possible locations for entry source type
+              if (!possibleType || possibleType === 'NotSet') {
                 possibleType = detailedJourney.entrySource.type || 
                               detailedJourney.entrySource.eventType ||
                               detailedJourney.entrySource.sourceType;
@@ -6416,6 +6568,18 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
                   case 'api':
                     entrySourceType = 'APIEvent';
                     entrySourceDescription = 'API Event Entry Source';
+                    break;
+                  case 'notset':
+                    // For NotSet, try to infer from event definition mapping
+                    if (journeyToEntrySourceMap.has(journey.name)) {
+                      const mappedSource = journeyToEntrySourceMap.get(journey.name);
+                      entrySourceType = mappedSource.type;
+                      entrySourceDescription = `${mappedSource.type} Entry Source`;
+                      console.log(`🔧 [SFMC API] Journey "${journey.name}" NotSet mapped to: ${entrySourceType}`);
+                    } else {
+                      entrySourceType = 'APIEvent'; // Default assumption for NotSet
+                      entrySourceDescription = 'API Event Entry Source (assumed from NotSet)';
+                    }
                     break;
                   case 'salesforcedataevent':
                   case 'salesforce data event':
