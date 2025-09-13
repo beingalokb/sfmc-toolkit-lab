@@ -6443,6 +6443,25 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           
           const detailedJourney = detailResponse.data;
           
+          // DEBUG: Log the complete activity structure for EMAILV2 activities
+          if (detailedJourney.activities) {
+            console.log(`🔍 [SFMC API] Journey "${journey.name}" has ${detailedJourney.activities.length} activities`);
+            detailedJourney.activities.forEach((activity, index) => {
+              if (activity.type === 'EMAILV2') {
+                console.log(`🚨 [DEBUG] EMAILV2 Activity ${index + 1} in "${journey.name}":`, {
+                  id: activity.id,
+                  name: activity.name,
+                  type: activity.type,
+                  hasArguments: !!(activity.arguments),
+                  arguments: activity.arguments,
+                  activityObjectId: activity.activityObjectId,
+                  properties: activity.properties,
+                  fullActivity: JSON.stringify(activity, null, 2)
+                });
+              }
+            });
+          }
+          
           // Extract entry source Data Extension ID from multiple sources
           let entryDataExtensionId = null;
           let entryDataExtensionName = null;
