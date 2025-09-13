@@ -6443,6 +6443,22 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
           
           const detailedJourney = detailResponse.data;
           
+          // DEBUG: Log the raw Journey API response structure
+          console.log(`🚨 [DEBUG] Journey "${journey.name}" API response structure:`, {
+            hasActivities: !!(detailedJourney.activities),
+            activitiesCount: detailedJourney.activities?.length || 0,
+            topLevelKeys: Object.keys(detailedJourney || {}),
+            sampleActivity: detailedJourney.activities?.[0] ? {
+              id: detailedJourney.activities[0].id,
+              type: detailedJourney.activities[0].type,
+              name: detailedJourney.activities[0].name,
+              hasArguments: !!(detailedJourney.activities[0].arguments),
+              argumentsKeys: detailedJourney.activities[0].arguments ? Object.keys(detailedJourney.activities[0].arguments) : null,
+              hasProperties: !!(detailedJourney.activities[0].properties),
+              propertiesKeys: detailedJourney.activities[0].properties ? Object.keys(detailedJourney.activities[0].properties) : null
+            } : null
+          });
+          
           // DEBUG: Log the complete activity structure for EMAILV2 activities
           if (detailedJourney.activities) {
             console.log(`🔍 [SFMC API] Journey "${journey.name}" has ${detailedJourney.activities.length} activities`);
