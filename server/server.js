@@ -11581,19 +11581,30 @@ function processSchemaForSFMC(schema, sfmcObjects) {
     });
     
     (sfmcObjects['Journeys'] || []).forEach(j => {
-      const jNodeId = j.id; // Use original ID
-      console.log(`🚀 [Journey Processing] Starting processing for Journey: "${j.name}" (ID: ${j.id})`);
-      console.log(`🔍 [Journey Data] Journey object keys:`, Object.keys(j));
-      console.log(`🔍 [Journey Data] Has activities:`, !!(j.activities), `Activities count:`, (j.activities || []).length);
-      if (j.activities && j.activities.length > 0) {
-        console.log(`🔍 [Journey Data] Sample activity:`, {
-          id: j.activities[0].id,
-          name: j.activities[0].name,
-          type: j.activities[0].type,
-          hasArguments: !!(j.activities[0].arguments)
-        });
+      try {
+        const jNodeId = j.id; // Use original ID
+        console.log(`🚀 [Journey Processing] Starting processing for Journey: "${j.name}" (ID: ${j.id})`);
+        console.log(`🔍 [Journey Data] Journey object keys:`, Object.keys(j));
+        console.log(`🔍 [Journey Data] Has activities:`, !!(j.activities), `Activities count:`, (j.activities || []).length);
+        if (j.activities && j.activities.length > 0) {
+          console.log(`🔍 [Journey Data] Sample activity:`, {
+            id: j.activities[0].id,
+            name: j.activities[0].name,
+            type: j.activities[0].type,
+            hasArguments: !!(j.activities[0].arguments)
+          });
+        }
+        pushNode({ id: jNodeId, type: 'Journeys', label: j.name, category: 'Journeys', metadata: j });
+      } catch (error) {
+        console.error(`❌ [Journey Processing] Error processing Journey "${j.name}" (${j.id}):`, error.message);
+        console.error(`❌ [Journey Processing] Journey object:`, j);
+        // Still try to create the basic node
+        try {
+          pushNode({ id: j.id, type: 'Journeys', label: j.name || 'Unknown Journey', category: 'Journeys', metadata: j });
+        } catch (nodeError) {
+          console.error(`❌ [Journey Processing] Failed to create node for Journey "${j.name}":`, nodeError.message);
+        }
       }
-      pushNode({ id: jNodeId, type: 'Journeys', label: j.name, category: 'Journeys', metadata: j });
 
       // Handle Journey entry sources (both DE and non-DE types)
       if (j.entryDataExtensionId) {
@@ -11759,6 +11770,9 @@ function processSchemaForSFMC(schema, sfmcObjects) {
           }
         }
       });
+      } catch (activityError) {
+        console.error(`❌ [Journey Activity Processing] Error processing activities for Journey "${j.name}":`, activityError.message);
+      }
     });
 
     // --- Event Definitions (standalone objects) ---
