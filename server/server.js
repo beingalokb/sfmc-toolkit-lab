@@ -6215,7 +6215,13 @@ async function fetchSFMCAutomations(accessToken, restEndpoint) {
 async function fetchSFMCJourneys(accessToken, restEndpoint) {
   try {
     console.log('🔍 [SFMC API] Fetching Journeys...');
-    
+    console.log('🔐 [SFMC API] Auth check:', {
+      hasAccessToken: !!accessToken,
+      tokenLength: accessToken ? accessToken.length : 0,
+      restEndpoint: restEndpoint,
+      url: `${restEndpoint}/interaction/v1/interactions`
+    });
+
     // First get interactions (journeys) list
     const interactionsResponse = await axios.get(`${restEndpoint}/interaction/v1/interactions`, {
       headers: {
@@ -6232,6 +6238,10 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
     
     // Fetch event definitions to get Journey → Data Extension mappings
     console.log('🔍 [SFMC API] Fetching event definitions for Journey entry sources...');
+    console.log('🔐 [SFMC API] Event Definitions API check:', {
+      url: `${restEndpoint}/interaction/v1/eventDefinitions?$page=1&$pagesize=500&category=Audience`,
+      hasAccessToken: !!accessToken
+    });
     let eventDefinitions = [];
     try {
       const eventDefsResponse = await axios.get(`${restEndpoint}/interaction/v1/eventDefinitions?$page=1&$pagesize=500&category=Audience`, {
@@ -11541,6 +11551,12 @@ function processSchemaForSFMC(schema, sfmcObjects) {
     });
 
     // --- Journeys ---
+    console.log('🔍 [Schema Processing] Journeys debug:', {
+      hasJourneys: !!(sfmcObjects['Journeys']),
+      journeysCount: sfmcObjects['Journeys']?.length || 0,
+      journeysSample: sfmcObjects['Journeys']?.slice(0, 2).map(j => ({ id: j.id, name: j.name })) || []
+    });
+    
     (sfmcObjects['Journeys'] || []).forEach(j => {
       const jNodeId = j.id; // Use original ID
       pushNode({ id: jNodeId, type: 'Journeys', label: j.name, category: 'Journeys', metadata: j });
@@ -11617,6 +11633,13 @@ function processSchemaForSFMC(schema, sfmcObjects) {
     });
 
     // --- Event Definitions (standalone objects) ---
+    console.log('🔍 [Schema Processing] Event Definitions debug:', {
+      hasEventDefinitions: !!(sfmcObjects.eventDefinitions),
+      eventDefinitionsCount: sfmcObjects.eventDefinitions?.length || 0,
+      hasJourneyMapping: !!(sfmcObjects.journeyToEntrySourceMap),
+      journeyMappingSize: sfmcObjects.journeyToEntrySourceMap?.size || 0
+    });
+    
     (sfmcObjects.eventDefinitions || []).forEach(eventDef => {
       if (eventDef && eventDef.id && eventDef.name) {
         const eventDefNodeId = `eventdef_${eventDef.id}`;
