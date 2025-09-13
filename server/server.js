@@ -11595,183 +11595,181 @@ function processSchemaForSFMC(schema, sfmcObjects) {
           });
         }
         pushNode({ id: jNodeId, type: 'Journeys', label: j.name, category: 'Journeys', metadata: j });
-      } catch (error) {
-        console.error(`❌ [Journey Processing] Error processing Journey "${j.name}" (${j.id}):`, error.message);
+
+        // Handle Journey entry sources (both DE and non-DE types)
+        if (j.entryDataExtensionId) {
+          // Data Extension entry source
+          const deNodeId = j.entryDataExtensionId; // Use the extracted DE ID
+          
+          // Look up the actual Data Extension to get its real name
+          let actualDE = null;
+          let deName = 'Entry Data Extension'; // Default fallback
+          
+          if (sfmcObjects['Data Extensions']) {
+            actualDE = sfmcObjects['Data Extensions'].find(de => 
+              de.id === deNodeId || 
+              de.ObjectID === deNodeId ||
+              de.customerKey === deNodeId ||
+              de.externalKey === deNodeId
+            );
+            
+            if (actualDE) {
+              deName = actualDE.name || actualDE.Name || deName;
+              console.log(`✅ [Journey Relationship] Found actual DE name for ${deNodeId}: "${deName}"`);
+            } else {
+              console.log(`⚠️ [Journey Relationship] Could not find actual DE for ID ${deNodeId}, using fallback name`);
+            }
+          }
+          
+          // Use the Journey's entryDataExtensionName if available and no actual DE found
+          if (!actualDE && j.entryDataExtensionName) {
+            deName = j.entryDataExtensionName;
+            console.log(`✅ [Journey Relationship] Using entryDataExtensionName: "${deName}"`);
+          }
+          
+          pushNode({
+            id: deNodeId,
+            type: 'Data Extensions', 
+            label: deName,
+            category: 'Data Extensions',
+            metadata: actualDE ? { ...actualDE, isEntrySource: true, journeyId: j.id } : { isEntrySource: true, journeyId: j.id }
+          });
+          pushEdge(jNodeId, deNodeId, 'entry_source', 'uses as entry source');
+          console.log(`🔗 [Journey Relationship] Created: ${j.name} → ${deName} (${deNodeId})`);
+          
+        } else if (j.entrySourceDescription) {
+          // Non-Data Extension entry source (API Event, Salesforce Data Event, etc.)
+          const entrySourceNodeId = `${j.id}_entry_source`;
+          const entrySourceType = j.entrySourceType || 'Unknown';
+          
+          pushNode({
+            id: entrySourceNodeId,
+            type: 'Event Definition',
+            label: j.entrySourceDescription,
+            category: 'Journey Event Definitions',
+            metadata: {
+              entrySourceType: entrySourceType,
+              journeyId: j.id,
+              isNonDEEntrySource: true,
+              description: j.entrySourceDescription
+            }
+          });
+          pushEdge(jNodeId, entrySourceNodeId, 'entry_source', 'triggered by');
+          console.log(`🔗 [Journey Relationship] Created: ${j.name} → ${j.entrySourceDescription} (${entrySourceType})`);
+        }
+
+        // Process journey activities for additional relationships
+        console.log(`🔍 [Journey Processing] Processing activities for Journey "${j.name}" (${j.id}), has ${(j.activities || []).length} activities`);
+        
+        (j.activities || []).forEach((act, index) => {
+          console.log(`🔍 [Journey Activity ${index + 1}] Type: ${act.type}, Name: "${act.name}", ID: ${act.id}`);
+          
+          // Handle legacy EMAIL activities
+          if (act.type === 'EMAIL' && act.arguments?.triggeredSendDefinitionId) {
+            const tsNodeId = act.arguments.triggeredSendDefinitionId; // Use original ID
+            pushEdge(jNodeId, tsNodeId, 'sends', 'sends email (legacy)');
+            console.log(`🔗 [Legacy EMAIL] Created edge: ${j.name} → ${tsNodeId}`);
+          }
+          
+          // Handle new EMAILV2 activities (Journey email sends)
+          if (act.type === 'EMAILV2' && act.arguments) {
+            console.log(`🔍 [Journey Activity] Processing EMAILV2 activity "${act.name}" in Journey "${j.name}"`);
+            console.log(`🔍 [Journey Activity] Arguments:`, {
+              hasTriggeredSendKey: !!(act.arguments.triggeredSendKey),
+              triggeredSendKey: act.arguments.triggeredSendKey,
+              hasEmail: !!(act.arguments.email),
+              emailInfo: act.arguments.email ? {
+                id: act.arguments.email.id,
+                name: act.arguments.email.name,
+                customerKey: act.arguments.email.customerKey
+              } : null
+            });
+            
+            // Link to existing Triggered Send Definition (if it exists)
+            if (act.arguments.triggeredSendKey) {
+              // Use the triggeredSendKey as the node ID (this matches existing TS CustomerKey)
+              const tsDefNodeId = act.arguments.triggeredSendKey;
+              
+              // Check if this Triggered Send already exists in our fetched data
+              const existingTS = sfmcObjects['Journey Email Triggered Sends']?.find(ts => 
+                ts.customerKey === act.arguments.triggeredSendKey || ts.id === act.arguments.triggeredSendKey
+              );
+              
+              if (existingTS) {
+                // Create edge to existing Triggered Send
+                pushEdge(jNodeId, tsDefNodeId, 'uses_ts', 'uses triggered send');
+                console.log(`🔗 [Journey Activity] Linked Journey "${j.name}" to existing TS: ${existingTS.name}`);
+              } else {
+                // Create new Triggered Send node if not found in existing data
+                const tsDefLabel = `${act.name} (Journey TS)`;
+                
+                pushNode({
+                  id: tsDefNodeId,
+                  type: 'Journey Email Triggered Sends',
+                  label: tsDefLabel,
+                  category: 'Journey Email Triggered Sends',
+                  metadata: {
+                    ...act,
+                    triggeredSendKey: act.arguments.triggeredSendKey,
+                    journeyId: j.id,
+                    journeyName: j.name,
+                    activityType: 'EMAILV2',
+                    isJourneyCreated: true,
+                    source: 'journey_activity'
+                  }
+                });
+                
+                // Create edge: Journey → Triggered Send Definition
+                pushEdge(jNodeId, tsDefNodeId, 'creates_ts', 'creates triggered send');
+                console.log(`🔗 [Journey Activity] Created new TS: ${j.name} → ${tsDefLabel}`);
+              }
+            }
+            
+            // Create Email Asset node (content)
+            if (act.arguments.email) {
+              const emailAssetId = act.arguments.email.customerKey || act.arguments.email.id;
+              const emailAssetName = act.arguments.email.name || 'Email Asset';
+              const emailNodeId = `email_${emailAssetId}`;
+              
+              pushNode({
+                id: emailNodeId,
+                type: 'Email Assets',
+                label: emailAssetName,
+                category: 'Email Assets',
+                metadata: {
+                  ...act.arguments.email,
+                  customerKey: act.arguments.email.customerKey,
+                  emailId: act.arguments.email.id,
+                  journeyActivityId: act.id,
+                  journeyActivityName: act.name,
+                  sourceJourneyId: j.id,
+                  sourceJourneyName: j.name
+                }
+              });
+              
+              // Create edge: Journey → Email Asset
+              pushEdge(jNodeId, emailNodeId, 'sends_email', 'sends email content');
+              console.log(`🔗 [Journey Activity] Created: ${j.name} → ${emailAssetName} (email content)`);
+              
+              // Create edge: Triggered Send → Email Asset (if triggeredSendKey exists)
+              if (act.arguments.triggeredSendKey) {
+                const tsDefNodeId = act.arguments.triggeredSendKey; // Use the actual triggeredSendKey as ID
+                pushEdge(tsDefNodeId, emailNodeId, 'uses_content', 'uses email content');
+                console.log(`🔗 [Journey Activity] Created: TS → ${emailAssetName} (content relationship)`);
+              }
+            }
+          }
+        });
+        
+      } catch (journeyError) {
+        console.error(`❌ [Journey Processing] Error processing Journey "${j?.name}" (${j?.id}):`, journeyError.message);
         console.error(`❌ [Journey Processing] Journey object:`, j);
         // Still try to create the basic node
         try {
           pushNode({ id: j.id, type: 'Journeys', label: j.name || 'Unknown Journey', category: 'Journeys', metadata: j });
         } catch (nodeError) {
-          console.error(`❌ [Journey Processing] Failed to create node for Journey "${j.name}":`, nodeError.message);
+          console.error(`❌ [Journey Processing] Failed to create node for Journey "${j?.name}":`, nodeError.message);
         }
-      }
-
-      // Handle Journey entry sources (both DE and non-DE types)
-      if (j.entryDataExtensionId) {
-        // Data Extension entry source
-        const deNodeId = j.entryDataExtensionId; // Use the extracted DE ID
-        
-        // Look up the actual Data Extension to get its real name
-        let actualDE = null;
-        let deName = 'Entry Data Extension'; // Default fallback
-        
-        if (sfmcObjects['Data Extensions']) {
-          actualDE = sfmcObjects['Data Extensions'].find(de => 
-            de.id === deNodeId || 
-            de.ObjectID === deNodeId ||
-            de.customerKey === deNodeId ||
-            de.externalKey === deNodeId
-          );
-          
-          if (actualDE) {
-            deName = actualDE.name || actualDE.Name || deName;
-            console.log(`✅ [Journey Relationship] Found actual DE name for ${deNodeId}: "${deName}"`);
-          } else {
-            console.log(`⚠️ [Journey Relationship] Could not find actual DE for ID ${deNodeId}, using fallback name`);
-          }
-        }
-        
-        // Use the Journey's entryDataExtensionName if available and no actual DE found
-        if (!actualDE && j.entryDataExtensionName) {
-          deName = j.entryDataExtensionName;
-          console.log(`✅ [Journey Relationship] Using entryDataExtensionName: "${deName}"`);
-        }
-        
-        pushNode({
-          id: deNodeId,
-          type: 'Data Extensions', 
-          label: deName,
-          category: 'Data Extensions',
-          metadata: actualDE ? { ...actualDE, isEntrySource: true, journeyId: j.id } : { isEntrySource: true, journeyId: j.id }
-        });
-        pushEdge(jNodeId, deNodeId, 'entry_source', 'uses as entry source');
-        console.log(`🔗 [Journey Relationship] Created: ${j.name} → ${deName} (${deNodeId})`);
-        
-      } else if (j.entrySourceDescription) {
-        // Non-Data Extension entry source (API Event, Salesforce Data Event, etc.)
-        const entrySourceNodeId = `${j.id}_entry_source`;
-        const entrySourceType = j.entrySourceType || 'Unknown';
-        
-        pushNode({
-          id: entrySourceNodeId,
-          type: 'Event Definition',
-          label: j.entrySourceDescription,
-          category: 'Journey Event Definitions',
-          metadata: {
-            entrySourceType: entrySourceType,
-            journeyId: j.id,
-            isNonDEEntrySource: true,
-            description: j.entrySourceDescription
-          }
-        });
-        pushEdge(jNodeId, entrySourceNodeId, 'entry_source', 'triggered by');
-        console.log(`🔗 [Journey Relationship] Created: ${j.name} → ${j.entrySourceDescription} (${entrySourceType})`);
-      }
-
-      // Process journey activities for additional relationships
-      console.log(`🔍 [Journey Processing] Processing activities for Journey "${j.name}" (${j.id}), has ${(j.activities || []).length} activities`);
-      
-      (j.activities || []).forEach((act, index) => {
-        console.log(`🔍 [Journey Activity ${index + 1}] Type: ${act.type}, Name: "${act.name}", ID: ${act.id}`);
-        
-        // Handle legacy EMAIL activities
-        if (act.type === 'EMAIL' && act.arguments?.triggeredSendDefinitionId) {
-          const tsNodeId = act.arguments.triggeredSendDefinitionId; // Use original ID
-          pushEdge(jNodeId, tsNodeId, 'sends', 'sends email (legacy)');
-          console.log(`🔗 [Legacy EMAIL] Created edge: ${j.name} → ${tsNodeId}`);
-        }
-        
-        // Handle new EMAILV2 activities (Journey email sends)
-        if (act.type === 'EMAILV2' && act.arguments) {
-          console.log(`🔍 [Journey Activity] Processing EMAILV2 activity "${act.name}" in Journey "${j.name}"`);
-          console.log(`🔍 [Journey Activity] Arguments:`, {
-            hasTriggeredSendKey: !!(act.arguments.triggeredSendKey),
-            triggeredSendKey: act.arguments.triggeredSendKey,
-            hasEmail: !!(act.arguments.email),
-            emailInfo: act.arguments.email ? {
-              id: act.arguments.email.id,
-              name: act.arguments.email.name,
-              customerKey: act.arguments.email.customerKey
-            } : null
-          });
-          
-          // Link to existing Triggered Send Definition (if it exists)
-          if (act.arguments.triggeredSendKey) {
-            // Use the triggeredSendKey as the node ID (this matches existing TS CustomerKey)
-            const tsDefNodeId = act.arguments.triggeredSendKey;
-            
-            // Check if this Triggered Send already exists in our fetched data
-            const existingTS = sfmcObjects['Journey Email Triggered Sends']?.find(ts => 
-              ts.customerKey === act.arguments.triggeredSendKey || ts.id === act.arguments.triggeredSendKey
-            );
-            
-            if (existingTS) {
-              // Create edge to existing Triggered Send
-              pushEdge(jNodeId, tsDefNodeId, 'uses_ts', 'uses triggered send');
-              console.log(`🔗 [Journey Activity] Linked Journey "${j.name}" to existing TS: ${existingTS.name}`);
-            } else {
-              // Create new Triggered Send node if not found in existing data
-              const tsDefLabel = `${act.name} (Journey TS)`;
-              
-              pushNode({
-                id: tsDefNodeId,
-                type: 'Journey Email Triggered Sends',
-                label: tsDefLabel,
-                category: 'Journey Email Triggered Sends',
-                metadata: {
-                  ...act,
-                  triggeredSendKey: act.arguments.triggeredSendKey,
-                  journeyId: j.id,
-                  journeyName: j.name,
-                  activityType: 'EMAILV2',
-                  isJourneyCreated: true,
-                  source: 'journey_activity'
-                }
-              });
-              
-              // Create edge: Journey → Triggered Send Definition
-              pushEdge(jNodeId, tsDefNodeId, 'creates_ts', 'creates triggered send');
-              console.log(`🔗 [Journey Activity] Created new TS: ${j.name} → ${tsDefLabel}`);
-            }
-          }
-          
-          // Create Email Asset node (content)
-          if (act.arguments.email) {
-            const emailAssetId = act.arguments.email.customerKey || act.arguments.email.id;
-            const emailAssetName = act.arguments.email.name || 'Email Asset';
-            const emailNodeId = `email_${emailAssetId}`;
-            
-            pushNode({
-              id: emailNodeId,
-              type: 'Email Assets',
-              label: emailAssetName,
-              category: 'Email Assets',
-              metadata: {
-                ...act.arguments.email,
-                customerKey: act.arguments.email.customerKey,
-                emailId: act.arguments.email.id,
-                journeyActivityId: act.id,
-                journeyActivityName: act.name,
-                sourceJourneyId: j.id,
-                sourceJourneyName: j.name
-              }
-            });
-            
-            // Create edge: Journey → Email Asset
-            pushEdge(jNodeId, emailNodeId, 'sends_email', 'sends email content');
-            console.log(`🔗 [Journey Activity] Created: ${j.name} → ${emailAssetName} (email content)`);
-            
-            // Create edge: Triggered Send → Email Asset (if triggeredSendKey exists)
-            if (act.arguments.triggeredSendKey) {
-              const tsDefNodeId = act.arguments.triggeredSendKey; // Use the actual triggeredSendKey as ID
-              pushEdge(tsDefNodeId, emailNodeId, 'uses_content', 'uses email content');
-              console.log(`🔗 [Journey Activity] Created: TS → ${emailAssetName} (content relationship)`);
-            }
-          }
-        }
-      });
-      } catch (activityError) {
-        console.error(`❌ [Journey Activity Processing] Error processing activities for Journey "${j.name}":`, activityError.message);
       }
     });
 
