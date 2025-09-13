@@ -6245,6 +6245,9 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
       eventDefinitions = eventDefsResponse.data?.items || [];
       console.log(`✅ [SFMC API] Fetched ${eventDefinitions.length} event definitions`);
       
+      // Store event definitions in sfmcObjects for later use in schema building
+      sfmcObjects.eventDefinitions = eventDefinitions;
+      
       // Log some sample event definitions for debugging
       if (eventDefinitions.length > 0) {
         console.log('📊 [SFMC API] Sample event definition:', {
@@ -6275,6 +6278,8 @@ async function fetchSFMCJourneys(accessToken, restEndpoint) {
       }
     } catch (eventDefsError) {
       console.warn('⚠️ [SFMC API] Failed to fetch event definitions:', eventDefsError.message);
+      // Store empty array for consistency
+      sfmcObjects.eventDefinitions = [];
     }
     
     // Create a mapping of Journey ID to entry source from event definitions
