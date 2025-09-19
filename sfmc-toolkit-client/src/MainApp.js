@@ -1,13 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-import PreferenceCenterProjectForm from './PreferenceCenterProjectForm';
-import PreferenceCenterNoCoreForm from './PreferenceCenterNoCoreForm';
-import PreferenceCenterConfigForm from './PreferenceCenterConfigForm';
 import EmailArchiving from './EmailArchiving';
 import Settings from './Settings';
 import ExportMenu from './components/ExportMenu';
-import SchemaBuilder from './SchemaBuilder';
-import ObjectExplorer from './ObjectExplorer';
 
 const baseURL = process.env.REACT_APP_BASE_URL;
 
@@ -1180,8 +1175,8 @@ export default function MainApp() {
                 </svg>
               </div>
               <div>
-                <h1 className="text-lg font-semibold tracking-tight text-gray-900">MC Explorer</h1>
-                <p className="text-xs text-gray-500">Marketing Cloud Management Platform</p>
+                <h1 className="text-lg font-semibold tracking-tight text-gray-900">SFMC Toolkit - Labs</h1>
+                <p className="text-xs text-gray-500">Salesforce Marketing Cloud Toolkit - Labs Edition</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -1196,26 +1191,20 @@ export default function MainApp() {
           {/* Refined Navigation Tabs */}
           <nav className="mt-4" role="tablist" aria-label="Main navigation">
             <div className="flex items-center gap-1 overflow-x-auto">
-              {['Search Assets','Object Explorer','Distributed Marketing','Preference Center','Email Auditing','Email Archiving','Settings'].map(label => (
+              {['Search Assets','Distributed Marketing','Email Archiving','Settings'].map(label => (
                 <button
                   key={label}
                   type="button"
                   role="tab"
                   aria-selected={
                     (label === 'Search Assets' && parentNav === 'search') ||
-                    (label === 'Object Explorer' && parentNav === 'schemaBuilder') ||
                     (label === 'Distributed Marketing' && parentNav === 'distributedMarketing') ||
-                    (label === 'Preference Center' && parentNav === 'preferencecenter') ||
-                    (label === 'Email Auditing' && parentNav === 'emailArchiving') ||
                     (label === 'Email Archiving' && parentNav === 'emailArchivingSetup') ||
                     (label === 'Settings' && parentNav === 'settings')
                   }
                   className={`px-4 py-2 text-sm font-medium rounded-lg border border-transparent hover:bg-gray-50 transition-all duration-200 whitespace-nowrap ${
                     ((label === 'Search Assets' && parentNav === 'search') ||
-                    (label === 'Object Explorer' && parentNav === 'schemaBuilder') ||
                     (label === 'Distributed Marketing' && parentNav === 'distributedMarketing') ||
-                    (label === 'Preference Center' && parentNav === 'preferencecenter') ||
-                    (label === 'Email Auditing' && parentNav === 'emailArchiving') ||
                     (label === 'Email Archiving' && parentNav === 'emailArchivingSetup') ||
                     (label === 'Settings' && parentNav === 'settings'))
                       ? 'bg-brand text-white shadow-sm'
@@ -1223,10 +1212,7 @@ export default function MainApp() {
                   }`}
                   onClick={() => {
                     if (label === 'Search Assets') setParentNav('search');
-                    else if (label === 'Object Explorer') setParentNav('schemaBuilder');
                     else if (label === 'Distributed Marketing') setParentNav('distributedMarketing');
-                    else if (label === 'Preference Center') setParentNav('preferencecenter');
-                    else if (label === 'Email Auditing') setParentNav('emailArchiving');
                     else if (label === 'Email Archiving') setParentNav('emailArchivingSetup');
                     else if (label === 'Settings') setParentNav('settings');
                   }}

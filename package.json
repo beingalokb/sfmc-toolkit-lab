@@ -1,5 +1,5 @@
 {
-  "name": "mc-explorer",
+  "name": "sfmc-toolkit-lab",
   "version": "1.0.0",
   "main": "server.js",
   "engines": {
@@ -7,15 +7,15 @@
     "npm": ">=8.0.0"
   },
   "scripts": {
-    "build": "cd mc-explorer-client && npm install && npm run build && cd ../server && npm install",
+    "build": "cd sfmc-toolkit-client && npm install && npm run build && cd ../server && npm install",
     "start": "node server/server.js",
     "dev": "nodemon server.js",
-    "postinstall": "cd mc-explorer-client && npm install && cd ../server && npm install"
+    "postinstall": "cd sfmc-toolkit-client && npm install && cd ../server && npm install"
   },
-  "keywords": [],
+  "keywords": ["salesforce", "marketing-cloud", "sfmc", "labs", "toolkit"],
   "author": "",
-  "license": "ISC",
-  "description": "",
+  "license": "MIT",
+  "description": "SFMC Toolkit - Labs Edition: A lightweight toolkit for Salesforce Marketing Cloud",
   "dependencies": {
     "axios": "^1.9.0",
     "body-parser": "^2.2.0",
