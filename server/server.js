@@ -724,8 +724,9 @@ app.get('/de/details', async (req, res) => {
 });
 
 // =========================
-// Preference Center API (Step 1)
+// Preference Center API (Disabled in Labs version)
 // =========================
+/*
 const PREFERENCE_PROJECTS_DE = 'Preference_Center_Projects';
 
 app.post('/api/preference-center/project', async (req, res) => {
@@ -799,8 +800,10 @@ app.post('/api/preference-center/project', async (req, res) => {
     res.status(500).json({ error: 'Failed to create project' });
   }
 });
+*/
 
-// === Preference Center Builder: Advanced Endpoints ===
+// === Preference Center Builder: Advanced Endpoints (Disabled in Labs) ===
+/*
 
 // 1. Folder Path Validation
 app.post('/folders', async (req, res) => {
@@ -1004,8 +1007,9 @@ function generateCloudPageContent(config) {
   html += `<input type='submit' name='submit' value='Update' /></form></div></body></html>`;
   return ampscript.join('\n') + '\n' + html;
 }
+*/
 
-
+/*
 app.post('/preference-center/save-config', async (req, res) => {
   const config = req.body;
   const controllerDEName = 'PC_Controller';
@@ -1128,7 +1132,9 @@ app.post('/preference-center/save-config', async (req, res) => {
     res.status(500).json({ success: false, error: err?.response?.data || err.message });
   }
 });
+*/
 
+/*
 // POST /preference-center/project - Accepts full MC project JSON and orchestrates asset creation
 app.post('/preference-center/project', async (req, res) => {
   const project = req.body;
@@ -2654,8 +2660,10 @@ app.post('/createDMFullSetup', async (req, res) => {
     res.status(500).json({ status: 'ERROR', message: e.message });
   }
 });
+*/
 
-// Preference Center Config API
+/*
+// Preference Center Config API (Disabled in Labs)
 app.post('/preference-center/configure', async (req, res) => {
   try {
     const config = req.body;
@@ -2772,6 +2780,7 @@ app.post('/preference-center/configure', async (req, res) => {
     res.status(500).json({ status: 'ERROR', message: e.message });
   }
 });
+*/
 
 // Helper to create a Data Extension in Marketing Cloud using SOAP
 async function createDataExtensionSOAP(deName, deDef, accessToken, subdomain) {

@@ -4,8 +4,6 @@ const AppNavigation = ({ activeTab, setActiveTab, onLogout }) => {
   const navItems = [
     { id: 'search', label: 'Search Assets', icon: '🔍' },
     { id: 'distributedMarketing', label: 'Distributed Marketing', icon: '📧' },
-    { id: 'preferencecenter', label: 'Preference Center', icon: '⚙️' },
-    { id: 'emailArchiving', label: 'Email Auditing', icon: '📊' },
     { id: 'emailArchivingSetup', label: 'Email Archiving', icon: '🗃️' },
     { id: 'settings', label: 'Settings', icon: '🔧' },
   ];

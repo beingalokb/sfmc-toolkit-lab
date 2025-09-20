@@ -131,7 +131,7 @@ export default function MainApp() {
   const [qsLoading, setQSLoading] = useState(false);
 
   // Add separate state for Preference Center success
-  const [preferenceCenterStatus, setPreferenceCenterStatus] = useState("");
+  // State for different features
 
   // Add projectName state
   const [projectName, setProjectName] = useState('');
@@ -677,30 +677,6 @@ export default function MainApp() {
     }
   };
 
-  // Handler for Preference Center Builder form submission
-  const handlePreferenceCenterSubmit = async (config) => {
-    try {
-      setPreviewResult({ loading: true });
-      const accessToken = localStorage.getItem('accessToken');
-      const subdomain = localStorage.getItem('subdomain');
-      const res = await fetch('/preference-center/project', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-          'x-mc-subdomain': subdomain
-        },
-        body: JSON.stringify(config)
-      });
-      const data = await res.json();
-      setPreviewResult({ loading: false, data });
-      console.log('✅ Preference Center generated:', data);
-    } catch (e) {
-      setPreviewResult({ loading: false, error: e.message });
-      console.error('❌ Preference Center generation failed:', e);
-    }
-  };
-
   // Handler to fetch SendClassification details by name
   const fetchSendClassDetails = async (name) => {
     setSendClassModal({ open: true, loading: true, error: null, details: null, name });
@@ -1089,12 +1065,6 @@ export default function MainApp() {
         Distributed Marketing
       </button>
       <button
-        className={`px-4 py-2 rounded-lg ${activeTab === 'preferencecenter' ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
-        onClick={() => setActiveTab('preferencecenter')}
-      >
-        Preference Center
-      </button>
-      <button
         className={`px-4 py-2 rounded-lg ${activeTab === 'emailarchiving' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800'}`}
         onClick={() => setActiveTab('emailarchiving')}
       >
@@ -1175,8 +1145,8 @@ export default function MainApp() {
                 </svg>
               </div>
               <div>
-                <h1 className="text-lg font-semibold tracking-tight text-gray-900">SFMC Toolkit - Labs</h1>
-                <p className="text-xs text-gray-500">Salesforce Marketing Cloud Toolkit - Labs Edition</p>
+                <h1 className="text-lg font-semibold tracking-tight text-gray-900">MC Explorer</h1>
+                <p className="text-xs text-gray-500">Marketing Cloud Management Platform</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -1886,124 +1856,16 @@ export default function MainApp() {
               );
             })()}
           </>
-        ) : parentNav === 'preference' ? (
-          <div className="p-6 bg-white rounded shadow">
-            <h2 className="text-xl font-bold mb-4 text-indigo-700">How do you want your preference center to be set up?</h2>
-            <select
-              className="border rounded px-3 py-2 w-full mb-6"
-              value={guidedPrefOption || ''}
-              onChange={e => setGuidedPrefOption(e.target.value)}
-            >
-              <option value="" disabled>Select an option...</option>
-              <option value="no_sf_core">Marketing Cloud Preference Center with no Salesforce core integration</option>
-              <option value="sf_core_contact_lead">Marketing Cloud Preference Center with Salesforce core contact, Lead integration</option>
-              <option value="sf_core_consent">Marketing Cloud Preference Center with Salesforce core consent model</option>
-            </select>
-
-            {guidedPrefOption === 'no_sf_core' && (
-              <div className="mt-6 text-left">
-                <a
-                  href="/Custom%20Preference%20Center_No_SF_Integration.zip"
-                  download
-                  className="inline-block bg-indigo-600 text-white px-4 py-2 rounded font-semibold mb-4 hover:bg-indigo-700"
-                >
-                  Download Preference Center Package (ZIP)
-                </a>
-                <div className="bg-gray-50 border-l-4 border-indigo-400 p-4 rounded">
-                  <h3 className="font-bold mb-2 text-indigo-700">Instructions</h3>
-                  <ol className="list-decimal ml-6 text-sm text-gray-800 space-y-1">
-                    <li>In the <b>Package Manager</b> folder, deploy the JSON into SFMC via Package Manager.</li>
-                    <li>Go into the Cloud pages and do a search all and replace for the cloudpageURL IDs; there will be 2-3 that did not get deployed correctly.</li>
-                    <li>In <b>cpc_main</b> on line 301, ensure that the cloud page ID is for <b>cpc_main</b>.</li>
-                    <li>In <b>cpc_main</b> on line 331, ensure that the cloud page ID is for <b>cpc_handler</b>.</li>
-                    <li>In <b>cpc_handler</b>, every <b>CloudPagesURL</b> function should point to the cloud page ID for <b>cpc_main</b>.</li>
-                    <li>Test, validate, and add additional features as needed.</li>
-                    <li>To use the preference center, the url expects a <b>subkey</b> parameter at the end of the URL (e.g. <span className="break-all">https://mcf7bhdjzswk278tj2j38nqtlq2q.pub.sfmc-content.com/jqi02yqkmgp?subkey=TEST10001</span>).</li>                  </ol>
-                  <div className="mt-2 text-xs text-gray-600">
-                    <b>NOTE:</b> The preference center assumes that a record with email exists in All Subscribers.
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {guidedPrefOption === 'sf_core_contact_lead' && (
-              <div className="mt-6 text-left text-gray-600">
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                  <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core contact, Lead integration is in development.
-                </div>
-              </div>
-            )}
-
-            {guidedPrefOption === 'sf_core_consent' && (
-              <div className="mt-6 text-left text-gray-600">
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                  <b>Coming soon:</b> Marketing Cloud Preference Center with Salesforce core consent model is in development.
-                </div>
-              </div>
-            )}
-          </div>
         ) : parentNav === 'distributedMarketing' ? (
           <div className="rounded-xl border border-border bg-card p-6">
             {renderDMQuickSend()}
           </div>
         ) : null}
 
-        {/* Render content for Object Explorer */}
-        {parentNav === 'schemaBuilder' && (
-          <ObjectExplorer />
-        )}
-
-        {/* Render content for Preference Center config */}
-        {parentNav === 'preferencecenter' && (
-          <div className="rounded-xl border border-border bg-card p-6" id="preferencecenter-success-section">
-            {/* Only show success message for Preference Center flow */}
-            {preferenceCenterStatus && preferenceCenterStatus.startsWith('✅') && (
-              <div className="bg-green-50 border border-green-300 text-green-800 rounded p-4 mb-4" id="preferencecenter-success-message">
-                <div className="text-2xl mb-2">✅ Configuration Completed Successfully!</div>
-                <div className="mb-2 font-semibold">Your Preference Center setup is now complete.</div>
-                <ul className="mb-2 list-disc pl-6">
-                  <li><b>PC_Controller</b>: This Data Extension contains all the configuration values used to render your dynamic Preference Center (labels, instructions, integration type, branding, etc.).</li>
-                  <li><b>PC_Log</b>: This Data Extension automatically tracks all subscriber preference updates, including old vs. new values for audit and compliance.</li>
-                </ul>
-                <div className="mb-2">Both Data Extensions are created under your Data Extensions folder.</div>
-                <div className="mb-2 font-semibold">Below is your ready-to-use CloudPage code. You can paste this into a new CloudPage to get started. Feel free to customize the HTML layout and styling to match your brand.</div>
-                <CloudPageCodeSample />
-              </div>
-            )}
-            <PreferenceCenterConfigForm 
-              onSubmit={async config => {
-                setPreferenceCenterStatus('Submitting configuration...');
-                setQSLoading(true);
-                try {
-                  const res = await fetch(`${baseURL}/preference-center/configure`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
-                  });
-                  const json = await res.json();
-                  if (json.status === 'OK') {
-                    setPreferenceCenterStatus('✅ Configuration Completed Successfully!');
-                    setTimeout(() => {
-                      const el = document.getElementById('preferencecenter-success-section');
-                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 100);
-                  } else {
-                    setPreferenceCenterStatus('❌ Failed to submit configuration: ' + (json.message || 'Unknown error'));
-                  }
-                } catch (e) {
-                  setPreferenceCenterStatus('❌ Failed to submit configuration: ' + e.message);
-                } finally {
-                  setQSLoading(false);
-                }
-              }}
-            />
-          </div>
-        )}
-
-        {/* Email Auditing content */}
-        {parentNav === 'emailArchiving' && (
+        {/* Email Archiving content */}
+        {parentNav === 'emailArchivingSetup' && (
           <div className="rounded-xl border border-border bg-card p-6">
-            <h2 className="text-sm font-semibold mb-4">Email Auditing</h2>
+            <h2 className="text-sm font-semibold mb-4">Email Archiving</h2>
             {/* Search Fields */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div>
@@ -2194,47 +2056,4 @@ function formatDate(dateStr) {
     hour: '2-digit',
     minute: '2-digit'
   }).replace(',', '');
-}
-
-function CloudPageCodeSample() {
-  const [codeSample, setCodeSample] = React.useState('');
-  const [copied, setCopied] = React.useState(false);
-
-  useEffect(() => {
-    fetch(process.env.PUBLIC_URL + '/MC_only_Preference_Code.html')
-      .then(res => res.text())
-      .then(setCodeSample);
-  }, []);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(codeSample);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  const handleDownload = () => {
-    const blob = new Blob([codeSample], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'PreferenceCenterCloudPage.html';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className="mb-2">
-      <div className="flex items-center mb-1">
-        <span className="font-semibold mr-2">Show Code:</span>
-        <Btn variant="primary" onClick={handleCopy}>{copied ? 'Copied!' : 'Copy'}</Btn>
-        <Btn variant="ghost" onClick={handleDownload}>Download as .html</Btn>
-      </div>
-      <textarea
-        className="w-full font-mono text-xs p-2 border border-border rounded bg-panel"
-        rows={16}
-        value={codeSample}
-        readOnly
-      />
-    </div>
-  );
 }
