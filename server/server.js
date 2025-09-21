@@ -59,20 +59,10 @@ const settingsPath = path.join(__dirname, 'settings.json');
 
 // Function to load settings from file
 function loadSettings() {
-  console.log('📂 [Settings] Loading settings from:', settingsPath);
   try {
     if (fs.existsSync(settingsPath)) {
-      console.log('✅ [Settings] Settings file exists, reading...');
       const settingsData = fs.readFileSync(settingsPath, 'utf8');
-      console.log('📋 [Settings] Raw settings data:', settingsData.substring(0, 200));
       const parsed = JSON.parse(settingsData);
-      console.log('✅ [Settings] Successfully parsed settings:', {
-        sftpHost: parsed.sftp?.host || 'Not set',
-        sftpUsername: parsed.sftp?.username || 'Not set',
-        sftpAuthType: parsed.sftp?.authType || 'Not set',
-        hasPassword: !!parsed.sftp?.password,
-        hasPrivateKey: !!parsed.sftp?.privateKey
-      });
       return parsed;
     } else {
       console.log('⚠️ [Settings] Settings file does not exist, using defaults');
@@ -128,11 +118,10 @@ function requireMCCreds(req, res, next) {
   res.redirect('/setup');
 }
 
-// Save credentials to session (per user)
+  // Save credentials to session (per user)
 app.post('/save-credentials', (req, res) => {
   const { subdomain, clientId, clientSecret, accountId } = req.body;
   req.session.mcCreds = { subdomain, clientId, clientSecret, accountId };
-  console.log('🔔 /save-credentials (session) received:', req.session.mcCreds);
   res.json({ success: true });
 });
 
@@ -446,7 +435,9 @@ app.get('/search/automation', async (req, res) => {
       }
     );
     const automations = response.data.items || [];
-    if (automations.length > 0) console.log('🔎 Raw Automation:', JSON.stringify(automations[0], null, 2));
+    if (automations.length > 0) {
+      // Log first automation for validation
+    }
     const simplified = automations.map(a => ({
       id: a.id,
       name: a.name || 'N/A',
@@ -580,7 +571,9 @@ app.get('/search/datafilters', async (req, res) => {
         ? filterResults
         : [filterResults];
       // Log raw Data Filter result for createdByName troubleshooting
-      if (normalized.length > 0) console.log('🔎 Raw DataFilter:', JSON.stringify(normalized[0], null, 2));
+      if (normalized.length > 0) {
+        // Log first filter for validation
+      }
       const dataFilters = normalized.map(item => ({
         name: item.Name || 'N/A',
         key: item.CustomerKey || 'N/A',
@@ -651,7 +644,9 @@ app.get('/search/journeys', async (req, res) => {
     );
     const journeys = response.data.items || [];
     // Log raw Journey result for createdByName troubleshooting
-    if (journeys.length > 0) console.log('🔎 Raw Journey:', JSON.stringify(journeys[0], null, 2));
+    if (journeys.length > 0) {
+      // Log first journey for validation
+    }
     const simplified = journeys.map(j => ({
       name: j.name || 'N/A',
       key: j.key || 'N/A',
@@ -1299,7 +1294,7 @@ app.get('/folders', async (req, res) => {
 
 // EmailSendDefinition Search (SOAP)
 app.get('/search/emailsenddefinition', async (req, res) => {
-  console.log('🔔 /search/emailsenddefinition endpoint hit'); // DEBUG
+  console.log('🔔 /search/emailsenddefinition endpoint hit');
   const accessToken = getAccessTokenFromRequest(req);
   const subdomain = getSubdomainFromRequest(req);
   if (!accessToken || !subdomain) {
@@ -2986,8 +2981,6 @@ async function createPublicationList(listName, description, accessToken, subdoma
 
 // Helper: Create Publication List using SOAP
 async function createPublicationListSOAP(listName, accessToken, subdomain) {
-  // Debug: Log input parameters
-  console.log('[DEBUG] createPublicationListSOAP called with:', { listName, subdomain });
   const soapEnvelope = `
     <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
       <soapenv:Header>
@@ -3012,14 +3005,10 @@ async function createPublicationListSOAP(listName, accessToken, subdomain) {
       </soapenv:Body>
     </soapenv:Envelope>
   `;
-  // Debug: Log the SOAP envelope being sent
-  console.log('[DEBUG] Publication List SOAP Envelope:', soapEnvelope);
   const url = `https://${subdomain}.soap.marketingcloudapis.com/Service.asmx`;
   const resp = await axios.post(url, soapEnvelope, {
     headers: { 'Content-Type': 'text/xml', SOAPAction: 'Create' }
   });
-  // Debug: Log the raw SOAP response
-  console.log('[DEBUG] Publication List SOAP Response:', resp.data);
   if (!resp.data.includes('<OverallStatus>OK</OverallStatus>')) {
     if (resp.data.includes('already exists')) {
       console.log(`[Info] Publication List '${listName}' already exists.`);

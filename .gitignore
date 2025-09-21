@@ -77,3 +77,9 @@ jspm_packages/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Debug and development files
+debug_*.js
+test_*.js
+*.debug.js
+console_*.js
