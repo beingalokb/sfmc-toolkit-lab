@@ -25,16 +25,11 @@ cd ../sfmc-toolkit-client && npm start
 
 ## 🛠️ Features
 
-### ✅ **Included in Labs Edition:**
+### ✅ **Core Features:**
 - **🔍 Search Assets** - Find emails, data extensions, journeys, and more
 - **📧 Distributed Marketing** - Quick setup for journey-based campaigns  
 - **🗃️ Email Archiving** - Archive and analyze email send data
 - **⚙️ Settings** - Configure SFTP and other integrations
-
-### ❌ **Removed from Labs Edition:**
-- Schema Builder/Object Explorer (Premium feature)
-- Preference Center Builder (Premium feature) 
-- Email Auditing (Basic archiving included instead)
 
 ## 🔐 Security & Compliance
 

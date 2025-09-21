@@ -16,7 +16,7 @@
 2. **Create a Connected App in Marketing Cloud:**
    - Go to Marketing Cloud Setup → Apps → Installed Packages
    - Create New Package → Add Component → API Integration
-   - Integration Type: Server-to-Server
+   - Integration Type: Web App
    - Required Permissions:
      - Email: Read, Write, Send
      - Web: Read, Write  
@@ -50,23 +50,45 @@ cd sfmc-toolkit-client && npm start
 
 ## 🚀 Production Deployment
 
+### 🏢 **Architecture: Single-Tenant Per Deployment**
+
+**Important**: This application is designed for **single-tenant deployment** - each company/organization should deploy their own instance with their own Marketing Cloud credentials.
+
+**Why Single-Tenant?**
+- Each company has different Marketing Cloud credentials
+- Security isolation between organizations  
+- Custom configurations per organization
+- Compliance with data privacy requirements
+
+### **Deployment Options:**
+
+#### **Option 1: Company Self-Deployment (Recommended)**
+Each company deploys their own instance:
+
 ### Render.com (Recommended)
 1. Connect your GitHub repository
 2. Set environment variables in Render dashboard:
    - `CLIENT_ID` → Your Connected App Client ID
    - `CLIENT_SECRET` → Your Connected App Client Secret  
    - `AUTH_DOMAIN` → Your MC subdomain auth domain
-   - `REDIRECT_URI` → Your production callback URL
-   - `BASE_URL` → Your production domain
+   - `REDIRECT_URI` → Your production callback URL (e.g., `https://company-app.onrender.com/auth/callback`)
+   - `BASE_URL` → Your production domain (e.g., `https://company-app.onrender.com`)
 
 ### Heroku
 ```bash
-heroku config:set CLIENT_ID=your_client_id
-heroku config:set CLIENT_SECRET=your_client_secret
-heroku config:set AUTH_DOMAIN=your_auth_domain
-heroku config:set REDIRECT_URI=https://yourapp.herokuapp.com/auth/callback
-heroku config:set BASE_URL=https://yourapp.herokuapp.com
+# Each company sets their own credentials:
+heroku config:set CLIENT_ID=your_company_client_id
+heroku config:set CLIENT_SECRET=your_company_client_secret
+heroku config:set AUTH_DOMAIN=your_company_auth_domain
+heroku config:set REDIRECT_URI=https://your-company-app.herokuapp.com/auth/callback
+heroku config:set BASE_URL=https://your-company-app.herokuapp.com
 ```
+
+#### **Option 2: Service Provider Model**
+If you're providing this as a service to multiple companies:
+- Deploy separate instances for each client company
+- Use infrastructure-as-code (Terraform, etc.) to automate deployments
+- Each deployment gets its own domain and environment variables
 
 ### Other Platforms
 Use your platform's environment variable injection system. **Never hardcode credentials in source code.**
