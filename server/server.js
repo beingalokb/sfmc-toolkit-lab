@@ -10,6 +10,31 @@
 
 // server.js (Full with working auth redirect)
 require('dotenv').config();
+
+// Validate environment configuration
+function validateEnvironment() {
+  const requiredVars = ['CLIENT_ID', 'CLIENT_SECRET', 'AUTH_DOMAIN'];
+  const missingVars = requiredVars.filter(varName => 
+    !process.env[varName] || process.env[varName] === 'your_client_id_here' || process.env[varName] === 'your_client_secret_here'
+  );
+  
+  if (missingVars.length > 0) {
+    console.log('🚨 [SETUP REQUIRED] Missing or placeholder environment variables:', missingVars);
+    console.log('📋 [SETUP] Please follow these steps:');
+    console.log('   1. Copy .env.example to .env.local');
+    console.log('   2. Create a Connected App in Marketing Cloud Setup');
+    console.log('   3. Add your real CLIENT_ID, CLIENT_SECRET, and AUTH_DOMAIN to .env.local');
+    console.log('   4. Restart the server');
+    console.log('⚠️  [SECURITY] Never commit real credentials to git!');
+    console.log('');
+    console.log('🔧 [INFO] Server will continue with session-based authentication.');
+    console.log('');
+  } else {
+    console.log('✅ [CONFIG] Environment variables configured properly');
+  }
+}
+
+validateEnvironment();
 const express = require('express');
 const axios = require('axios');
 const xml2js = require('xml2js');
