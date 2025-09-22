@@ -1,0 +1,17 @@
+{
+  "high": true,
+  "moderate": false,
+  "low": false,
+  "critical": true,
+  "report-type": "summary",
+  "allowlist": [
+  ],
+  "skip-dev": false,
+  "path-whitelist": [],
+  "show-found": true,
+  "retry": {
+    "count": 5,
+    "delay": 3000
+  },
+  "output-format": "text"
+}
