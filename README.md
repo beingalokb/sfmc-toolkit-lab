@@ -1,26 +1,32 @@
 # 🧪 SFMC Toolkit - Labs Edition
 
-A streamlined, open-source version of the MC Explorer focused on essential Salesforce Marketing Cloud tools for developers and marketers.
+A secure, multi-tenant Salesforce Marketing Cloud toolkit with OAuth 2.0 authentication. Built for developers and marketers who need essential SFMC tools with enterprise-grade security.
 
 ## ⚡ Quick Start
 
-> **🔐 SECURITY FIRST:** Before running, please read [SECURITY_SETUP.md](./SECURITY_SETUP.md) for proper credential configuration.
+> **🔐 NEW OAUTH SETUP:** This version uses secure OAuth 2.0 flow. No manual credential entry required!
 
 ```bash
 # 1. Clone and setup
 git clone https://github.com/beingalokb/sfmc-toolkit-lab.git
 cd sfmc-toolkit-lab
 
-# 2. Configure credentials (REQUIRED)
-cp server/.env.example server/.env.local
-# Edit .env.local with your Marketing Cloud Connected App credentials
+# 2. Configure environment (REQUIRED)
+cp server/.env.example server/.env
+# Edit .env with your app secrets and database URL
 
-# 3. Install dependencies
+# 3. Setup database
+# PostgreSQL (recommended): Create database and run server/database/schema.sql
+# SQLite (development): Will be created automatically
+
+# 4. Install dependencies
 npm install
 cd server && npm install
+cd ../sfmc-toolkit-client && npm install
 
-# 4. Start the application
-cd ../sfmc-toolkit-client && npm start
+# 5. Start the application
+cd ../server && npm start
+# In another terminal: cd sfmc-toolkit-client && npm start
 ```
 
 ## 🛠️ Features
@@ -31,16 +37,24 @@ cd ../sfmc-toolkit-client && npm start
 - **🗃️ Email Archiving** - Archive and analyze email send data
 - **⚙️ Settings** - Configure SFTP and other integrations
 
+### 🔒 **Security Features:**
+- **OAuth 2.0 Authentication** - Secure, industry-standard login flow
+- **Multi-Tenant Architecture** - Isolated data per organization
+- **Encrypted Credential Storage** - Client secrets encrypted at rest
+- **Session-Based Security** - No tokens exposed to frontend
+- **AppExchange Ready** - Meets Salesforce security requirements
+
 ## 🔐 Security & Compliance
 
 **This project follows Salesforce security best practices:**
-- ✅ No hardcoded credentials in source code
-- ✅ Environment-based configuration
-- ✅ Secure OAuth authentication flow
-- ✅ Session-based credential storage
-- ✅ Ready for Salesforce security review
+- ✅ OAuth 2.0 Authorization Code flow (Web App integration)
+- ✅ No customer credentials in environment variables
+- ✅ AES encryption for sensitive data
+- ✅ Session-based authentication
+- ✅ Multi-tenant data isolation
+- ✅ Ready for Salesforce AppExchange security review
 
-**📖 Read [SECURITY_SETUP.md](./SECURITY_SETUP.md) for complete setup instructions.**
+**📖 Read [OAUTH_IMPLEMENTATION_STATUS.md](./OAUTH_IMPLEMENTATION_STATUS.md) for architecture details.**
 
 ## 🚀 Deployment
 
