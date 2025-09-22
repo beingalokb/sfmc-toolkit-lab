@@ -190,20 +190,22 @@ export default function MainApp() {
   const [guidedPrefOption, setGuidedPrefOption] = useState('');
 
   const handleLogout = async () => {
-    // Clear local/session storage
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('mc_subdomain');
-    localStorage.removeItem('mc_clientId');
-    localStorage.removeItem('mc_clientSecret');
-    localStorage.removeItem('mc_accountId');
-    sessionStorage.clear();
-    // Call backend to clear session
     try {
-      await fetch('/logout', { method: 'POST', credentials: 'include' });
+      // Call backend to clear session and revoke tokens
+      await fetch('/api/auth/logout', { 
+        method: 'POST', 
+        credentials: 'include' 
+      });
     } catch (e) {
-      // Ignore errors
+      console.error('Logout error:', e);
     }
-    // Redirect to setup
+    
+    // Update global auth state
+    if (window.updateAuthStatus) {
+      window.updateAuthStatus(false);
+    }
+    
+    // Redirect to setup page
     window.location.href = '/setup';
   };
 
@@ -247,26 +249,15 @@ export default function MainApp() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const accessToken = localStorage.getItem('accessToken');
-    const subdomain = localStorage.getItem('subdomain');
-    if (!accessToken || !subdomain) {
-      console.warn('⚠️ No access token or subdomain found. Redirecting to login...');
-      localStorage.removeItem('isAuthenticated');
-      window.location.href = '/login';
-      return;
-    }
-
     setLoading(true);
     setPendingFetches(6); // 6 fetches: DE, Automation, DataFilter, Journey, Folders, Publications
 
     const fetchWithLogging = async (path, setter, label) => {
       try {
         const res = await fetch(`${baseURL}${path}`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'x-mc-subdomain': subdomain
-          }
+          credentials: 'include' // Use session-based auth
         });
+        
         if (res.status === 401) {
           console.warn(`🚫 ${label} fetch unauthorized`);
           setter([]);
@@ -299,19 +290,15 @@ export default function MainApp() {
   useEffect(() => {
     if (!isAuthenticated) return;
     console.log('Current activeTab:', activeTab); // DEBUG
-    const accessToken = localStorage.getItem('accessToken');
-    const subdomain = localStorage.getItem('subdomain');
-    if (!accessToken || !subdomain) return;
+    
     setLoading(true);
     setPendingFetches(1);
+    
     const fetchWithLogging = async (path, setter, label) => {
       try {
         console.log('Fetching', label, 'from', path); // DEBUG
         const res = await fetch(`${baseURL}${path}`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'x-mc-subdomain': subdomain
-          }
+          credentials: 'include' // Use session-based auth
         });
         if (res.status === 401) {
           setter([]);

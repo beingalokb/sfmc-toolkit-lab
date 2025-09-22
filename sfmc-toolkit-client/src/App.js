@@ -2,63 +2,92 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import SetupForm from './SetupForm';
 import MainApp from './MainApp';
-import LoginPage from './LoginPage';
 import AuthCallback from './AuthCallback';
-import CredentialSetup from './CredentialSetup';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem('isAuthenticated') === 'true');
-  const [backendHasCreds, setBackendHasCreds] = useState(null); // null = loading, true/false = checked
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
 
+  // Check authentication status on mount and when storage changes
   useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const response = await fetch('/api/auth/status', {
+          credentials: 'include' // Include session cookies
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setIsAuthenticated(data.authenticated);
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        console.error('Auth status check failed:', error);
+        setIsAuthenticated(false);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    checkAuthStatus();
+
+    // Listen for storage changes (login/logout in other tabs)
     const handleStorage = () => {
-      setIsAuthenticated(localStorage.getItem('isAuthenticated') === 'true');
+      checkAuthStatus();
     };
     window.addEventListener('storage', handleStorage);
-    // Also check on mount in case localStorage changed in this tab
-    handleStorage();
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
-
-  useEffect(() => {
-    // Listen for changes to localStorage in this tab (e.g., after login)
-    const checkAuth = () => {
-      setIsAuthenticated(localStorage.getItem('isAuthenticated') === 'true');
+    
+    // Check auth when window gains focus
+    window.addEventListener('focus', checkAuthStatus);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('focus', checkAuthStatus);
     };
-    window.addEventListener('focus', checkAuth);
-    return () => window.removeEventListener('focus', checkAuth);
   }, []);
 
-  // Check with backend for credential presence
-  useEffect(() => {
-    fetch('/has-credentials')
-      .then(res => res.json())
-      .then(data => setBackendHasCreds(!!data.hasCreds))
-      .catch(() => setBackendHasCreds(false));
-  }, []);
+  // Global auth state updater for components
+  window.updateAuthStatus = (authenticated) => {
+    setIsAuthenticated(authenticated);
+  };
 
-  if (backendHasCreds === null) return <div>Loading...</div>;
-  if (!backendHasCreds) return <CredentialSetup />;
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-200">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-  console.log('🔐 Local auth status:', isAuthenticated);
+  console.log('🔐 Auth status:', isAuthenticated);
 
   return (
     <Router>
       <Routes>
-        {/* Always start here */}
-        <Route path="/" element={<Navigate to="/login" />} />
+        {/* Default route */}
+        <Route path="/" element={
+          isAuthenticated ? <Navigate to="/explorer" /> : <Navigate to="/setup" />
+        } />
 
-        {/* Show login page */}
-        <Route path="/login" element={<LoginPage />} />
+        {/* OAuth setup/login page */}
+        <Route path="/setup" element={
+          isAuthenticated ? <Navigate to="/explorer" /> : <SetupForm />
+        } />
 
-        {/* Handle redirect from MC OAuth */}
+        {/* Handle OAuth callback */}
         <Route path="/auth/callback" element={<AuthCallback />} />
 
-        {/* Main app after auth */}
-        <Route path="/explorer/*" element={isAuthenticated ? <MainApp /> : <Navigate to="/login" />} />
+        {/* Main app after authentication */}
+        <Route path="/explorer/*" element={
+          isAuthenticated ? <MainApp /> : <Navigate to="/setup" />
+        } />
 
-        {/* SetupForm is optional — remove if unused */}
-        <Route path="/setup" element={isAuthenticated ? <SetupForm /> : <Navigate to="/login" />} />
+        {/* Catch all other routes */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );

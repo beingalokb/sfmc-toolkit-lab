@@ -1,52 +1,78 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-const baseURL = process.env.REACT_APP_BASE_URL;
 
 function AuthCallback() {
   const navigate = useNavigate();
+  const [message, setMessage] = useState('Verifying credentials and logging in...');
 
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get('code');
+    const handleCallback = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const state = urlParams.get('state');
+        const error = urlParams.get('error');
 
-    if (code) {
-      console.log('🟢 Auth code received:', code);
+        if (error) {
+          console.error('🚫 OAuth error:', error);
+          setMessage('OAuth authorization was denied or failed');
+          setTimeout(() => navigate('/setup'), 3000);
+          return;
+        }
 
-      fetch(`${baseURL}/auth/callback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ code })
-      })
-        .then(async res => {
-          const data = await res.json().catch(() => ({}));
-          if (res.ok && data.success && data.accessToken && data.subdomain) {
-            console.log('✅ Auth callback success', data);
-            localStorage.setItem('isAuthenticated', 'true');
-            localStorage.setItem('accessToken', data.accessToken);
-            localStorage.setItem('subdomain', data.subdomain);
-            window.location.href = '/explorer?auth=1';
-          } else {
-            console.error('❌ Auth failed', data);
-            alert('Authentication failed: ' + (data.error || 'Unknown error. Please try again.'));
-            navigate('/login');
-          }
-        })
-        .catch(err => {
-          console.error('🚨 Auth callback error:', err);
-          alert('Network error during authentication. Please try again.');
-          navigate('/login');
+        if (!code) {
+          console.error('🚫 No authorization code found');
+          setMessage('No authorization code received');
+          setTimeout(() => navigate('/setup'), 3000);
+          return;
+        }
+
+        console.log('🟢 Auth code received:', code);
+        setMessage('Exchanging authorization code for access token...');
+
+        // Exchange code for tokens using our OAuth callback endpoint
+        const response = await fetch('/api/auth/callback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // Include session cookies
+          body: JSON.stringify({ code, state })
         });
-    } else {
-      console.error('🚫 No auth code found in URL');
-      alert('No authorization code found. Please try logging in again.');
-      navigate('/login');
-    }
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          console.log('✅ OAuth callback success');
+          setMessage('Authentication successful! Redirecting...');
+          
+          // Update global auth state
+          if (window.updateAuthStatus) {
+            window.updateAuthStatus(true);
+          }
+          
+          // Redirect to main app
+          setTimeout(() => navigate('/explorer'), 1000);
+        } else {
+          console.error('❌ OAuth callback failed:', data);
+          setMessage(`Authentication failed: ${data.error || 'Unknown error'}`);
+          setTimeout(() => navigate('/setup'), 3000);
+        }
+      } catch (err) {
+        console.error('🚨 Auth callback error:', err);
+        setMessage('Network error during authentication. Please try again.');
+        setTimeout(() => navigate('/setup'), 3000);
+      }
+    };
+
+    handleCallback();
   }, [navigate]);
 
   return (
-    <div className="flex justify-center items-center h-screen text-lg">
-      Verifying credentials and logging in...
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="bg-white p-8 rounded-xl shadow-md text-center max-w-md">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+        <h2 className="text-xl font-semibold text-gray-700 mb-2">Processing Authentication</h2>
+        <p className="text-gray-600">{message}</p>
+      </div>
     </div>
   );
 }
